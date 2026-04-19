@@ -1,0 +1,128 @@
+# Plotra Platform Configuration
+# EUDR Compliance & Traceability Platform
+
+app:
+  name: "Plotra Platform"
+  version: "1.0.0"
+  debug: true
+  env: "development"
+  secret_key: "dev-secret-change-in-production-use-PLOTRA_APP__SECRET_KEY-env-var"
+  algorithm: "HS256"
+  access_token_expire_minutes: 60
+  frontend_base_url: "http://localhost:8080"
+
+auth:
+  max_login_attempts: 5
+  lockout_duration_minutes: 15
+  password_reset_token_expiry_hours: 24
+
+database:
+  host: "localhost"
+  port: 5432
+  username: "postgres"
+  password: "postgres"
+  name: "plotra_db"
+  pool_size: 10
+  max_overflow: 20
+  async_mode: true
+
+redis:
+  host: "localhost"
+  port: 6379
+  db: 0
+
+postgis:
+  enabled: true
+  srid: 4326
+
+satellite:
+  provider: "sentinel_hub"
+  api_key: ""
+  base_url: "https://services.sentinel-hub.com"
+  simulation_mode: true
+  ndvi_threshold: 0.65
+  deforestation_baseline_year: 2020
+  biomass_threshold: 100.0
+  risk_thresholds:
+    high: 70.0
+    medium: 30.0
+
+eudr:
+  compliance_status: "Under Review"
+  certificate_validity_days: 365
+  dds_version: "1.0"
+  portal_url: "https://eudr-portal.example.com"
+  compliance_thresholds:
+    compliant: 90.0
+    under_review: 70.0
+    requires_action: 50.0
+  compliance_scoring_weights:
+    deforestation_free: 30
+    legal_ownership: 25
+    traceability_verified: 25
+    documents_complete: 10
+    satellite_analysis: 10
+
+geospatial:
+  gps_accuracy_threshold_meters: 10
+  min_polygon_area_hectares: 0.1
+  max_farm_polygons_per_farmer: 10
+  parent_child_validation: true
+  boundary_overlap_tolerance: 0.01
+
+storage:
+  documents_path: "./uploads/documents"
+  certificates_path: "./uploads/certificates"
+  photos_path: "./uploads/photos"
+  s3_bucket: ""
+  s3_endpoint: ""
+  s3_access_key: ""
+  s3_secret_key: ""
+  s3_region: "af-south-1"
+  max_file_size_mb: 50
+
+celery:
+  broker_url: "redis://localhost:6379/1"
+  result_backend: "redis://localhost:6379/2"
+
+cors:
+  allowed_origins:
+    - "http://localhost"
+    - "http://localhost:3000"
+    - "http://localhost:8080"
+    - "http://localhost:8000"
+    - "http://127.0.0.1"
+    - "http://127.0.0.1:8080"
+    - "http://127.0.0.1:8000"
+    - "https://dev.plotra.eu"
+    - "https://plotra.eu"
+  allow_credentials: true
+
+email:
+  smtp_server: "mail.vegrid.co.ke"
+  smtp_port: 587
+  smtp_username: "plotra@vegrid.co.ke"
+  smtp_password: "Antananarivo086"
+  from_email: "plotra@vegrid.co.ke"
+  from_name: "Plotra Platform"
+  use_tls: true
+  debug_mode: false
+  allow_credentials: true
+
+payments:
+  enabled: false
+  mpesa_consumer_key: ""
+  mpesa_consumer_secret: ""
+  mpesa_shortcode: ""
+  escrow_enabled: true
+
+verification:
+  require_all_fields: false
+  auto_submit_eudr: false
+  alert_threshold_days: 30
+
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file: "logs/plotra.log"
+  audit_enabled: true

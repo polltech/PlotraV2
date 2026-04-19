@@ -1,0 +1,57 @@
+# Production overrides — use with:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# Prerequisites:
+#   1. Copy .env.example → .env and fill in secrets
+#   2. Ensure your reverse proxy (Traefik / Caddy / nginx upstream) terminates SSL
+#      and forwards to port 8080 (dashboard) or 8000 (API)
+
+services:
+  postgres:
+    environment:
+      POSTGRES_USER:     ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB:       ${POSTGRES_DB:-plotra_db}
+    restart: always
+
+  backend:
+    environment:
+      - PLOTRA_APP__SECRET_KEY=${PLOTRA_APP__SECRET_KEY}
+      - PLOTRA_APP__DEBUG=false
+      - PLOTRA_APP__ACCESS_TOKEN_EXPIRE_MINUTES=${PLOTRA_APP__ACCESS_TOKEN_EXPIRE_MINUTES:-60}
+      - PLOTRA_APP__FRONTEND_BASE_URL=${PLOTRA_APP__FRONTEND_BASE_URL}
+      - PLOTRA_DATABASE__HOST=postgres
+      - PLOTRA_DATABASE__PORT=5432
+      - PLOTRA_DATABASE__USERNAME=${POSTGRES_USER:-postgres}
+      - PLOTRA_DATABASE__PASSWORD=${POSTGRES_PASSWORD}
+      - PLOTRA_DATABASE__NAME=${POSTGRES_DB:-plotra_db}
+      - PLOTRA_EMAIL__SMTP_SERVER=${PLOTRA_EMAIL__SMTP_SERVER:-}
+      - PLOTRA_EMAIL__SMTP_PORT=${PLOTRA_EMAIL__SMTP_PORT:-587}
+      - PLOTRA_EMAIL__SMTP_USERNAME=${PLOTRA_EMAIL__SMTP_USERNAME:-}
+      - PLOTRA_EMAIL__SMTP_PASSWORD=${PLOTRA_EMAIL__SMTP_PASSWORD:-}
+      - PLOTRA_EMAIL__FROM_EMAIL=${PLOTRA_EMAIL__FROM_EMAIL:-}
+      - PLOTRA_EMAIL__FROM_NAME=${PLOTRA_EMAIL__FROM_NAME:-Plotra Platform}
+      - PLOTRA_SATELLITE__API_KEY=${PLOTRA_SATELLITE__API_KEY:-}
+      - PLOTRA_SATELLITE__SIMULATION_MODE=${PLOTRA_SATELLITE__SIMULATION_MODE:-false}
+      - PLOTRA_STORAGE__S3_BUCKET=${PLOTRA_STORAGE__S3_BUCKET:-}
+      - PLOTRA_STORAGE__S3_ENDPOINT=${PLOTRA_STORAGE__S3_ENDPOINT:-}
+      - PLOTRA_STORAGE__S3_ACCESS_KEY=${PLOTRA_STORAGE__S3_ACCESS_KEY:-}
+      - PLOTRA_STORAGE__S3_SECRET_KEY=${PLOTRA_STORAGE__S3_SECRET_KEY:-}
+      - PLOTRA_STORAGE__S3_REGION=${PLOTRA_STORAGE__S3_REGION:-af-south-1}
+      - PLOTRA_PAYMENTS__ENABLED=${PLOTRA_PAYMENTS__ENABLED:-false}
+      - PLOTRA_PAYMENTS__MPESA_CONSUMER_KEY=${PLOTRA_PAYMENTS__MPESA_CONSUMER_KEY:-}
+      - PLOTRA_PAYMENTS__MPESA_CONSUMER_SECRET=${PLOTRA_PAYMENTS__MPESA_CONSUMER_SECRET:-}
+      - PLOTRA_PAYMENTS__MPESA_SHORTCODE=${PLOTRA_PAYMENTS__MPESA_SHORTCODE:-}
+      - UVICORN_WORKERS=${UVICORN_WORKERS:-2}
+      - PYTHONPATH=/app
+    command: >
+      sh -c "python -m uvicorn app.main:app
+             --host 0.0.0.0
+             --port 8000
+             --workers ${UVICORN_WORKERS:-2}
+             --proxy-headers
+             --forwarded-allow-ips='*'"
+    restart: always
+
+  dashboard:
+    restart: always

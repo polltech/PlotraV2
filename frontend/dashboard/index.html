@@ -1,0 +1,3043 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title>Plotra Dashboard</title>
+    <link rel="shortcut icon" href="favicon.ico">
+    <link rel="icon" type="image/x-icon" href="favicon.ico">
+    
+    <!-- Hope UI Library / Plugin Css Build -->
+    <link rel="stylesheet" href="hope-ui/assets/css/core/libs.min.css">
+    
+    <!-- Aos Animation Css -->
+    <link rel="stylesheet" href="hope-ui/assets/vendor/aos/dist/aos.css">
+    
+    <!-- Hope Ui Design System Css -->
+    <link rel="stylesheet" href="hope-ui/assets/css/hope-ui.min.css?v=4.0.0">
+    
+    <!-- Custom Css -->
+    <link rel="stylesheet" href="hope-ui/assets/css/custom.min.css?v=4.0.0">
+    
+    <!-- Dark Css -->
+    <link rel="stylesheet" href="hope-ui/assets/css/dark.min.css">
+    
+    <!-- Customizer Css -->
+    <link rel="stylesheet" href="hope-ui/assets/css/customizer.min.css">
+    
+    <!-- RTL Css -->
+    <link rel="stylesheet" href="hope-ui/assets/css/rtl.min.css">
+    
+    <!-- Bootstrap Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+    
+    <!-- Leaflet CSS -->
+    <link href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css"/>
+    
+    <!-- Custom Plotra CSS -->
+    <link href="css/styles.css" rel="stylesheet">
+    <link href="css/modern.css" rel="stylesheet">
+    <link href="css/dashboards.css" rel="stylesheet">
+    <link href="css/mocha_dashboard.css" rel="stylesheet">
+    <link href="css/farmer-profile.css" rel="stylesheet">
+    
+    <style>
+        #pageContent .row {
+            display: flex !important;
+            flex-wrap: wrap !important;
+            width: 100% !important;
+            margin-left: 0 !important;
+            margin-right: 0 !important;
+        }
+        #pageContent .col-lg-4 {
+            flex: 0 0 33.333% !important;
+            max-width: 33.333% !important;
+            padding-left: 0.5rem !important;
+            padding-right: 0.5rem !important;
+        }
+        #pageContent .col-lg-8 {
+            flex: 0 0 66.667% !important;
+            max-width: 66.667% !important;
+            padding-left: 0.5rem !important;
+            padding-right: 0.5rem !important;
+        }
+        /* Sidebar scrollbar styling for visibility */
+        .sidebar-body {
+            overflow-y: auto !important;
+            max-height: calc(100vh - 120px) !important;
+        }
+        .sidebar-body::-webkit-scrollbar {
+            width: 8px;
+        }
+        .sidebar-body::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 4px;
+        }
+        .sidebar-body::-webkit-scrollbar-thumb {
+            background: #daa520;
+            border-radius: 4px;
+        }
+        .sidebar-body::-webkit-scrollbar-thumb:hover {
+            background: #cd853f;
+        }
+    </style>
+
+    <!-- Hide landing page instantly if user is already logged in (prevents flash) -->
+    <script>
+        (function () {
+            var token = localStorage.getItem('plotra_token');
+            if (token && token.length > 10) {
+                document.documentElement.classList.add('pre-auth');
+            }
+        })();
+    </script>
+    <style>
+        html.pre-auth #landing-page { display: none !important; }
+        html.pre-auth #app-container { display: block !important; }
+    </style>
+
+    <!-- Landing Page Styles -->
+    <style>
+        /* ============ COFFEE PALETTE ============ */
+        :root {
+            --coffee-espresso: #2C1A0E;
+            --coffee-dark:     #3D2314;
+            --coffee-brown:    #6F4E37;
+            --coffee-caramel:  #C8956C;
+            --coffee-latte:    #D4A574;
+            --coffee-cream:    #F0D9C4;
+            --coffee-milk:     #FDF6EF;
+            --coffee-white:    #FFFAF6;
+        }
+
+        /* ============ BASE ============ */
+        .landing-page {
+            min-height: 100vh;
+            background: var(--coffee-white);
+            font-family: 'Segoe UI', system-ui, sans-serif;
+        }
+
+        /* ============ NAVBAR ============ */
+        .lp-nav {
+            background: rgba(255,250,246,0.97);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid var(--coffee-cream);
+            z-index: 1000;
+        }
+        .lp-nav-inner {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 1rem 0;
+        }
+        .lp-brand { display: flex; align-items: center; gap: 0.5rem; text-decoration: none; }
+        .lp-logo { height: 36px; }
+        .lp-brand-name { font-weight: 700; font-size: 1.4rem; color: var(--coffee-espresso); }
+        .lp-nav-actions { display: flex; gap: 0.75rem; }
+
+        /* ============ BUTTONS ============ */
+        .lp-btn-primary {
+            background: var(--coffee-brown);
+            color: #fff;
+            border: 2px solid var(--coffee-brown);
+            border-radius: 8px;
+            font-weight: 600;
+            padding: 0.55rem 1.4rem;
+            transition: all .25s;
+        }
+        .lp-btn-primary:hover {
+            background: var(--coffee-espresso);
+            border-color: var(--coffee-espresso);
+            color: #fff;
+            transform: translateY(-1px);
+            box-shadow: 0 6px 18px rgba(44,26,14,.25);
+        }
+        .lp-btn-outline {
+            background: transparent;
+            color: var(--coffee-brown);
+            border: 2px solid var(--coffee-brown);
+            border-radius: 8px;
+            font-weight: 600;
+            padding: 0.55rem 1.4rem;
+            transition: all .25s;
+        }
+        .lp-btn-outline:hover { background: var(--coffee-brown); color: #fff; }
+        .lp-btn-ghost {
+            background: transparent;
+            color: var(--coffee-brown);
+            border: 2px solid transparent;
+            border-radius: 8px;
+            font-weight: 600;
+            padding: 0.55rem 1.4rem;
+            transition: all .25s;
+        }
+        .lp-btn-ghost:hover { border-color: var(--coffee-cream); background: var(--coffee-cream); }
+        .lp-btn-lg { padding: .8rem 2.2rem; font-size: 1.05rem; }
+
+        /* ============ HERO ============ */
+        .lp-hero {
+            padding: 5rem 0 4rem;
+            background: linear-gradient(135deg, var(--coffee-white) 0%, var(--coffee-milk) 60%, #fff 100%);
+            position: relative;
+            overflow: hidden;
+        }
+        .lp-hero::before {
+            content: '';
+            position: absolute;
+            top: -80px; right: -80px;
+            width: 400px; height: 400px;
+            background: radial-gradient(circle, rgba(200,149,108,.18) 0%, transparent 70%);
+            pointer-events: none;
+        }
+        .lp-hero-inner {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 4rem;
+            align-items: center;
+        }
+        .lp-badge {
+            display: inline-block;
+            background: var(--coffee-cream);
+            color: var(--coffee-brown);
+            font-size: .8rem;
+            font-weight: 600;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            padding: .35rem 1rem;
+            border-radius: 999px;
+            margin-bottom: 1rem;
+        }
+        .lp-hero-title {
+            font-size: 2.5rem;
+            font-weight: 700;
+            line-height: 1.15;
+            color: var(--coffee-espresso);
+            margin-bottom: 1rem;
+        }
+        .lp-accent { color: var(--coffee-caramel); }
+        .lp-hero-sub {
+            font-size: 1rem;
+            color: var(--coffee-brown);
+            line-height: 1.6;
+            margin-bottom: 1.5rem;
+            max-width: 480px;
+        }
+        .lp-hero-cta { display: flex; gap: 0.75rem; flex-wrap: wrap; }
+        .lp-img-placeholder {
+            background: var(--coffee-cream);
+            border-radius: 12px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: .5rem;
+            color: var(--coffee-caramel);
+            font-size: .85rem;
+            aspect-ratio: 4/3;
+            font-weight: 500;
+        }
+        .lp-img-placeholder i { font-size: 2.5rem; }
+        .lp-img-placeholder.sm { aspect-ratio: unset; height: 140px; border-radius: 12px; }
+        .lp-img-placeholder.md { aspect-ratio: 3/2; border-radius: 12px; }
+
+        /* ============ STATS ============ */
+        .lp-stats { background: var(--coffee-brown); padding: 2.5rem 0; }
+        .lp-stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1rem;
+            text-align: center;
+        }
+        .lp-stat-num { display: block; font-size: 2rem; font-weight: 800; color: var(--coffee-cream); }
+        .lp-stat-label { display: block; font-size: .85rem; color: rgba(240,217,196,.75); margin-top: .2rem; font-weight: 500; }
+
+        /* ============ SECTIONS SHARED ============ */
+        .lp-section { padding: 3.5rem 0; }
+        .lp-section-head { text-align: center; margin-bottom: 2rem; }
+        .lp-section-title { font-size: 1.75rem; font-weight: 700; color: var(--coffee-espresso); margin-bottom: .5rem; }
+        .lp-section-sub { font-size: 0.95rem; color: var(--coffee-brown); max-width: 500px; margin: 0 auto; line-height: 1.6; }
+
+        /* ============ FEATURES ============ */
+        .lp-features-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.25rem; }
+        .lp-feature-card {
+            background: #fff;
+            border: 1px solid var(--coffee-cream);
+            border-radius: 12px;
+            padding: 1.25rem;
+            transition: all .25s;
+        }
+        .lp-feature-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 20px rgba(44,26,14,.08);
+            border-color: var(--coffee-latte);
+        }
+        .lp-feature-icon {
+            width: 44px; height: 44px;
+            background: var(--coffee-cream);
+            border-radius: 10px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.2rem; color: var(--coffee-brown);
+            margin-bottom: 0.75rem;
+            transition: background .25s;
+        }
+        .lp-feature-card:hover .lp-feature-icon { background: var(--coffee-brown); color: #fff; }
+        .lp-feature-card h3 { font-size: 1.05rem; font-weight: 700; color: var(--coffee-espresso); margin-bottom: .6rem; }
+        .lp-feature-card p { font-size: .9rem; color: var(--coffee-brown); line-height: 1.6; margin: 0; }
+
+        /* ============ HOW IT WORKS ============ */
+        .lp-how { background: var(--coffee-milk); }
+        .lp-steps { display: flex; align-items: flex-start; gap: 1rem; }
+        .lp-step { flex: 1; text-align: center; }
+        .lp-step-num { font-size: 3rem; font-weight: 900; color: var(--coffee-cream); line-height: 1; margin-bottom: .75rem; }
+        .lp-step-img-wrap { margin-bottom: 1rem; }
+        .lp-step h3 { font-size: 1.1rem; font-weight: 700; color: var(--coffee-espresso); margin-bottom: .5rem; }
+        .lp-step p { font-size: .9rem; color: var(--coffee-brown); line-height: 1.6; }
+        .lp-step-arrow { display: flex; align-items: center; padding-top: 60px; font-size: 1.75rem; color: var(--coffee-caramel); flex-shrink: 0; }
+
+        /* ============ FOR WHO ============ */
+        .lp-forwho-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 2rem; }
+        .lp-forwho-card { background: #fff; border: 1px solid var(--coffee-cream); border-radius: 16px; overflow: hidden; transition: box-shadow .25s; }
+        .lp-forwho-card:hover { box-shadow: 0 12px 32px rgba(44,26,14,.1); }
+        .lp-forwho-img-wrap { overflow: hidden; }
+        .lp-forwho-body { padding: 1.75rem; }
+        .lp-forwho-tag {
+            display: inline-block;
+            background: var(--coffee-cream);
+            color: var(--coffee-brown);
+            font-size: .75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;
+            padding: .25rem .75rem; border-radius: 999px; margin-bottom: .85rem;
+        }
+        .lp-forwho-body h3 { font-size: 1.3rem; font-weight: 800; color: var(--coffee-espresso); margin-bottom: .6rem; }
+        .lp-forwho-body p { color: var(--coffee-brown); font-size: .95rem; line-height: 1.65; margin-bottom: 1.25rem; }
+
+        /* ============ CTA ============ */
+        .lp-cta { background: linear-gradient(135deg, var(--coffee-dark) 0%, var(--coffee-brown) 100%); padding: 5rem 0; text-align: center; }
+        .lp-cta-inner h2 { font-size: 1.75rem; font-weight: 700; color: var(--coffee-cream); margin-bottom: .5rem; }
+        .lp-cta-inner p { color: rgba(240,217,196,.8); font-size: 0.95rem; margin-bottom: 1.25rem; }
+        .lp-cta .lp-btn-primary { background: var(--coffee-caramel); border-color: var(--coffee-caramel); color: var(--coffee-espresso); font-weight: 700; }
+        .lp-cta .lp-btn-primary:hover { background: var(--coffee-cream); border-color: var(--coffee-cream); }
+
+        /* ============ FOOTER ============ */
+        .lp-footer { background: var(--coffee-espresso); padding: 4rem 0 2rem; color: var(--coffee-cream); }
+        .lp-footer-grid { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 2.5rem; margin-bottom: 3rem; }
+        .lp-footer-brand p { font-size: .9rem; color: rgba(240,217,196,.7); line-height: 1.65; margin-top: .5rem; }
+        .lp-footer .lp-brand-name { color: var(--coffee-cream); }
+        .lp-footer-col h6 { font-size: .75rem; text-transform: uppercase; letter-spacing: 1.5px; font-weight: 700; color: var(--coffee-latte); margin-bottom: 1rem; }
+        .lp-footer-col ul { list-style: none; padding: 0; margin: 0; }
+        .lp-footer-col ul li { margin-bottom: .6rem; }
+        .lp-footer-col ul li a { color: rgba(240,217,196,.7); text-decoration: none; font-size: .9rem; transition: color .2s; }
+        .lp-footer-col ul li a:hover { color: var(--coffee-cream); }
+        .lp-footer-bottom { border-top: 1px solid rgba(240,217,196,.15); padding-top: 1.5rem; display: flex; justify-content: space-between; font-size: .85rem; color: rgba(240,217,196,.5); }
+
+        /* ============ ANIMATIONS ============ */
+        .fade-up { opacity: 0; transform: translateY(28px); transition: opacity .65s ease, transform .65s ease; }
+        .fade-up.visible { opacity: 1; transform: translateY(0); }
+
+        /* ============ AUTH MODAL ============ */
+        .auth-modal .modal-close-btn {
+            position: absolute !important; top: 20px !important; right: 20px !important;
+            z-index: 1050 !important; background: transparent !important; border: none !important;
+            width: 32px !important; height: 32px !important;
+            display: flex !important; align-items: center !important; justify-content: center !important;
+            color: #000000 !important; opacity: 0.8 !important;
+            transition: all 0.3s ease !important; cursor: pointer !important; font-size: 1.2rem !important;
+        }
+        .auth-modal .modal-close-btn:hover { opacity: 1 !important; transform: scale(1.1) !important; }
+        .auth-modal .modal-body { padding: 5rem 2rem 2rem 2rem !important; width: 100% !important; max-width: 100% !important; }
+        #loginModal, #registerModal { display: flex !important; align-items: center; justify-content: center; padding: 1rem !important; }
+        #loginModal:not(.show), #registerModal:not(.show) { display: none !important; }
+        .auth-modal .modal-dialog { margin: 0 !important; max-width: 480px !important; width: 100% !important; }
+        .auth-modal .modal-content {
+            border-radius: 12px !important; width: 100% !important; max-width: none !important;
+            border-top: 4px solid #6f4e37 !important;
+            border-right: 1px solid #c49a72 !important;
+            border-bottom: 1px solid #c49a72 !important;
+            border-left: 1px solid #c49a72 !important;
+        }
+        .auth-modal .form-control, .auth-modal select.form-select {
+            border-top: 2px solid #6f4e37 !important;
+            border-right: 1px solid #c8a882 !important;
+            border-bottom: 1px solid #c8a882 !important;
+            border-left: 1px solid #c8a882 !important;
+            border-radius: 6px !important;
+        }
+        .auth-modal .form-control:focus, .auth-modal select.form-select:focus {
+            border-top: 2px solid #4a2c1a !important;
+            border-right: 1px solid #6f4e37 !important;
+            border-bottom: 1px solid #6f4e37 !important;
+            border-left: 1px solid #6f4e37 !important;
+            box-shadow: 0 0 0 3px rgba(111,78,55,0.15) !important;
+        }
+        .phone-input-wrap {
+            border-top: 2px solid #6f4e37 !important;
+            border-right: 1px solid #c8a882 !important;
+            border-bottom: 1px solid #c8a882 !important;
+            border-left: 1px solid #c8a882 !important;
+            border-radius: 6px !important;
+        }
+        .auth-modal .modal-body form { width: 100% !important; max-width: 100% !important; }
+        .auth-modal .modal-body .text-center { width: 100% !important; max-width: 100% !important; text-align: center !important; }
+        .auth-modal .modal-body h1.fw-bold,
+        .auth-modal .modal-body h2.fw-bold,
+        .auth-modal .modal-body h3.fw-bold,
+        .auth-modal .modal-body h4.fw-bold { text-align: center !important; }
+        .auth-modal input, .auth-modal .form-control { width: 100% !important; max-width: 100% !important; box-sizing: border-box !important; }
+        .auth-modal .d-flex { width: 100% !important; max-width: 100% !important; }
+        .auth-modal .text-center, .auth-modal .mb-4.text-center { width: 100% !important; margin-left: auto !important; margin-right: auto !important; }
+        .auth-modal * { box-sizing: border-box !important; }
+        .auth-modal .step-content {
+            width: 100% !important; padding: 0 !important; box-shadow: none !important;
+            border: none !important; background: transparent !important; display: none !important;
+        }
+        .auth-modal .step-content.active { display: block !important; }
+        .auth-modal h4, .auth-modal h5 { font-size: 1.1rem !important; }
+        .auth-modal p, .auth-modal .form-label, .auth-modal small { font-size: 0.78rem !important; }
+        .auth-modal .form-control, .auth-modal .form-select { font-size: 0.82rem !important; padding: 0.32rem 0.6rem !important; }
+        .auth-modal .btn:not(.btn-link):not(.phone-country-btn) { font-size: 0.82rem !important; padding: 0.35rem 1rem !important; }
+        .auth-modal .mb-3 { margin-bottom: 0.55rem !important; }
+        .auth-modal .mb-4 { margin-bottom: 0.8rem !important; }
+        .auth-modal .otp-box { width: 36px !important; height: 40px !important; font-size: 1.05rem !important; }
+
+        /* ============ PHONE INPUT ============ */
+        .phone-input-wrap { position: relative; display: flex; width: 100%; border: 1px solid #dee2e6; border-radius: 0.375rem; background: #fff; }
+        .phone-input-wrap:focus-within { border-color: #86b7fe; box-shadow: 0 0 0 0.25rem rgba(13,110,253,.15); }
+        .phone-country-btn {
+            display: flex; align-items: center; gap: 6px; flex-shrink: 0;
+            background: #f8f9fa; border: none; border-right: 1px solid #dee2e6;
+            border-radius: 0.375rem 0 0 0.375rem;
+            padding: 0.45rem 0.75rem; white-space: nowrap; cursor: pointer;
+        }
+        .phone-country-btn:hover { background: #e9ecef; }
+        .phone-country-btn img.phone-flag { width: 24px; height: 16px; object-fit: cover; border-radius: 2px; display: block; }
+        .phone-prefix { font-weight: 600; color: #333; font-size: 0.875rem; }
+        .phone-caret { font-size: 0.6rem; color: #888; }
+        .phone-input-wrap input[type="tel"] {
+            flex: 1; border: none; border-radius: 0 0.375rem 0.375rem 0;
+            padding: 0.45rem 0.75rem; outline: none; background: transparent; font-size: 1rem; min-width: 0;
+        }
+        .phone-country-menu {
+            display: none; position: absolute; top: calc(100% + 3px); left: 0;
+            z-index: 99999; background: #fff;
+            border: 1px solid #dee2e6; border-radius: 0.5rem;
+            min-width: 190px; list-style: none; padding: 4px 0; margin: 0;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.13);
+        }
+        .phone-country-menu.open { display: block; }
+        .phone-country-menu li a { display: flex; align-items: center; gap: 10px; padding: 9px 14px; text-decoration: none; color: #212529; font-size: 0.9rem; }
+        .phone-country-menu li a:hover { background: #f0f4ff; }
+        .phone-country-menu li a img { width: 24px; height: 16px; object-fit: cover; border-radius: 2px; flex-shrink: 0; }
+
+        /* ============ REGISTRATION FIELD VALIDATION ============ */
+        .reg-field-wrap { position: relative; }
+        .reg-field-icon {
+            position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+            font-size: .95rem; pointer-events: none; line-height: 1;
+        }
+        .reg-field-icon--outside { right: -22px; }
+        .reg-field-icon.valid  { color: #6f4e37; }
+        .reg-field-icon.invalid{ color: #dc3545; }
+        .reg-field-icon.checking::after { content:''; display:inline-block; width:10px;height:10px; border:2px solid #6f4e37; border-top-color:transparent; border-radius:50%; animation:spin .7s linear infinite; }
+        @keyframes spin { to { transform: translateY(-50%) rotate(360deg); } }
+        .reg-field-msg { font-size:.75rem; margin-top:3px; min-height:14px; }
+        .reg-field-msg.taken  { color:#dc3545; }
+        .reg-field-msg.free   { color:#6f4e37; }
+        /* phone wrap: icon sits outside */
+        #regPhoneWrap { flex: 1; }
+
+        /* ============ OTP INPUTS ============ */
+        .otp-grid { display:flex; gap:8px; justify-content:center; }
+        .otp-box {
+            width:44px; height:52px; text-align:center; font-size:1.4rem; font-weight:700;
+            border:2px solid #dee2e6; border-radius:10px; outline:none;
+            transition:border-color .2s;
+        }
+        .otp-box:focus { border-color:#6f4e37; box-shadow:0 0 0 3px rgba(111,78,55,.15); }
+        .otp-box.filled { border-color:#6f4e37; background:#fffaf6; }
+        .otp-box.error  { border-color:#dc3545; background:#fff5f5; }
+        .reg-terms-row { display:flex !important; flex-direction:row !important; align-items:flex-start !important; gap:8px !important; margin:1rem 0 1.5rem !important; width:100% !important; overflow:hidden !important; }
+        .auth-modal .reg-terms-row input[type="checkbox"] { width:16px !important; max-width:16px !important; min-width:16px !important; height:16px !important; flex:0 0 16px !important; flex-shrink:0 !important; cursor:pointer; accent-color:#6f4e37; margin-top:2px !important; display:inline-block !important; }
+        .reg-terms-row .reg-terms-label { flex:1 1 auto !important; min-width:0 !important; max-width:calc(100% - 24px) !important; font-size:.875rem; line-height:1.4; text-align:left !important; white-space:normal !important; word-break:break-word !important; overflow-wrap:break-word !important; display:block !important; cursor:pointer; }
+
+        /* ============ RESPONSIVE ============ */
+        
+        /* Tablet Landscape (992px - 1199px) */
+        @media (min-width: 992px) and (max-width: 1199px) {
+            .lp-hero-inner { gap: 2rem; }
+            .lp-hero-title { font-size: 2.8rem; }
+            .lp-features-grid { grid-template-columns: repeat(2, 1fr); }
+            .lp-footer-grid { grid-template-columns: 1.5fr 1fr 1fr 1fr; gap: 1.5rem; }
+        }
+        
+        /* Tablet Portrait (768px - 991px) */
+        @media (min-width: 768px) and (max-width: 991px) {
+            .lp-hero-inner { grid-template-columns: 1fr; gap: 2rem; }
+            .lp-hero-title { font-size: 2.4rem; }
+            .lp-hero-sub { max-width: 100%; }
+            .lp-features-grid { grid-template-columns: repeat(2, 1fr); gap: 1rem; }
+            .lp-stats-grid { grid-template-columns: repeat(2, 1fr); gap: 1rem; }
+            .lp-steps { flex-wrap: wrap; justify-content: center; }
+            .lp-step { flex: 0 0 45%; }
+            .lp-step-arrow { display: none; }
+            .lp-forwho-grid { grid-template-columns: 1fr; gap: 1.5rem; }
+            .lp-footer-grid { grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+            .lp-section { padding: 3rem 0; }
+        }
+        
+        /* Mobile Landscape (576px - 767px) */
+        @media (min-width: 576px) and (max-width: 767px) {
+            .lp-hero { padding: 3rem 0 2rem; }
+            .lp-hero-inner { grid-template-columns: 1fr; gap: 1.5rem; }
+            .lp-hero-title { font-size: 2rem; }
+            .lp-hero-sub { font-size: 1rem; margin-bottom: 1.5rem; }
+            .lp-hero-cta { flex-direction: column; gap: 0.75rem; }
+            .lp-hero-cta .btn { width: 100%; }
+            .lp-features-grid { grid-template-columns: 1fr 1fr; gap: 1rem; }
+            .lp-stats { padding: 1.5rem 0; }
+            .lp-stats-grid { grid-template-columns: repeat(2, 1fr); gap: 1rem; }
+            .lp-stat-num { font-size: 1.5rem; }
+            .lp-stat-label { font-size: 0.75rem; }
+            .lp-section { padding: 2.5rem 0; }
+            .lp-section-title { font-size: 1.75rem; }
+            .lp-steps { flex-direction: column; align-items: center; gap: 0.5rem; }
+            .lp-step { width: 100%; max-width: 300px; }
+            .lp-step-arrow { transform: rotate(90deg); padding: 0.5rem 0; }
+            .lp-forwho-grid { grid-template-columns: 1fr; gap: 1.5rem; }
+            .lp-forwho-card { flex-direction: column; }
+            .lp-img-placeholder.md { aspect-ratio: 16/9; }
+            .lp-footer-grid { grid-template-columns: 1fr 1fr; gap: 1rem; }
+            .lp-footer-col h6 { font-size: 0.9rem; }
+            .lp-nav-actions { gap: 0.5rem; }
+            .lp-btn-lg { padding: 0.7rem 1.5rem; font-size: 0.95rem; }
+        }
+        
+        /* Mobile Portrait (320px - 575px) */
+        @media (max-width: 575px) {
+            .lp-nav-inner { flex-wrap: wrap; gap: 0.75rem; }
+            .lp-logo { height: 28px; }
+            .lp-brand-name { font-size: 1.1rem; }
+            .lp-nav-actions { width: 100%; justify-content: center; }
+            .lp-nav-actions .btn { padding: 0.5rem 1rem; font-size: 0.85rem; }
+            
+            .lp-hero { padding: 2rem 0 1.5rem; }
+            .lp-hero-inner { grid-template-columns: 1fr; gap: 1.5rem; }
+            .lp-hero-text { text-align: center; }
+            .lp-badge { font-size: 0.7rem; padding: 0.25rem 0.75rem; }
+            .lp-hero-title { font-size: 1.75rem; line-height: 1.2; }
+            .lp-hero-sub { font-size: 0.95rem; line-height: 1.6; margin-bottom: 1.25rem; }
+            .lp-hero-cta { flex-direction: column; gap: 0.5rem; }
+            .lp-hero-cta .btn { width: 100%; }
+            .lp-img-placeholder { border-radius: 12px; }
+            .lp-img-placeholder i { font-size: 2rem; }
+            .lp-img-placeholder span { font-size: 0.8rem; }
+            
+            .lp-stats { padding: 1.25rem 0; }
+            .lp-stats-grid { grid-template-columns: repeat(2, 1fr); gap: 0.75rem; }
+            .lp-stat { padding: 0.75rem 0.5rem; }
+            .lp-stat-num { font-size: 1.25rem; }
+            .lp-stat-label { font-size: 0.65rem; }
+            
+            .lp-section { padding: 2rem 0; }
+            .lp-section-head { margin-bottom: 1.5rem; }
+            .lp-section-title { font-size: 1.5rem; }
+            .lp-section-sub { font-size: 0.9rem; }
+            
+            .lp-features-grid { grid-template-columns: 1fr; gap: 1rem; }
+            .lp-feature-card { padding: 1.25rem; }
+            .lp-feature-icon { width: 48px; height: 48px; font-size: 1.25rem; }
+            .lp-feature-card h3 { font-size: 1.1rem; }
+            .lp-feature-card p { font-size: 0.85rem; }
+            
+            .lp-how { padding: 1.5rem 0; }
+            .lp-steps { gap: 0; }
+            .lp-step { width: 100%; max-width: 280px; padding: 1rem; }
+            .lp-step-num { font-size: 1.5rem; width: 36px; height: 36px; }
+            .lp-step-img-wrap .lp-img-placeholder.sm { height: 100px; }
+            .lp-step h3 { font-size: 1rem; }
+            .lp-step p { font-size: 0.8rem; }
+            .lp-step-arrow { transform: rotate(90deg); padding: 0.25rem 0; }
+            .lp-step-arrow i { font-size: 1.25rem; }
+            
+            .lp-forwho { padding: 1.5rem 0; }
+            .lp-forwho-grid { gap: 1rem; }
+            .lp-forwho-card { flex-direction: column; border-radius: 12px; }
+            .lp-forwho-img-wrap { width: 100%; }
+            .lp-img-placeholder.md { aspect-ratio: 16/9; border-radius: 12px 12px 0 0; }
+            .lp-forwho-body { padding: 1.25rem; }
+            .lp-forwho-tag { font-size: 0.7rem; padding: 0.25rem 0.5rem; }
+            .lp-forwho-body h3 { font-size: 1.1rem; }
+            .lp-forwho-body p { font-size: 0.85rem; }
+            .lp-forwho-body .btn { width: 100%; }
+            
+            .lp-cta { padding: 2rem 0; }
+            .lp-cta-inner { padding: 1.5rem 1rem; border-radius: 12px; }
+            .lp-cta h2 { font-size: 1.5rem; }
+            .lp-cta p { font-size: 0.9rem; margin-bottom: 1.5rem; }
+            .lp-cta .btn { width: 100%; }
+            
+            .lp-footer { padding: 2rem 0 1rem; }
+            .lp-footer-grid { grid-template-columns: 1fr; gap: 1.5rem; text-align: center; }
+            .lp-footer-brand { margin-bottom: 1rem; }
+            .lp-footer-col h6 { font-size: 0.9rem; margin-bottom: 0.75rem; }
+            .lp-footer-col ul li { margin-bottom: 0.5rem; }
+            .lp-footer-col a { font-size: 0.85rem; }
+            .lp-footer-bottom { flex-direction: column; gap: 0.5rem; font-size: 0.8rem; }
+        }
+        
+        /* Extra small devices */
+        @media (max-width: 380px) {
+            .lp-hero-title { font-size: 1.5rem; }
+            .lp-section-title { font-size: 1.35rem; }
+            .lp-stat-num { font-size: 1.1rem; }
+            .lp-badge { font-size: 0.65rem; }
+        }
+        
+        /* Landscape orientation */
+        @media (max-width: 767px) and (orientation: landscape) {
+            .lp-hero { padding: 2rem 0; }
+            .lp-hero-inner { grid-template-columns: 1fr 1fr; gap: 1rem; }
+            .lp-hero-text { text-align: left; }
+            .lp-hero-title { font-size: 1.75rem; }
+            .lp-features-grid { grid-template-columns: repeat(3, 1fr); }
+            .lp-stats-grid { grid-template-columns: repeat(4, 1fr); }
+        }
+        
+        /* Touch devices */
+        @media (hover: none) and (pointer: coarse) {
+            .lp-btn-primary, .lp-btn-outline, .lp-btn-ghost {
+                min-height: 44px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+            .lp-nav-actions .btn {
+                min-height: 40px;
+            }
+        }
+        
+        /* Reduced motion */
+        @media (prefers-reduced-motion: reduce) {
+            .fade-up { animation: none; opacity: 1; transform: none; }
+            * { transition-duration: 0.01ms !important; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- Landing Page -->
+    <div id="landing-page" class="landing-page">
+
+        <!-- Navbar -->
+        <nav class="lp-nav sticky-top">
+            <div class="container">
+                <div class="lp-nav-inner">
+                    <a class="lp-brand" href="#">
+                        <img src="Logo_for_coffee_202604042330.jpeg" alt="Plotra" class="lp-logo">
+                        <span class="lp-brand-name">Plotra</span>
+                    </a>
+                    <div class="lp-nav-actions">
+                        <button type="button" class="btn lp-btn-outline" onclick="window.app?.showLoginModal()">Sign In</button>
+                        <button type="button" class="btn lp-btn-primary" onclick="window.app?.showRegisterModal()">Get Started</button>
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Hero Section -->
+        <section class="lp-hero">
+            <div class="container">
+                <div class="lp-hero-inner">
+                    <div class="lp-hero-text fade-up">
+                        <span class="lp-badge">Parcel-based EUDR Compliance</span>
+                        <h1 class="lp-hero-title">Grow with confidence.<br><span class="lp-accent">Farm the future.</span></h1>
+                        <p class="lp-hero-sub">Plotra connects coffee farmers, cooperatives and global buyers through digital traceability &mdash; turning your land and harvests into verified, compliant records.</p>
+                        <div class="lp-hero-cta">
+                            <button type="button" class="btn lp-btn-primary lp-btn-lg" onclick="window.app?.showRegisterModal()">Start for Free</button>
+                            <button type="button" class="btn lp-btn-ghost lp-btn-lg" onclick="document.getElementById('lp-features').scrollIntoView({behavior:'smooth'})">Learn More</button>
+                        </div>
+                    </div>
+                    <div class="lp-hero-visual fade-up" style="animation-delay:.2s">
+                        <div class="lp-img-placeholder">
+                            <i class="bi bi-image"></i>
+                            <span>Hero Image</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Stats Bar -->
+        <div class="lp-stats">
+            <div class="container">
+                <div class="lp-stats-grid">
+                    <div class="lp-stat fade-up"><span class="lp-stat-num" data-target="10000" data-suffix="+" data-final="10K+">10K+</span><span class="lp-stat-label">Farmers Registered</span></div>
+                    <div class="lp-stat fade-up" style="animation-delay:.1s"><span class="lp-stat-num" data-target="50" data-suffix="+" data-final="50+">50+</span><span class="lp-stat-label">Cooperatives</span></div>
+                    <div class="lp-stat fade-up" style="animation-delay:.2s"><span class="lp-stat-num" data-target="3" data-final="3">3</span><span class="lp-stat-label">Countries</span></div>
+                    <div class="lp-stat fade-up" style="animation-delay:.3s"><span class="lp-stat-num" data-target="100" data-suffix="%" data-final="100%">100%</span><span class="lp-stat-label">EUDR Ready</span></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Features Section -->
+        <section class="lp-section" id="lp-features">
+            <div class="container">
+                <div class="lp-section-head fade-up">
+                    <h2 class="lp-section-title">Everything you need</h2>
+                    <p class="lp-section-sub">One platform for the entire coffee value chain &mdash; from farm to export.</p>
+                </div>
+                <div class="lp-features-grid">
+                    <div class="lp-feature-card fade-up">
+                        <div class="lp-feature-icon"><i class="bi bi-geo-alt-fill"></i></div>
+                        <h3>GPS Farm Mapping</h3>
+                        <p>Map every parcel with precision GPS. Every delivery and compliance record is anchored to a verified land boundary.</p>
+                    </div>
+                    <div class="lp-feature-card fade-up" style="animation-delay:.1s">
+                        <div class="lp-feature-icon"><i class="bi bi-shield-check"></i></div>
+                        <h3>EUDR Compliance</h3>
+                        <p>Generate audit-ready EUDR compliance reports automatically. Stay ahead of EU import regulations without extra work.</p>
+                    </div>
+                    <div class="lp-feature-card fade-up" style="animation-delay:.2s">
+                        <div class="lp-feature-icon"><i class="bi bi-graph-up-arrow"></i></div>
+                        <h3>Production Tracking</h3>
+                        <p>Record harvests, deliveries and yields in real-time. Gain insights that help you increase output season after season.</p>
+                    </div>
+                    <div class="lp-feature-card fade-up" style="animation-delay:.3s">
+                        <div class="lp-feature-icon"><i class="bi bi-people-fill"></i></div>
+                        <h3>Cooperative Management</h3>
+                        <p>Connect farmers to cooperatives digitally. Manage members, verify records, and coordinate deliveries seamlessly.</p>
+                    </div>
+                    <div class="lp-feature-card fade-up" style="animation-delay:.4s">
+                        <div class="lp-feature-icon"><i class="bi bi-phone-fill"></i></div>
+                        <h3>Mobile First</h3>
+                        <p>Built for the field. Works on any smartphone. No laptop needed &mdash; manage your farm from anywhere.</p>
+                    </div>
+                    <div class="lp-feature-card fade-up" style="animation-delay:.5s">
+                        <div class="lp-feature-icon"><i class="bi bi-globe2"></i></div>
+                        <h3>Market Access</h3>
+                        <p>Verified compliance opens doors to premium buyers and international markets that require traceability standards.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- How It Works -->
+        <section class="lp-section lp-how" id="lp-how">
+            <div class="container">
+                <div class="lp-section-head fade-up">
+                    <h2 class="lp-section-title">How it works</h2>
+                    <p class="lp-section-sub">Three steps to a fully compliant, traceable coffee farm.</p>
+                </div>
+                <div class="lp-steps">
+                    <div class="lp-step fade-up">
+                        <div class="lp-step-num">01</div>
+                        <div class="lp-step-img-wrap"><div class="lp-img-placeholder sm"><i class="bi bi-image"></i></div></div>
+                        <h3>Register &amp; Map</h3>
+                        <p>Sign up with your phone number. Map your farm parcels using GPS &mdash; no paperwork needed.</p>
+                    </div>
+                    <div class="lp-step-arrow"><i class="bi bi-arrow-right"></i></div>
+                    <div class="lp-step fade-up" style="animation-delay:.15s">
+                        <div class="lp-step-num">02</div>
+                        <div class="lp-step-img-wrap"><div class="lp-img-placeholder sm"><i class="bi bi-image"></i></div></div>
+                        <h3>Track &amp; Verify</h3>
+                        <p>Log deliveries and harvests. Your cooperative verifies your records for EUDR compliance.</p>
+                    </div>
+                    <div class="lp-step-arrow"><i class="bi bi-arrow-right"></i></div>
+                    <div class="lp-step fade-up" style="animation-delay:.3s">
+                        <div class="lp-step-num">03</div>
+                        <div class="lp-step-img-wrap"><div class="lp-img-placeholder sm"><i class="bi bi-image"></i></div></div>
+                        <h3>Export &amp; Earn</h3>
+                        <p>Compliant records unlock access to premium international markets and better prices.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- For Who -->
+        <section class="lp-section lp-forwho" id="lp-forwho">
+            <div class="container">
+                <div class="lp-section-head fade-up">
+                    <h2 class="lp-section-title">Built for everyone in the chain</h2>
+                </div>
+                <div class="lp-forwho-grid">
+                    <div class="lp-forwho-card fade-up">
+                        <div class="lp-forwho-img-wrap">
+                            <div class="lp-img-placeholder md"><i class="bi bi-image"></i><span>Farmer Image</span></div>
+                        </div>
+                        <div class="lp-forwho-body">
+                            <span class="lp-forwho-tag">Farmers</span>
+                            <h3>Grow more, earn more</h3>
+                            <p>Map your farm, track your harvest, and get the certificates that unlock better prices from international buyers.</p>
+                            <button class="btn lp-btn-primary" onclick="window.app?.showRegisterModal()">Join as Farmer</button>
+                        </div>
+                    </div>
+                    <div class="lp-forwho-card fade-up" style="animation-delay:.15s">
+                        <div class="lp-forwho-img-wrap">
+                            <div class="lp-img-placeholder md"><i class="bi bi-image"></i><span>Cooperative Image</span></div>
+                        </div>
+                        <div class="lp-forwho-body">
+                            <span class="lp-forwho-tag">Cooperatives</span>
+                            <h3>Manage with ease</h3>
+                            <p>Onboard members digitally, verify compliance, coordinate deliveries &mdash; all from a single dashboard.</p>
+                            <button class="btn lp-btn-outline" onclick="window.app?.showLoginModal()">Sign In</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- CTA Section -->
+        <section class="lp-cta">
+            <div class="container">
+                <div class="lp-cta-inner fade-up">
+                    <h2>Ready to transform your farm?</h2>
+                    <p>Join thousands of farmers already using Plotra to grow smarter.</p>
+                    <button class="btn lp-btn-primary lp-btn-lg" onclick="window.app?.showRegisterModal()">Get Started &mdash; It&apos;s Free</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Footer -->
+        <footer class="lp-footer">
+            <div class="container">
+                <div class="lp-footer-grid">
+                    <div class="lp-footer-brand">
+                        <div class="lp-brand mb-2">
+                            <img src="Logo_for_coffee_202604042330.jpeg" alt="Plotra" class="lp-logo">
+                            <span class="lp-brand-name">Plotra</span>
+                        </div>
+                        <p>Parcel-based infrastructure for EUDR compliance and coffee supply chain traceability.</p>
+                    </div>
+                    <div class="lp-footer-col">
+                        <h6>Platform</h6>
+                        <ul>
+                            <li><a href="javascript:void(0)" onclick="document.getElementById('lp-features').scrollIntoView({behavior:'smooth'})">Features</a></li>
+                            <li><a href="javascript:void(0)" onclick="document.getElementById('lp-how').scrollIntoView({behavior:'smooth'})">How it works</a></li>
+                            <li><a href="javascript:void(0)" onclick="document.getElementById('lp-forwho').scrollIntoView({behavior:'smooth'})">Who is it for</a></li>
+                        </ul>
+                    </div>
+                    <div class="lp-footer-col">
+                        <h6>Company</h6>
+                        <ul>
+                            <li><a href="#">About Terraxis</a></li>
+                            <li><a href="mailto:hello@plotra.africa">Contact</a></li>
+                        </ul>
+                    </div>
+                    <div class="lp-footer-col">
+                        <h6>Legal</h6>
+                        <ul>
+                            <li><a href="privacy.html">Privacy Policy</a></li>
+                            <li><a href="terms.html">Terms of Service</a></li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="lp-footer-bottom">
+                    <span>&copy; 2026 Terraxis SRL. All rights reserved.</span>
+                    <span>Plotra Platform</span>
+                </div>
+            </div>
+        </footer>
+
+    </div>
+
+    <!-- Login Modal -->
+    <div class="modal fade auth-modal" id="loginModal" data-bs-backdrop="static" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered" style="max-width: 480px;">
+            <div class="modal-content border-0 shadow-lg">
+                <div class="modal-body px-5 py-5 position-relative">
+                    <button type="button" class="btn-close modal-close-btn" data-bs-dismiss="modal" aria-label="Close"></button>
+                    <div class="mb-4 text-center">
+                        <img src="Logo_for_coffee_202604042330.jpeg" alt="Plotra Logo" style="height: 32px; margin-bottom: 20px;">
+                    </div>
+
+                    <form id="loginForm" novalidate>
+                        <!-- Login Step 1: Phone -->
+                        <div id="loginStep1" class="step-content active text-center">
+                            <h4 class="fw-bold mb-1" style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">Get Started</h5>
+                            <p class="mb-4" style="color: #6f4e37; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">to continue to Plotra</p>
+                            <div class="mb-4">
+                                <div class="phone-input-wrap">
+                                    <button type="button" class="phone-country-btn" onclick="app.toggleCountryMenu(this)">
+                                        <img src="https://flagcdn.com/w40/ke.png" class="phone-flag" id="loginFlagImg" alt="KE">
+                                        <span class="phone-prefix" id="loginPrefix">+254</span>
+                                        <span class="phone-caret">▾</span>
+                                    </button>
+                                    <ul class="phone-country-menu">
+                                        <li><a href="#" onclick="app.selectCountry('login','ke','+254','Kenya');return false;"><img src="https://flagcdn.com/w40/ke.png" alt="KE"> Kenya <span class="ms-auto text-muted small">+254</span></a></li>
+                                        <li><a href="#" onclick="app.selectCountry('login','ug','+256','Uganda');return false;"><img src="https://flagcdn.com/w40/ug.png" alt="UG"> Uganda <span class="ms-auto text-muted small">+256</span></a></li>
+                                        <li><a href="#" onclick="app.selectCountry('login','tz','+255','Tanzania');return false;"><img src="https://flagcdn.com/w40/tz.png" alt="TZ"> Tanzania <span class="ms-auto text-muted small">+255</span></a></li>
+                                    </ul>
+                                    <input type="tel" id="loginUsername" name="username" placeholder="712 345 678" required>
+                                </div>
+                                <input type="hidden" id="loginCountry" value="Kenya">
+                            </div>
+                            <div class="mb-4 x-small-text text-center">
+                                New to Plotra? <a href="javascript:void(0)" onclick="app.showRegisterModal()" class="text-decoration-none fw-medium" style="color: #6f4e37;">Join Our Community</a>
+                            </div>
+                            <div class="d-flex justify-content-center mt-3 gap-2">
+                                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="app.showRegisterModal()" style="color: #6f4e37; border-color: #6f4e37; height: 36px; line-height: 1.4; width: 130px;">Join Community</button>
+                                <button type="button" class="btn btn-primary btn-sm" id="btnNextLogin" style="height: 36px; line-height: 1.4; width: 100px;">Next</button>
+                            </div>
+                        </div>
+
+                        <!-- Login Step 2: Password -->
+                        <div id="loginStep2" class="step-content">
+                            <div class="d-flex align-items-center mb-3">
+                                <button type="button" class="btn btn-link p-0 text-dark me-2" id="btnBackLogin">
+                                    <i class="bi bi-arrow-left fs-5"></i>
+                                </button>
+                                <span id="displayLoginEmail" class="text-muted"></span>
+                            </div>
+                            <h5 class="fw-bold mb-3">Enter password</h5>
+                            <div class="mb-3 position-relative">
+                                <input type="password" class="form-control" id="loginPassword" name="password" placeholder="Password" required style="padding-right: 44px;">
+                                <button class="btn btn-link text-dark text-decoration-none position-absolute end-0 top-50 translate-middle-y p-0 me-2" type="button" onclick="app.togglePassword('loginPassword', 'loginPasswordToggle')">
+                                    <i class="bi bi-eye" id="loginPasswordToggle"></i>
+                                </button>
+                            </div>
+                            <div class="mb-4 x-small-text">
+                                <a href="javascript:void(0)" onclick="app.showForgotStep()" class="text-decoration-none fw-normal" style="color: #6f4e37;">Forgot password?</a>
+                            </div>
+                            <div class="d-flex justify-content-center mt-4">
+                                <button type="submit" class="btn btn-primary px-4 py-2 fw-medium" style="min-width: 120px;">Get Started</button>
+                            </div>
+                        </div>
+
+                        <!-- Forgot Password Step -->
+                        <div id="loginStepForgot" class="step-content">
+                            <div class="d-flex align-items-center mb-3">
+                                <button type="button" class="btn btn-link p-0 text-dark me-2" onclick="app.showLoginModal()">
+                                    <i class="bi bi-arrow-left fs-5"></i>
+                                </button>
+                                <span class="text-muted small">Back to sign in</span>
+                            </div>
+                            <h5 class="fw-bold mb-2">Reset password</h5>
+                            <p class="mb-3 small text-muted">Enter your registered phone number. We'll send a verification code if the account exists.</p>
+                            <div class="mb-3">
+                                <div class="phone-input-wrap">
+                                    <button type="button" class="phone-country-btn" onclick="app.toggleCountryMenu(this)">
+                                        <img src="https://flagcdn.com/w40/ke.png" class="phone-flag" id="forgotFlagImg" alt="KE">
+                                        <span class="phone-prefix" id="forgotPrefix">+254</span>
+                                        <span class="phone-caret">▾</span>
+                                    </button>
+                                    <ul class="phone-country-menu">
+                                        <li><a href="#" onclick="app.selectCountry('forgot','ke','+254','Kenya');return false;"><img src="https://flagcdn.com/w40/ke.png" alt="KE"> Kenya <span class="ms-auto text-muted small">+254</span></a></li>
+                                        <li><a href="#" onclick="app.selectCountry('forgot','ug','+256','Uganda');return false;"><img src="https://flagcdn.com/w40/ug.png" alt="UG"> Uganda <span class="ms-auto text-muted small">+256</span></a></li>
+                                        <li><a href="#" onclick="app.selectCountry('forgot','tz','+255','Tanzania');return false;"><img src="https://flagcdn.com/w40/tz.png" alt="TZ"> Tanzania <span class="ms-auto text-muted small">+255</span></a></li>
+                                    </ul>
+                                    <input type="tel" id="forgotEmail" name="phone" placeholder="712 345 678" required>
+                                </div>
+                                <input type="hidden" id="forgotCountry" value="Kenya">
+                            </div>
+                            <div class="reg-field-msg text-center mb-2" id="msgForgot"></div>
+                            <div class="d-flex justify-content-center mt-3">
+                                <button type="button" class="btn btn-primary px-4 py-2 fw-medium" id="btnForgotSend" onclick="app.handleForgot()" style="min-width: 120px;">Send OTP</button>
+                            </div>
+                        </div>
+
+                        <!-- Forgot Password OTP Step -->
+                        <div id="loginStepForgotOTP" class="step-content">
+                            <div class="d-flex align-items-center mb-3">
+                                <button type="button" class="btn btn-link p-0 text-dark me-2" onclick="app.showForgotStep()">
+                                    <i class="bi bi-arrow-left fs-5"></i>
+                                </button>
+                                <span class="text-muted small">Verify phone</span>
+                            </div>
+                            <h5 class="fw-bold mb-2">Enter verification code</h5>
+                            <p class="text-muted small mb-3" id="forgotOtpDesc">We sent a 6-digit code to your phone.</p>
+                            <div class="otp-grid mb-3" id="forgotOtpGrid">
+                                <input class="otp-box" type="text" maxlength="1" inputmode="numeric" pattern="[0-9]">
+                                <input class="otp-box" type="text" maxlength="1" inputmode="numeric" pattern="[0-9]">
+                                <input class="otp-box" type="text" maxlength="1" inputmode="numeric" pattern="[0-9]">
+                                <input class="otp-box" type="text" maxlength="1" inputmode="numeric" pattern="[0-9]">
+                                <input class="otp-box" type="text" maxlength="1" inputmode="numeric" pattern="[0-9]">
+                                <input class="otp-box" type="text" maxlength="1" inputmode="numeric" pattern="[0-9]">
+                            </div>
+                            <div id="devForgotOtpBanner" style="display:none;background:#fff8e1;border:1px dashed #6f4e37;border-radius:8px;padding:6px 12px;margin-bottom:8px;text-align:center;font-size:.82rem;color:#4a2c0a;">
+                                🛠 Dev OTP: <strong id="devForgotOtpCode" style="letter-spacing:3px;"></strong>
+                            </div>
+                            <div class="reg-field-msg text-center mb-2" id="msgForgotOtp"></div>
+                            <div class="d-flex justify-content-center mb-2">
+                                <button type="button" class="btn btn-primary px-4 py-2" id="btnVerifyForgotOTP" onclick="app.handleForgotOTPVerify()" style="min-width:120px;">Verify</button>
+                            </div>
+                            <div class="text-center">
+                                <span class="text-muted small">Didn't receive it? </span>
+                                <button type="button" class="btn btn-link p-0 small" onclick="app.handleForgot()" style="color:#6f4e37;">Resend</button>
+                            </div>
+                        </div>
+
+                        <!-- Reset Password Step -->
+                        <div id="loginStepReset" class="step-content">
+                            <h5 class="fw-bold mb-2">New password</h5>
+                            <p class="mb-3 small text-muted">Enter a new password for your account.</p>
+                            <div class="mb-3 position-relative">
+                                <input type="password" class="form-control form-control-sm" id="resetPassword" name="new_password" placeholder="New password" required minlength="8" style="padding-right: 40px;">
+                                <button class="btn btn-link text-dark text-decoration-none position-absolute end-0 top-50 translate-middle-y p-0 me-2" type="button" onclick="app.togglePassword('resetPassword', 'resetPasswordToggle')">
+                                    <i class="bi bi-eye" id="resetPasswordToggle"></i>
+                                </button>
+                            </div>
+                            <div class="mb-3 position-relative">
+                                <input type="password" class="form-control form-control-sm" id="resetConfirmPassword" name="confirm_password" placeholder="Confirm password" required style="padding-right: 40px;">
+                                <button class="btn btn-link text-dark text-decoration-none position-absolute end-0 top-50 translate-middle-y p-0 me-2" type="button" onclick="app.togglePassword('resetConfirmPassword', 'resetConfirmPasswordToggle')">
+                                    <i class="bi bi-eye" id="resetConfirmPasswordToggle"></i>
+                                </button>
+                            </div>
+                            <div class="d-flex justify-content-center mt-3">
+                                <button type="button" class="btn btn-primary px-4 py-2 fw-medium" onclick="app.handleReset()" style="min-width: 120px;">Set Password</button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Registration Modal -->
+    <div class="modal fade auth-modal" id="registerModal" data-bs-backdrop="static" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered" style="max-width: 400px;">
+            <div class="modal-content border-0 shadow-lg">
+                <div class="modal-body px-4 py-4 position-relative">
+                    <button type="button" class="btn-close modal-close-btn" data-bs-dismiss="modal" aria-label="Close"></button>
+                    <div class="mb-4 text-center">
+                        <img src="Logo_for_coffee_202604042330.jpeg" alt="Plotra Logo" style="height: 32px; margin-bottom: 20px;">
+                    </div>
+
+                    <form id="registerForm" novalidate>
+                        <!-- Register Step 1: Personal Info -->
+                        <div id="regStep1" class="step-content active text-center">
+                            <h4 class="fw-bold mb-3" style="color: #1a1a2e;">Create Account</h5>
+
+                            <!-- First Name -->
+                            <div class="mb-3 reg-field-wrap position-relative">
+                                <input type="text" class="form-control" id="regFirstName" name="first_name" placeholder="First Name" required autocomplete="given-name">
+                                <span class="reg-field-icon" id="iconFirstName"></span>
+                            </div>
+                            <!-- Last Name -->
+                            <div class="mb-3 reg-field-wrap position-relative">
+                                <input type="text" class="form-control" id="regLastName" name="last_name" placeholder="Last Name" required autocomplete="family-name">
+                                <span class="reg-field-icon" id="iconLastName"></span>
+                                <div class="reg-field-msg" id="msgName"></div>
+                            </div>
+
+                            <!-- Phone -->
+                            <div class="mb-3 text-start">
+                                <label class="form-label small fw-medium text-muted mb-1">Phone Number <span class="text-danger">*</span></label>
+                                <div class="reg-field-wrap position-relative">
+                                    <div class="phone-input-wrap" id="regPhoneWrap">
+                                        <button type="button" class="phone-country-btn" onclick="app.toggleCountryMenu(this)">
+                                            <img src="https://flagcdn.com/w40/ke.png" class="phone-flag" id="regFlagImg" alt="KE">
+                                            <span class="phone-prefix" id="regPrefix">+254</span>
+                                            <span class="phone-caret">▾</span>
+                                        </button>
+                                        <ul class="phone-country-menu">
+                                            <li><a href="#" onclick="app.selectCountry('reg','ke','+254','Kenya');return false;"><img src="https://flagcdn.com/w40/ke.png" alt="KE"> Kenya <span class="ms-auto text-muted small">+254</span></a></li>
+                                            <li><a href="#" onclick="app.selectCountry('reg','ug','+256','Uganda');return false;"><img src="https://flagcdn.com/w40/ug.png" alt="UG"> Uganda <span class="ms-auto text-muted small">+256</span></a></li>
+                                            <li><a href="#" onclick="app.selectCountry('reg','tz','+255','Tanzania');return false;"><img src="https://flagcdn.com/w40/tz.png" alt="TZ"> Tanzania <span class="ms-auto text-muted small">+255</span></a></li>
+                                        </ul>
+                                        <input type="tel" id="regPhone" name="phone" placeholder="0712 345 678" required maxlength="10" inputmode="numeric">
+                                    </div>
+                                    <span class="reg-field-icon reg-field-icon--outside" id="iconPhone"></span>
+                                </div>
+                                <div class="reg-field-msg" id="msgPhone"></div>
+                                <input type="hidden" id="regCountry" value="Kenya">
+                            </div>
+
+                            <!-- Email -->
+                            <div class="mb-4 text-start">
+                                <label class="form-label small fw-medium text-muted mb-1">Email <span class="text-muted fw-normal">(optional)</span></label>
+                                <div class="reg-field-wrap position-relative">
+                                    <input type="email" class="form-control" id="regEmail" name="email" placeholder="email@example.com" autocomplete="email">
+                                    <span class="reg-field-icon" id="iconEmail"></span>
+                                </div>
+                                <div class="reg-field-msg" id="msgEmail"></div>
+                            </div>
+
+                            <div class="d-flex justify-content-center mt-3 gap-2">
+                                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="app.showLoginModal()" style="color:#6f4e37;border-color:#6f4e37;height:36px;line-height:1.4;width:110px;">Sign In</button>
+                                <button type="button" class="btn btn-primary btn-sm" id="btnNextReg1" style="height:36px;line-height:1.4;width:110px;">Next</button>
+                            </div>
+                        </div>
+
+                        <!-- OTP Verification Step -->
+                        <div id="regStepOTP" class="step-content">
+                            <div class="d-flex align-items-center mb-3">
+                                <button type="button" class="btn btn-link p-0 text-dark me-2" id="btnBackOTP"><i class="bi bi-arrow-left fs-5"></i></button>
+                                <span class="text-muted small">Verify phone</span>
+                            </div>
+                            <h4 class="fw-bold mb-2">Enter verification code</h5>
+                            <p class="text-muted small mb-4" id="otpDesc">We sent a 6-digit code to your phone.</p>
+                            <div class="otp-grid mb-3" id="otpInputGrid">
+                                <input class="otp-box" type="text" maxlength="1" inputmode="numeric" pattern="[0-9]">
+                                <input class="otp-box" type="text" maxlength="1" inputmode="numeric" pattern="[0-9]">
+                                <input class="otp-box" type="text" maxlength="1" inputmode="numeric" pattern="[0-9]">
+                                <input class="otp-box" type="text" maxlength="1" inputmode="numeric" pattern="[0-9]">
+                                <input class="otp-box" type="text" maxlength="1" inputmode="numeric" pattern="[0-9]">
+                                <input class="otp-box" type="text" maxlength="1" inputmode="numeric" pattern="[0-9]">
+                            </div>
+                            <!-- DEV: OTP preview — remove before going live -->
+                            <div id="devOtpBanner" style="display:none;background:#fff8e1;border:1px dashed #6f4e37;border-radius:8px;padding:8px 14px;margin-bottom:10px;text-align:center;font-size:.85rem;color:#4a2c0a;">
+                                🛠 Dev mode — OTP: <strong id="devOtpCode" style="font-size:1.1rem;letter-spacing:3px;"></strong>
+                            </div>
+                            <div class="reg-field-msg text-center mb-3" id="msgOTP"></div>
+                            <div class="d-flex justify-content-center mb-3">
+                                <button type="button" class="btn btn-primary px-4 py-2" id="btnVerifyOTP" style="min-width:120px;">Verify</button>
+                            </div>
+                            <div class="text-center">
+                                <span class="text-muted small">Didn't receive it? </span>
+                                <button type="button" class="btn btn-link p-0 small" id="btnResendOTP" style="color:#6f4e37;">Resend code</button>
+                            </div>
+                        </div>
+
+                        <!-- Register Step 2: Location (Hidden Role = Farmer) -->
+                        <div id="regStep2" class="step-content">
+                            <input type="hidden" id="regRole" name="role" value="farmer">
+                            <div class="d-flex align-items-center mb-3">
+                                <button type="button" class="btn btn-link p-0 text-dark me-2 btnBackReg1">
+                                    <i class="bi bi-arrow-left fs-5"></i>
+                                </button>
+                                <span class="text-muted small">Location</span>
+                            </div>
+                            <h5 class="fw-bold mb-3">Your Location</h5>
+                            <div class="mb-3">
+                                <input type="text" class="form-control" id="regCounty" name="county" placeholder="County" required>
+                            </div>
+                            <div class="mb-3">
+                                <input type="text" class="form-control" id="regSubcounty" name="subcounty" placeholder="Subcounty" required>
+                            </div>
+                            <div class="mb-3 mt-3">
+                                <label class="form-label fw-semibold" style="color: #6f4e37;">Cooperative Code</label>
+                                <div class="position-relative">
+                                    <input type="text" class="form-control" id="regCooperativeCode" name="cooperative_code" placeholder="Enter your cooperative code" required autocomplete="off">
+                                    <div id="cooperativeDropdown" class="position-absolute w-100 bg-white border rounded shadow-sm" style="display: none; max-height: 200px; overflow-y: auto; z-index: 1000; top: 100%;">
+                                    </div>
+                                </div>
+                                <small class="text-muted">Start typing to search for your cooperative</small>
+                            </div>
+                            <input type="hidden" id="regCooperativeId" name="cooperative_id" value="">
+                            <div class="d-flex justify-content-center mt-4">
+                                <button type="button" class="btn btn-primary px-4 py-2" id="btnNextReg2" style="min-width: 120px;">Next</button>
+                            </div>
+                        </div>
+
+                        <!-- Register Step 3: Gender & ID -->
+                        <div id="regStep3" class="step-content">
+                            <div class="d-flex align-items-center mb-3">
+                                <button type="button" class="btn btn-link p-0 text-dark me-2 btnBackReg2">
+                                    <i class="bi bi-arrow-left fs-5"></i>
+                                </button>
+                                <span class="text-muted small">Personal details</span>
+                            </div>
+                            <h5 class="fw-bold mb-3">Personal Information</h5>
+                            <div class="mb-3">
+                                <select class="form-select" id="regGender" name="gender" required>
+                                    <option value="" disabled selected>Select Gender</option>
+                                    <option value="F">Female</option>
+                                    <option value="M">Male</option>
+                                </select>
+                                <small class="text-muted">Required for gender-inclusive incentive programs</small>
+                            </div>
+                            <div class="mb-3">
+                                <select class="form-select" id="regIdType" name="id_type">
+                                    <option value="" disabled selected>ID Type (Optional)</option>
+                                    <option value="national_id">ID</option>
+                                    <option value="passport">Passport</option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <input type="text" class="form-control" id="regIdNumber" name="id_number" placeholder="ID Number">
+                            </div>
+                            <!-- Profile Photo -->
+                            <div class="mb-3 text-center">
+                                <div style="position:relative;display:inline-block;">
+                                    <img id="regPhotoPreview" src="https://ui-avatars.com/api/?name=User&background=6f4e37&color=fff&size=80"
+                                        style="width:80px;height:80px;border-radius:50%;object-fit:cover;border:3px solid #6f4e37;">
+                                    <label for="regProfilePhoto" style="position:absolute;bottom:0;right:0;background:#6f4e37;border-radius:50%;width:26px;height:26px;display:flex;align-items:center;justify-content:center;cursor:pointer;">
+                                        <i class="bi bi-camera-fill text-white" style="font-size:12px;"></i>
+                                        <input type="file" id="regProfilePhoto" name="profile_photo" accept="image/*" class="d-none" onchange="app.previewRegPhoto(this)">
+                                    </label>
+                                </div>
+                                <div class="text-muted small mt-1">Upload your photo <span class="text-muted fw-normal">(optional)</span></div>
+                            </div>
+                            <div class="d-flex justify-content-center mt-4">
+                                <button type="button" class="btn btn-primary px-4 py-2" id="btnNextReg3" style="min-width: 120px;">Next</button>
+                            </div>
+                        </div>
+
+                        <!-- Register Step 4: Password (FINAL STEP) -->
+                        <div id="regStep4" class="step-content">
+                            <div class="d-flex align-items-center mb-3">
+                                <button type="button" class="btn btn-link p-0 text-dark me-2 btnBackReg3">
+                                    <i class="bi bi-arrow-left fs-5"></i>
+                                </button>
+                                <span class="text-muted small">Create password</span>
+                            </div>
+                            <h5 class="fw-bold mb-3">Create a password</h5>
+                            <div class="mb-3 position-relative">
+                                <input type="password" class="form-control" id="regPassword" name="password" placeholder="Password" required minlength="8" style="padding-right: 44px;">
+                                <button class="btn btn-link text-dark text-decoration-none position-absolute end-0 top-50 translate-middle-y p-0 me-2" type="button" onclick="app.togglePassword('regPassword', 'regPasswordToggle')">
+                                    <i class="bi bi-eye" id="regPasswordToggle"></i>
+                                </button>
+                            </div>
+                            <div class="mb-4 position-relative">
+                                <input type="password" class="form-control" id="regConfirmPassword" name="confirm_password" placeholder="Confirm Password" required style="padding-right: 44px;">
+                                <button class="btn btn-link text-dark text-decoration-none position-absolute end-0 top-50 translate-middle-y p-0 me-2" type="button" onclick="app.togglePassword('regConfirmPassword', 'regConfirmPasswordToggle')">
+                                    <i class="bi bi-eye" id="regConfirmPasswordToggle"></i>
+                                </button>
+                            </div>
+                            <div class="reg-terms-row">
+                                <input type="checkbox" id="regTermsFinal" name="terms_final" required class="reg-terms-cb">
+                                <label for="regTermsFinal" class="reg-terms-label">I agree to the <a href="#" class="text-decoration-none" style="color:#6f4e37;">Terms of Use</a></label>
+                            </div>
+                            <div class="d-flex justify-content-center mt-4">
+                                <button type="submit" class="btn btn-primary px-4 py-2" style="min-width: 120px;">Finish</button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Farm Modal -->
+    <div class="modal fade" id="addFarmModal" tabindex="-1">
+        <div class="modal-dialog modal-lg modal-xl">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-geo-alt"></i> Add New Farm</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <form id="addFarmForm">
+                    <div class="modal-body">
+                        <!-- Horizontal Tab Navigation -->
+                        <ul class="nav nav-tabs mb-4" id="farmFormTabs" role="tablist">
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link active" id="tab1-tab" data-bs-toggle="tab" data-bs-target="#tab1" type="button" role="tab">
+                                    <i class="bi bi-1-circle"></i> Basic Farm Information
+                                </button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" id="tab2-tab" data-bs-toggle="tab" data-bs-target="#tab2" type="button" role="tab">
+                                    <i class="bi bi-2-circle"></i> Advanced Information
+                                </button>
+                            </li>
+                        </ul>
+
+                        <!-- Tab Content -->
+                        <div class="tab-content" id="farmFormTabContent">
+                            <!-- TAB 1: Basic Farm Information -->
+                            <div class="tab-pane fade show active" id="tab1" role="tabpanel">
+                                <!-- Step Navigation for Tab 1 -->
+                                <div class="step-indicator mb-4">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div class="step-item active" data-step="1">
+                                            <div class="step-circle">1</div>
+                                            <div class="step-label">Farmer Identity</div>
+                                        </div>
+                                        <div class="step-line"></div>
+                                        <div class="step-item" data-step="2">
+                                            <div class="step-circle">2</div>
+                                            <div class="step-label">Farm Basics</div>
+                                        </div>
+                                        <div class="step-line"></div>
+                                        <div class="step-item" data-step="3">
+                                            <div class="step-circle">3</div>
+                                            <div class="step-label">Coffee Production</div>
+                                        </div>
+                                        <div class="step-line"></div>
+                                        <div class="step-item" data-step="4">
+                                            <div class="step-circle">4</div>
+                                            <div class="step-label">GPS Polygon</div>
+                                        </div>
+                                        <div class="step-line"></div>
+                                        <div class="step-item" data-step="5">
+                                            <div class="step-circle">✓</div>
+                                            <div class="step-label">Review</div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Tab 1 Steps Container -->
+                                <div id="tab1Steps">
+                                    <!-- Step 1: Farmer Identity -->
+                                    <div class="step-content active" data-step="1">
+                                        <h6 class="mb-3 text-primary"><i class="bi bi-person-badge"></i> 1.1 Farmer Identity</h6>
+                                        <div class="row g-3">
+                                            <div class="col-md-6">
+                                                <label class="form-label">Full Name *</label>
+                                                <input type="text" class="form-control" id="farmerFullName" required placeholder="First and last name as on national ID">
+                                                <div class="invalid-feedback">Full name is required</div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label class="form-label">Phone Number *</label>
+                                                <input type="tel" class="form-control" id="farmerPhone" required placeholder="M-Pesa number">
+                                                <div class="invalid-feedback">Phone number is required</div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label class="form-label">National ID Number *</label>
+                                                <input type="text" class="form-control" id="farmerNationalId" required placeholder="Will be stored securely (SHA-256 hashed)">
+                                                <div class="invalid-feedback">National ID is required</div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label class="form-label">Gender *</label>
+                                                <select class="form-select" id="farmerGender" required>
+                                                    <option value="">Select gender</option>
+                                                    <option value="Male">Male</option>
+                                                    <option value="Female">Female</option>
+                                                    <option value="Other">Other</option>
+                                                </select>
+                                                <div class="invalid-feedback">Gender is required</div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label class="form-label">Cooperative Membership No. *</label>
+                                                <input type="text" class="form-control" id="cooperativeMemberNo" required>
+                                                <div class="invalid-feedback">Cooperative membership number is required</div>
+                                            </div>
+                                            <div class="col-12">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" id="dataConsent" required>
+                                                    <label class="form-check-label" for="dataConsent">
+                                                        I consent to the collection and processing of my data * (Required)
+                                                    </label>
+                                                    <div class="invalid-feedback">Data consent is required</div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Step 2: Farm Basics -->
+                                    <div class="step-content" data-step="2">
+                                        <h6 class="mb-3 text-primary"><i class="bi bi-farm"></i> 1.2 Farm Basics</h6>
+                                        <div class="row g-3">
+                                            <div class="col-md-6">
+                                                <label class="form-label">Farm Name / Local Name *</label>
+                                                <input type="text" class="form-control" id="farmName" required placeholder="What you call your plot">
+                                                <div class="invalid-feedback">Farm name is required</div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label class="form-label">Location - Sub-county / Village *</label>
+                                                <input type="text" class="form-control" id="farmLocation" required placeholder="Sub-county or village name">
+                                                <div class="invalid-feedback">Location is required</div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label class="form-label">Approximate Farm Size (ha) *</label>
+                                                <input type="number" class="form-control" id="farmAreaEstimate" step="0.01" required placeholder="Your estimate in hectares">
+                                                <div class="invalid-feedback">Approximate farm size is required</div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label class="form-label">Land Ownership Type *</label>
+                                                <select class="form-select" id="landOwnershipType" required>
+                                                    <option value="">Select ownership type</option>
+                                                    <option value="Title deed">Title deed</option>
+                                                    <option value="Lease agreement">Lease agreement</option>
+                                                    <option value="Family plot">Family plot</option>
+                                                    <option value="Customary tenure">Customary tenure</option>
+                                                </select>
+                                                <div class="invalid-feedback">Land ownership type is required</div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Step 3: Coffee Production -->
+                                    <div class="step-content" data-step="3">
+                                        <h6 class="mb-3 text-primary"><i class="bi bi-cup"></i> 1.3 Coffee Production</h6>
+                                        <div class="row g-3">
+                                            <div class="col-md-6">
+                                                <label class="form-label">Primary Crop</label>
+                                                <input type="text" class="form-control" value="Coffee" disabled>
+                                                <input type="hidden" id="primaryCrop" value="Coffee">
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label class="form-label">Coffee Variety *</label>
+                                                <select class="form-select" id="coffeeVariety" required>
+                                                    <option value="">Select variety</option>
+                                                    <option value="Ruiru 11">Ruiru 11</option>
+                                                    <option value="Batian">Batian</option>
+                                                    <option value="SL28">SL28</option>
+                                                    <option value="SL34">SL34</option>
+                                                    <option value="Other">Other</option>
+                                                </select>
+                                                <div class="invalid-feedback">Coffee variety is required</div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label class="form-label">Estimated Annual Yield (kg) *</label>
+                                                <input type="number" class="form-control" id="estimatedYield" step="0.1" required placeholder="Last full season">
+                                                <div class="invalid-feedback">Estimated annual yield is required</div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label class="form-label">Farming Method at Registration *</label>
+                                                <select class="form-select" id="farmingMethod" required>
+                                                    <option value="">Select farming method</option>
+                                                    <option value="Monocrop">Monocrop</option>
+                                                    <option value="Mixed crop">Mixed crop</option>
+                                                    <option value="Agroforestry">Agroforestry</option>
+                                                </select>
+                                                <div class="invalid-feedback">Farming method is required</div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+<!-- Step 4: GPS Polygon -->
+                                    <div class="step-content" data-step="4">
+                                        <h6 class="mb-3 text-primary"><i class="bi bi-globe"></i> 1.4 GPS Polygon Capture</h6>
+                                        <div class="row g-3">
+                                            <div class="col-12">
+                                                <label class="form-label">Farm Boundary <span class="text-muted fw-normal">(Optional — walk the perimeter)</span></label>
+                                                <div class="card">
+                                                    <div class="card-body p-0">
+                                                        <div id="farmMap" style="height: 300px; width: 100%;"></div>
+                                                        <div class="p-3 bg-light">
+                                                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                                                <span class="text-sm text-muted">GPS Accuracy: <span id="gpsAccuracy">--</span>m</span>
+                                                                <span class="text-sm text-muted">Points: <span id="pointCount">0</span></span>
+                                                                <span class="text-sm text-muted">Area: <span id="calculatedArea">--</span> ha</span>
+                                                            </div>
+                                                            <div class="d-flex gap-2 flex-wrap">
+                                                                <button type="button" class="btn btn-sm btn-primary" id="startCaptureBtn">
+                                                                    <i class="bi bi-geo-alt"></i> Start Capture
+                                                                </button>
+                                                                <button type="button" class="btn btn-sm btn-success" id="addPointBtn" disabled>
+                                                                    <i class="bi bi-plus-circle"></i> Add Point
+                                                                </button>
+                                                                <button type="button" class="btn btn-sm btn-warning" id="finishCaptureBtn" disabled>
+                                                                    <i class="bi bi-check-circle"></i> Finish
+                                                                </button>
+                                                                <button type="button" class="btn btn-sm btn-danger" id="clearPointsBtn" disabled>
+                                                                    <i class="bi bi-trash"></i> Clear
+                                                                </button>
+                                                            </div>
+                                                            <div class="mt-2 text-xs text-muted" id="captureInstructions">
+                                                                Click "Start Capture" to begin mapping your farm boundary. Walk around the perimeter and click "Add Point" at each corner (minimum 4 points required).
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div class="text-muted small mt-1" id="gpsPolygonError" style="display:none;">GPS polygon with at least 4 points is required</div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Step 5: Review Tab 1 -->
+                                    <div class="step-content" data-step="5">
+                                        <h6 class="mb-3 text-primary"><i class="bi bi-check-circle"></i> Review Basic Farm Information</h6>
+                                        <div class="alert alert-info mb-3">
+                                            <i class="bi bi-info-circle"></i> Please review your information before submitting. All fields marked with * are required.
+                                        </div>
+                                        <div class="row g-3" id="tab1ReviewContent">
+                                            <!-- Dynamically populated -->
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Tab 1 Navigation Buttons -->
+                                <div class="d-flex justify-content-between mt-4 pt-3 border-top">
+                                    <button type="button" class="btn btn-secondary" id="tab1PrevBtn" style="visibility:hidden">
+                                        <i class="bi bi-arrow-left"></i> Back
+                                    </button>
+                                    <button type="button" class="btn btn-primary" id="tab1NextBtn">
+                                        Next <i class="bi bi-arrow-right"></i>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- TAB 2: Advanced Farm Information -->
+                            <div class="tab-pane fade" id="tab2" role="tabpanel">
+                                <!-- Step Navigation for Tab 2 -->
+                                <div class="step-indicator mb-4">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div class="step-item" data-step="1">
+                                            <div class="step-circle">1</div>
+                                            <div class="step-label">Land Docs</div>
+                                        </div>
+                                        <div class="step-line"></div>
+                                        <div class="step-item" data-step="2">
+                                            <div class="step-circle">2</div>
+                                            <div class="step-label">Agroforestry</div>
+                                        </div>
+                                        <div class="step-line"></div>
+                                        <div class="step-item" data-step="3">
+                                            <div class="step-circle">3</div>
+                                            <div class="step-label">Practice Log</div>
+                                        </div>
+                                        <div class="step-line"></div>
+                                        <div class="step-item" data-step="4">
+                                            <div class="step-circle">4</div>
+                                            <div class="step-label">Heritage</div>
+                                        </div>
+                                        <div class="step-line"></div>
+                                        <div class="step-item" data-step="5">
+                                            <div class="step-circle">✓</div>
+                                            <div class="step-label">Review</div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Tab 2 Steps Container -->
+                                <div id="tab2Steps">
+                                    <!-- Step 1: Land Documentation -->
+                                    <div class="step-content" data-step="1">
+                                        <h6 class="mb-3 text-success"><i class="bi bi-file-earmark-text"></i> 2.1 Land Documentation</h6>
+                                        <div class="row g-3">
+                                            <div class="col-md-6">
+                                                <label class="form-label">Document Upload</label>
+                                                <input type="file" class="form-control" id="documentUpload" accept="image/*,.pdf">
+                                                <div class="form-text">Title deed, lease agreement, or family allocation letter (optional)</div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label class="form-label">Parent Parcel Link</label>
+                                                <input type="text" class="form-control" id="parentParcelLink" placeholder="Link to master deed holder's parcel (optional)">
+                                                <div class="form-text">For family or shared plots (optional)</div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Step 2: Agroforestry and Intercropping -->
+                                    <div class="step-content" data-step="2">
+                                        <h6 class="mb-3 text-success"><i class="bi bi-tree"></i> 2.2 Agroforestry and Intercropping</h6>
+                                        <div class="row g-3">
+                                            <div class="col-md-6">
+                                                <label class="form-label">Intercropped Species</label>
+                                                <select class="form-select" id="intercroppedSpecies" multiple>
+                                                    <option value="Avocado">Avocado</option>
+                                                    <option value="Macadamia">Macadamia</option>
+                                                    <option value="Banana">Banana</option>
+                                                    <option value="Other">Other</option>
+                                                </select>
+                                                <div class="form-text">Hold Ctrl/Cmd to select multiple (optional)</div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label class="form-label">Shade Trees Present</label>
+                                                <div class="d-flex align-items-center gap-3">
+                                                    <div class="form-check form-check-inline">
+                                                        <input class="form-check-input" type="radio" name="shadeTrees" id="shadeTreesYes" value="yes">
+                                                        <label class="form-check-label" for="shadeTreesYes">Yes</label>
+                                                    </div>
+                                                    <div class="form-check form-check-inline">
+                                                        <input class="form-check-input" type="radio" name="shadeTrees" id="shadeTreesNo" value="no" checked>
+                                                        <label class="form-check-label" for="shadeTreesNo">No</label>
+                                                    </div>
+                                                    <input type="number" class="form-control" id="shadeTreeCanopy" placeholder="Canopy %" style="width: 100px;" disabled>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label class="form-label">Estimated Number of Coffee Trees</label>
+                                                <input type="number" class="form-control" id="coffeeTreeCount" placeholder="Number of coffee trees">
+                                                <div class="form-text">Used to cross-check yield figures (optional)</div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label class="form-label">Agroforestry Start Year</label>
+                                                <input type="number" class="form-control" id="agroforestryStartYear" min="1900" max="2099" placeholder="e.g., 2020">
+                                                <div class="form-text">Year shade/intercrop system was established (optional)</div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Step 3: Practice Log -->
+                                    <div class="step-content" data-step="3">
+                                        <h6 class="mb-3 text-success"><i class="bi bi-journal-text"></i> 2.3 Practice Log — Initial Entry</h6>
+                                        <div class="row g-3">
+                                            <div class="col-md-6">
+                                                <label class="form-label">Last Pruning Date</label>
+                                                <input type="date" class="form-control" id="lastPruningDate">
+                                                <div class="form-text">Cross-referenced with satellite NDVI drop events (optional)</div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label class="form-label">Last Harvesting Date</label>
+                                                <input type="date" class="form-control" id="lastHarvestingDate">
+                                                <div class="form-text">Cross-referenced with satellite brown-down events (optional)</div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label class="form-label">Recent Planting Event</label>
+                                                <div class="input-group">
+                                                    <input type="date" class="form-control" id="plantingDate">
+                                                    <input type="text" class="form-control" id="plantingWhat" placeholder="What was planted">
+                                                </div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label class="form-label">Practice Photo Evidence</label>
+                                                <input type="file" class="form-control" id="practicePhoto" accept="image/*">
+                                                <div class="form-text">Timestamped photo of farm activity (optional)</div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Step 4: Farm History and Heritage -->
+                                    <div class="step-content" data-step="4">
+                                        <h6 class="mb-3 text-success"><i class="bi bi-clock-history"></i> 2.4 Farm History and Heritage</h6>
+                                        <div class="row g-3">
+                                            <div class="col-md-6">
+                                                <label class="form-label">Year Farm was Established</label>
+                                                <input type="number" class="form-control" id="farmEstablishedYear" min="1900" max="2099">
+                                                <div class="form-text">Supports NDVI heritage slope calculation (optional)</div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label class="form-label">Previous Land Use</label>
+                                                <select class="form-select" id="previousLandUse">
+                                                    <option value="">Select previous land use</option>
+                                                    <option value="Forest">Forest</option>
+                                                    <option value="Pasture">Pasture</option>
+                                                    <option value="Cropland">Cropland</option>
+                                                    <option value="Other">Other</option>
+                                                </select>
+                                                <div class="form-text">Informs satellite deforestation interpretation (optional)</div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label class="form-label">Certification Status</label>
+                                                <select class="form-select" id="certificationStatus" multiple>
+                                                    <option value="Rainforest Alliance">Rainforest Alliance</option>
+                                                    <option value="Organic">Organic</option>
+                                                    <option value="UTZ">UTZ</option>
+                                                    <option value="Fairtrade">Fairtrade</option>
+                                                    <option value="None">None</option>
+                                                </select>
+                                                <div class="form-text">Hold Ctrl/Cmd to select multiple (optional)</div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label class="form-label">NGO or Programme Support Received</label>
+                                                <input type="text" class="form-control" id="ngoSupport" placeholder="Name of programme">
+                                                <input type="text" class="form-control mt-2" id="ngoSupportYears" placeholder="Years active (e.g., 2020-2023)">
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Step 5: Review Tab 2 -->
+                                    <div class="step-content" data-step="5">
+                                        <h6 class="mb-3 text-success"><i class="bi bi-check-circle"></i> Review Advanced Farm Information</h6>
+                                        <div class="alert alert-success mb-3">
+                                            <i class="bi bi-info-circle"></i> Advanced information is optional but improves your compliance score and supports premium access.
+                                        </div>
+                                        <div class="progress mb-3" style="height: 20px;">
+                                            <div class="progress-bar bg-success" id="tab2ProgressBar" role="progressbar" style="width: 0%;">0% Complete</div>
+                                        </div>
+                                        <div class="row g-3" id="tab2ReviewContent">
+                                            <!-- Dynamically populated -->
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Tab 2 Navigation Buttons -->
+                                <div class="d-flex justify-content-between mt-4 pt-3 border-top">
+                                    <button type="button" class="btn btn-secondary" id="tab2PrevBtn" style="visibility:hidden">
+                                        <i class="bi bi-arrow-left"></i> Back
+                                    </button>
+                                    <button type="button" class="btn btn-success" id="tab2NextBtn">
+                                        Submit <i class="bi bi-check"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        .step-indicator {
+            padding: 10px 0;
+        }
+        .step-indicator .step-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            cursor: pointer;
+        }
+        .step-indicator .step-circle {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: #e9ecef;
+            color: #6c757d;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+        .step-indicator .step-item.active .step-circle,
+        .step-indicator .step-item.completed .step-circle {
+            background: #0d6efd;
+            color: white;
+        }
+        .step-indicator .step-item.completed .step-circle {
+            background: #198754;
+        }
+        .step-indicator .step-label {
+            font-size: 11px;
+            margin-top: 4px;
+            color: #6c757d;
+            text-align: center;
+            white-space: nowrap;
+        }
+        .step-indicator .step-item.active .step-label {
+            color: #0d6efd;
+            font-weight: 600;
+        }
+        .step-indicator .step-line {
+            flex: 1;
+            height: 2px;
+            background: #e9ecef;
+            margin: 0 8px 20px;
+        }
+        .step-content {
+            display: none;
+        }
+        .step-content.active {
+            display: block;
+        }
+    </style>
+
+    <!-- Add Cooperative Modal -->
+    <div class="modal fade" id="addCooperativeModal" tabindex="-1">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header bg-gradient text-center justify-content-center position-relative" style="background: linear-gradient(135deg, #6f4e37 0%, #8b6914 100%);">
+                    <h5 class="modal-title text-white w-100"><i class="bi bi-building"></i> Create New Cooperative</h5>
+                    <button type="button" class="btn-close btn-close-white position-absolute end-0 me-3" data-bs-dismiss="modal"></button>
+                </div>
+                <form id="addCooperativeForm">
+                    <div class="modal-body p-4">
+                        <!-- Section 1: Basic Information -->
+                        <div class="form-section mb-4" id="section-cooperative">
+                            <h6 class="section-title mb-4 border-bottom pb-2 text-center justify-content-center text-primary fw-bold"><i class="bi bi-building me-2"></i>Basic Information</h6>
+                            <div class="row g-3">
+                                <div class="col-md-12">
+                                    <div class="form-floating">
+                                        <input type="text" class="form-control" id="coopName" placeholder="Cooperative Name" required>
+                                        <label for="coopName">Cooperative Name *</label>
+                                        <div class="invalid-feedback">Please enter cooperative name</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-floating">
+                                        <input type="text" class="form-control" id="coopRegNumber" placeholder="Registration Number">
+                                        <label for="coopRegNumber">Registration Number</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="form-floating">
+                                        <select class="form-select" id="coopType">
+                                            <option value="" selected>Select type</option>
+                                            <option value="women">Women Based</option>
+                                            <option value="general">General</option>
+                                            <option value="men">Men Based</option>
+                                        </select>
+                                        <label for="coopType">Cooperative Type</label>
+                                    </div>
+                                </div>
+
+                                <!-- Contact Info -->
+                                <div class="col-12 mt-3"><hr class="my-2"></div>
+                                <h6 class="section-title mb-4 border-bottom pb-2 text-center justify-content-center text-primary fw-bold"><i class="bi bi-telephone me-2"></i>Contact Information</h6>
+                                <div class="col-md-6">
+                                    <div class="form-floating">
+                                        <input type="email" class="form-control" id="coopEmail" placeholder="Email">
+                                        <label for="coopEmail">Cooperative Email</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-floating">
+                                        <input type="text" class="form-control" id="coopPhone" placeholder="Phone">
+                                        <label for="coopPhone">Cooperative Phone</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-12">
+                                    <div class="form-floating">
+                                        <input type="text" class="form-control" id="coopAddress" placeholder="Address">
+                                        <label for="coopAddress">Cooperative Address</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+
+                                </div>
+                                <!-- Location Details -->
+                                <div class="col-12 mt-3"><hr class="my-2"></div>
+                                <h6 class="section-title mb-4 border-bottom pb-2 text-center justify-content-center text-primary fw-bold"><i class="bi bi-geo-alt me-2"></i>Location Details</h6>
+                                <div class="col-md-6">
+                                    <div class="form-floating">
+                                        <input type="text" class="form-control" id="coopCounty" placeholder="County">
+                                        <label for="coopCounty">County</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-floating">
+                                        <input type="text" class="form-control" id="coopSubcounty" placeholder="Subcounty">
+                                        <label for="coopSubcounty">Subcounty</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-floating">
+                                        <input type="text" class="form-control" id="coopDistrict" placeholder="District">
+                                        <label for="coopDistrict">District</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-floating">
+                                        <input type="text" class="form-control" id="coopWard" placeholder="Ward">
+                                        <label for="coopWard">Ward</label>
+                                    </div>
+                                </div>
+
+                            </div>
+                        </div>
+                        
+                        <div class="form-section">
+                             <h6 class="section-title mb-4 border-bottom pb-2 text-center justify-content-center text-primary fw-bold"><i class="bi bi-person-badge me-2"></i>Cooperative Workplace Admin</h6>
+                             <div class="alert alert-info d-flex align-items-center mb-3" role="alert">
+                                 <i class="bi bi-info-circle-fill me-2"></i>
+                                 <small>This user will be the primary administrator for the cooperative workplace</small>
+                             </div>
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <div class="form-floating">
+                                        <input type="text" class="form-control" id="coopAdminFirstName" placeholder="First Name">
+                                        <label for="coopAdminFirstName">Admin First Name</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-floating">
+                                        <input type="text" class="form-control" id="coopAdminLastName" placeholder="Last Name">
+                                        <label for="coopAdminLastName">Admin Last Name</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-floating">
+                                        <input type="email" class="form-control" id="coopAdminEmail" placeholder="Email" required>
+                                        <label for="coopAdminEmail">Admin Email *</label>
+                                        <div class="invalid-feedback">Please enter admin email</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-floating">
+                                        <input type="tel" class="form-control" id="coopAdminPhone" placeholder="Phone">
+                                        <label for="coopAdminPhone">Admin Phone</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-12">
+                                    <div class="form-floating">
+                                        <input type="password" class="form-control" id="coopAdminPassword" placeholder="Password" minlength="8">
+                                        <label for="coopAdminPassword">Admin Password (min 8 chars)</label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Section 3: Additional Cooperative Workplace Contact -->
+                         <div class="form-section">
+                             <h6 class="section-title mb-4 border-bottom pb-2 text-center justify-content-center text-primary fw-bold"><i class="bi bi-person-contact me-2"></i>Additional Cooperative Workplace Contact</h6>
+                             <div class="form-check form-switch mb-3">
+                                 <input class="form-check-input" type="checkbox" id="addContactPerson">
+                                 <label class="form-check-label" for="addContactPerson">Add a separate cooperative workplace contact (in addition to admin)</label>
+                             </div>
+                            <div class="contact-person-fields" style="display: none;">
+                                 <div class="alert alert-warning d-flex align-items-center mb-3" role="alert">
+                                     <i class="bi bi-person-badge me-2"></i>
+                                     <small>Enter details for an additional cooperative workplace contact for this cooperative</small>
+                                 </div>
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <div class="form-floating">
+                                            <input type="text" class="form-control" id="contactFirstName" placeholder="First Name">
+                                            <label for="contactFirstName">Contact First Name</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="form-floating">
+                                            <input type="text" class="form-control" id="contactLastName" placeholder="Last Name">
+                                            <label for="contactLastName">Contact Last Name</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="form-floating">
+                                            <input type="email" class="form-control" id="contactEmail" placeholder="Email">
+                                            <label for="contactEmail">Contact Email</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="form-floating">
+                                            <input type="tel" class="form-control" id="contactPhone" placeholder="Phone">
+                                            <label for="contactPhone">Contact Phone</label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                             <div class="no-contact-note mt-3">
+                                 <p class="text-muted small"><i class="bi bi-info-circle"></i> The cooperative workplace admin will be the primary contact by default</p>
+                             </div>
+                        </div>
+                        
+                        <!-- Section 4: Required Documents -->
+                        <div class="form-section" id="coopRequiredDocsSection" style="display: none;">
+                            <h6 class="section-title mb-4 border-bottom pb-2 text-center justify-content-center text-primary fw-bold"><i class="bi bi-file-earmark-text me-2"></i>Upload Required Documents</h6>
+                            <div class="alert alert-info d-flex align-items-center mb-3" role="alert">
+                                <i class="bi bi-info-circle-fill me-2"></i>
+                                <small>Please upload the required documents for this cooperative registration</small>
+                            </div>
+                            <div id="coopRequiredDocsList" class="row g-3">
+                                <div class="col-12 text-center text-muted">Loading documents...</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer bg-light border-top p-4 d-flex justify-content-center">
+                        <button type="button" class="btn btn-secondary px-5 me-3" data-bs-dismiss="modal" style="background-color: #001f3f; border-color: #001f3f;">Cancel</button>
+                        <button type="submit" class="btn btn-success px-5" id="coopSubmitBtn" style="background-color: #28a745; border-color: #28a745;">
+                            <i class="bi bi-check-lg"></i> Create Cooperative
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Delivery Modal -->
+    <div class="modal fade" id="addDeliveryModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header" style="background:linear-gradient(135deg,#2c1a0e,#6f4e37);color:white;">
+                    <h5 class="modal-title"><i class="bi bi-box-seam me-2"></i>Record Farmer Delivery</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <form id="addDeliveryForm">
+                    <div class="modal-body">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">Farmer <span class="text-danger">*</span></label>
+                                <select class="form-select" id="deliveryFarmer" onchange="app.loadFarmerFarms(this.value)" required>
+                                    <option value="">— select farmer —</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">Farm <span class="text-danger">*</span></label>
+                                <select class="form-select" id="deliveryFarm" required>
+                                    <option value="">— select farm —</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-semibold">Gross Weight (kg) <span class="text-danger">*</span></label>
+                                <input type="number" class="form-control" id="deliveryGrossWeight" step="0.01" min="0" oninput="app.calcNetWeight()" required>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-semibold">Tare Weight (kg)</label>
+                                <input type="number" class="form-control" id="deliveryTareWeight" step="0.01" min="0" value="0" oninput="app.calcNetWeight()">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-semibold">Net Weight (kg)</label>
+                                <input type="number" class="form-control" id="deliveryNetWeight" step="0.01" readonly style="background:#f8f5f2;">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">Quality Grade <span class="text-danger">*</span></label>
+                                <select class="form-select" id="deliveryGrade" required>
+                                    <option value="AA">AA — Premium</option>
+                                    <option value="AB">AB — Standard</option>
+                                    <option value="C">C — Commercial</option>
+                                    <option value="PB">PB — Peaberry</option>
+                                    <option value="E">E — Elephant Bean</option>
+                                    <option value="TT">TT — Light</option>
+                                    <option value="UG">UG — Undergrades</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">Moisture Content (%)</label>
+                                <input type="number" class="form-control" id="deliveryMoisture" step="0.1" value="12.0" min="0" max="100">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">Cherry Type</label>
+                                <select class="form-select" id="deliveryCherryType">
+                                    <option value="red_cherry">Red Cherry</option>
+                                    <option value="green_cherry">Green Cherry</option>
+                                    <option value="mixed">Mixed</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">Picking Date</label>
+                                <input type="date" class="form-control" id="deliveryPickingDate">
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label fw-semibold">Notes</label>
+                                <textarea class="form-control" id="deliveryNotes" rows="2" placeholder="Optional notes..."></textarea>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary"><i class="bi bi-check-circle me-1"></i>Record Delivery</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create Batch Modal -->
+    <div class="modal fade" id="createBatchModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-layers"></i> Create Batch</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <form id="createBatchForm">
+                    <div class="modal-body">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Quality Grade *</label>
+                                <select class="form-select" id="batchGrade" required>
+                                    <option value="AA">AA - Premium</option>
+                                    <option value="AB">AB - Standard</option>
+                                    <option value="C">C - Commercial</option>
+                                    <option value="PB">PB - Peaberry</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Total Weight (kg) *</label>
+                                <input type="number" class="form-control" id="batchWeight" step="0.01" required>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label">Select Deliveries to Include</label>
+                                <div id="batchDeliveries" class="border rounded p-3" style="max-height: 200px; overflow-y: auto;">
+                                    <p class="text-muted small">Loading deliveries...</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary"><i class="bi bi-check"></i> Create Batch</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notifications Modal -->
+    <div class="modal fade" id="notificationsModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-scrollable" style="max-width:480px">
+            <div class="modal-content">
+                <div class="modal-header" style="background:linear-gradient(135deg,#2c1a0e,#6f4e37);color:white;">
+                    <h5 class="modal-title"><i class="bi bi-bell me-2"></i>Notifications</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-0" id="notificationsModalBody">
+                    <div class="text-center py-5 text-muted">
+                        <i class="bi bi-bell-slash fs-1 d-block mb-2 opacity-50"></i>
+                        No notifications available
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Verification Approve/Reject Reason Modal -->
+    <div class="modal fade" id="verificationReasonModal" tabindex="-1">
+        <div class="modal-dialog" style="max-width:420px">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="verificationModalTitle">Approve Farm</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <label class="form-label" id="verificationReasonLabel">Notes (optional)</label>
+                    <textarea class="form-control" id="verificationReasonInput" rows="3"
+                        placeholder="Enter reason or notes..."></textarea>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-success btn-sm" id="verificationModalConfirmBtn"
+                        onclick="app.confirmVerificationAction()">Confirm</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Upload Document Modal -->
+    <div class="modal fade" id="uploadDocumentModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-file-earmark-plus"></i> Upload KYC Document</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <form id="uploadDocumentForm">
+                    <div class="modal-body">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Select Farm *</label>
+                                <select class="form-select" id="docFarm" required>
+                                    <option value="">Select Farm</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Document Type *</label>
+                                <select class="form-select" id="docType" required>
+                                    <option value="title_deed">Title Deed</option>
+                                    <option value="lease_agreement">Lease Agreement</option>
+                                    <option value="customary_rights">Customary Rights</option>
+                                    <option value="inheritance_letter">Inheritance Letter</option>
+                                    <option value="community_land_title">Community Land Title</option>
+                                    <option value="other">Other</option>
+                                </select>
+                            </div>
+                            <div class="col-md-12">
+                                <label class="form-label">Document Title *</label>
+                                <input type="text" class="form-control" id="docTitle" required placeholder="e.g., Plot 123 Title Deed">
+                            </div>
+                            <div class="col-md-12">
+                                <label class="form-label">Description</label>
+                                <textarea class="form-control" id="docDescription" rows="2"></textarea>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Ownership Type</label>
+                                <select class="form-select" id="docOwnership">
+                                    <option value="owned">Owned</option>
+                                    <option value="leased">Leased</option>
+                                    <option value="customary" selected>Customary</option>
+                                    <option value="tenant">Tenant</option>
+                                    <option value="community">Community</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Issuing Authority</label>
+                                <input type="text" class="form-control" id="docAuthority">
+                            </div>
+                            <div class="col-md-12">
+                                <label class="form-label">Select File (PDF, Image) *</label>
+                                <input type="file" class="form-control" id="docFile" required>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary"><i class="bi bi-upload"></i> Upload Document</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Generate DDS Modal -->
+    <div class="modal fade" id="generateDDSModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-file-earmark-plus"></i> Generate DDS (Due Diligence Statement)</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <form id="generateDDSForm">
+                    <div class="modal-body">
+                        <div class="row g-3">
+                            <!-- Operator Information -->
+                            <h6>Operator Information</h6>
+                            <div class="col-md-6">
+                                <label class="form-label">Operator Name *</label>
+                                <input type="text" class="form-control" id="ddsOperatorName" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Operator ID</label>
+                                <input type="text" class="form-control" id="ddsOperatorId" placeholder="National ID or Business Reg. No.">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Contact Name</label>
+                                <input type="text" class="form-control" id="ddsContactName">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Contact Email</label>
+                                <input type="email" class="form-control" id="ddsContactEmail">
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label">Contact Address</label>
+                                <textarea class="form-control" id="ddsContactAddress" rows="2"></textarea>
+                            </div>
+                            
+                            <!-- Commodity Information -->
+                            <h6 class="mt-4">Commodity Information</h6>
+                            <div class="col-md-4">
+                                <label class="form-label">Commodity Type</label>
+                                <select class="form-select" id="ddsCommodityType">
+                                    <option value="Coffee" selected>Coffee</option>
+                                    <option value="Tea">Tea</option>
+                                    <option value="Cocoa">Cocoa</option>
+                                    <option value="Palm Oil">Palm Oil</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">HS Code</label>
+                                <input type="text" class="form-control" id="ddsHSCode" value="090111">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Production Country</label>
+                                <select class="form-select" id="ddsCountry">
+                                    <option value="Kenya" selected>Kenya</option>
+                                    <option value="Uganda">Uganda</option>
+                                    <option value="Tanzania">Tanzania</option>
+                                    <option value="Ethiopia">Ethiopia</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Quantity *</label>
+                                <input type="number" class="form-control" id="ddsQuantity" step="0.01" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Unit</label>
+                                <select class="form-select" id="ddsUnit">
+                                    <option value="kg" selected>kg</option>
+                                    <option value="tonnes">tonnes</option>
+                                    <option value="bags">bags</option>
+                                </select>
+                            </div>
+                            
+                            <!-- Supplier Information -->
+                            <h6 class="mt-4">Supplier Information</h6>
+                            <div class="col-md-6">
+                                <label class="form-label">Supplier Name</label>
+                                <input type="text" class="form-control" id="ddsSupplierName">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Supplier Country</label>
+                                <input type="text" class="form-control" id="ddsSupplierCountry">
+                            </div>
+                            
+                            <!-- First Placement Information -->
+                            <h6 class="mt-4">First Placement Information</h6>
+                            <div class="col-md-6">
+                                <label class="form-label">First Placement Country</label>
+                                <input type="text" class="form-control" id="ddsFirstPlacementCountry">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">First Placement Date</label>
+                                <input type="date" class="form-control" id="ddsFirstPlacementDate">
+                            </div>
+                            
+                            <!-- Farm Selection -->
+                            <h6 class="mt-4">Associated Farms</h6>
+                            <div class="col-12">
+                                <label class="form-label">Select Farms</label>
+                                <select class="form-select" id="ddsFarmIds" multiple size="3">
+                                    <!-- Options will be populated dynamically -->
+                                </select>
+                                <div class="form-text">Hold Ctrl/Cmd to select multiple farms</div>
+                            </div>
+                            
+                            <div class="col-12 mt-4">
+                                <div class="alert alert-info">
+                                    <i class="bi bi-info-circle"></i> The DDS will be generated according to EUDR requirements and can be exported as XML.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary"><i class="bi bi-check"></i> Generate DDS</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- View/Edit Farm Modal -->
+    <div class="modal fade" id="viewFarmModal" tabindex="-1">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header" style="background:linear-gradient(135deg,#2d6a4f,#40916c);color:#fff;">
+                    <h5 class="modal-title"><i class="bi bi-geo-alt-fill me-2"></i><span id="viewFarmModalTitle">Farm Details</span></h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-0">
+                    <div id="farmDetailsContent">
+                        <div class="text-center py-5">
+                            <div class="spinner-border text-success"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer gap-2">
+                    <button type="button" class="btn btn-outline-danger" id="deleteFarmBtn"><i class="bi bi-trash me-1"></i>Delete</button>
+                    <button type="button" class="btn btn-secondary ms-auto" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Farm Polygon Capture/Recapture Modal -->
+    <div class="modal fade" id="farmCaptureModal" tabindex="-1" aria-labelledby="farmCaptureModalLabel">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title" id="farmCaptureModalLabel"><i class="bi bi-geo-alt-fill me-2"></i>Capture Farm Boundary</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-0">
+                    <input type="hidden" id="captureFarmId">
+                    <div class="row g-0">
+                        <!-- Map Panel -->
+                        <div class="col-lg-8">
+                            <div id="captureMapContainer" style="height:480px;background:#e9ecef;position:relative;">
+                                <div id="captureMap" style="height:100%;width:100%;"></div>
+                            </div>
+                            <div class="p-3 border-top bg-light d-flex gap-2 flex-wrap align-items-center">
+                                <button class="btn btn-success btn-sm" id="captureStartBtn"><i class="bi bi-play-fill me-1"></i>Start Capture</button>
+                                <button class="btn btn-primary btn-sm" id="captureAddPointBtn" disabled><i class="bi bi-plus-circle me-1"></i>Add Point</button>
+                                <button class="btn btn-warning btn-sm" id="captureFinishBtn" disabled><i class="bi bi-stop-fill me-1"></i>Finish</button>
+                                <button class="btn btn-outline-danger btn-sm" id="captureClearBtn"><i class="bi bi-trash me-1"></i>Clear</button>
+                                <span class="ms-auto text-muted small">Points: <strong id="capturePointCount">0</strong> | Area: <strong id="captureAreaDisplay">--</strong> ha</span>
+                            </div>
+                        </div>
+                        <!-- Info Panel -->
+                        <div class="col-lg-4 border-start p-3 d-flex flex-column gap-3">
+                            <div class="alert alert-info py-2 small mb-0">
+                                <i class="bi bi-info-circle me-1"></i>Walk around your farm boundary. Press <b>Start Capture</b>, then <b>Add Point</b> at each corner (min 4 points).
+                            </div>
+                            <div>
+                                <label class="form-label small fw-semibold">GPS Accuracy</label>
+                                <div class="input-group input-group-sm">
+                                    <input type="text" class="form-control" id="captureAccuracy" readonly placeholder="--">
+                                    <span class="input-group-text">m</span>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="form-label small fw-semibold">Estimated Area (ha)</label>
+                                <input type="number" class="form-control form-control-sm" id="captureAreaInput" placeholder="Or enter manually" step="0.01" min="0.01">
+                            </div>
+                            <div id="captureStatusMsg" class="text-muted small">Ready to capture.</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-success" id="saveCaptureBtn"><i class="bi bi-check-lg me-1"></i>Save Boundary</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- View User Modal -->
+    <div class="modal fade" id="viewUserModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-person"></i> User Details</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="userDetailsContent">
+                        <div class="text-center py-4">
+                            <div class="spinner-border text-primary"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Parcel Modal -->
+    <div class="modal fade" id="addParcelModal" tabindex="-1">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-boundary"></i> Add & Map Parcel</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <form id="addParcelForm">
+                    <div class="modal-body">
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label class="form-label">Parcel Code *</label>
+                                    <input type="text" class="form-control" id="parcelCode" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Area (Hectares) *</label>
+                                    <input type="number" class="form-control" id="parcelArea" step="0.01" readonly>
+                                    <div class="form-text text-primary">Calculated from map</div>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Land Use Type</label>
+                                    <select class="form-select" id="parcelLandUse">
+                                        <option value="agroforestry" selected>Agroforestry (EUDR Compliant)</option>
+                                        <option value="monocrop">Monocrop</option>
+                                        <option value="forest_reserve">Forest Reserve</option>
+                                    </select>
+                                </div>
+                                <div class="alert alert-warning x-small-text mb-3">
+                                    <i class="bi bi-info-circle"></i> Use the draw tool or start walking to map the boundary.
+                                </div>
+                                <div class="d-grid gap-2 mb-3">
+                                    <button type="button" class="btn btn-outline-success btn-sm" id="btnStartWalking" onclick="app.startWalking()">
+                                        <i class="bi bi-play-circle me-1"></i> Start Walking
+                                    </button>
+                                    <button type="button" class="btn btn-outline-primary btn-sm d-none" id="btnCapturePoint" onclick="app.capturePoint()">
+                                        <i class="bi bi-geo-alt-fill me-1"></i> Capture Point
+                                    </button>
+                                    <button type="button" class="btn btn-outline-danger btn-sm d-none" id="btnStopWalking" onclick="app.stopWalking()">
+                                        <i class="bi bi-stop-circle me-1"></i> Finish Walking
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="col-md-8">
+                                <div id="parcelDrawMap" style="height: 450px; border-radius: 8px; border: 1px solid #ddd;"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary" id="saveParcelBtn" disabled><i class="bi bi-check"></i> Save Parcel</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main App Container -->
+    <div id="app-container" class="d-none">
+        <!-- Sidebar Overlay (for mobile) -->
+        <div class="sidebar-overlay" id="sidebarOverlay"></div>
+        
+        <!-- Hope UI Sidebar -->
+        <aside class="sidebar sidebar-default sidebar-white sidebar-base navs-rounded-all" id="sidebar">
+            <div class="sidebar-header d-flex align-items-center justify-content-between">
+                <a href="#" class="navbar-brand d-flex align-items-center gap-2">
+                    <div class="logo-main">
+                        <img src="Logo_for_coffee_202604042330.jpeg" alt="Plotra" style="height: 32px;">
+                    </div>
+                    <h4 class="logo-title mb-0" style="color: #daa520;">Plotra</h5>
+                </a>
+            </div>
+            <div class="sidebar-body pt-0 data-scrollbar">
+                <div class="sidebar-list">
+                    <!-- User Profile -->
+                    <div class="user-profile" id="userProfile" style="display: none; padding: 1rem; border-bottom: 1px solid rgba(0,0,0,0.1); margin-bottom: 1rem;">
+                        <div class="d-flex align-items-center gap-3">
+                            <div class="user-avatar" id="userAvatar" style="width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,#6f4e37,#4a2c1a);color:white;display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:0.85rem;letter-spacing:1px;flex-shrink:0;"></div>
+                            <div class="user-info flex-grow-1" style="min-width:0;">
+                                <div class="user-name" id="userName" style="font-weight:bold;font-size:0.875rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></div>
+                                <div class="user-role" id="userRoleDisplay" style="font-size: 0.75rem; color: #6c757d;">Farmer</div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Sidebar Menu -->
+                    <ul class="navbar-nav iq-main-menu" id="sidebar-menu">
+                        <li class="nav-item">
+                            <a class="nav-link" href="#" data-page="dashboard">
+                                <i class="icon">
+                                    <svg width="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class="icon-20">
+                                        <path d="M3 7v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2z" fill="currentColor"></path>
+                                        <path d="M8 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2H8V5z" fill="currentColor"></path>
+                                    </svg>
+                                </i>
+                                <span class="item-name">Dashboard</span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#" data-page="farms">
+                                <i class="icon">
+                                    <svg width="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class="icon-20">
+                                        <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" fill="currentColor"></path>
+                                    </svg>
+                                </i>
+                                <span class="item-name">My Farms</span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#" data-page="cooperatives">
+                                <i class="icon">
+                                    <svg width="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class="icon-20">
+                                        <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" fill="currentColor"></path>
+                                    </svg>
+                                </i>
+                                <span class="item-name">Cooperatives</span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#" data-page="farmers">
+                                <i class="icon">
+                                    <svg width="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class="icon-20">
+                                        <path d="M16 4c0-1.11-.89-2-2-2H6c-1.11 0-2 .89-2 2v16c0 1.11.89 2 2 2h8c1.11 0 2-.89 2-2V4z" fill="currentColor"></path>
+                                        <path d="M10 10h4v4h-4v-4z" fill="currentColor"></path>
+                                    </svg>
+                                </i>
+                                <span class="item-name">Farmers</span>
+                            </a>
+                        </li>
+                        <li class="nav-item" id="nav-farmer-approvals">
+                            <a class="nav-link" href="#" data-page="farmer-approvals">
+                                <i class="icon">
+                                    <svg width="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class="icon-20">
+                                        <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-2 16l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z" fill="currentColor"></path>
+                                    </svg>
+                                </i>
+                                <span class="item-name">Farmer Approvals</span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#" data-page="compliance">
+                                <i class="icon">
+                                    <svg width="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class="icon-20">
+                                        <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" fill="currentColor"></path>
+                                    </svg>
+                                </i>
+                                <span class="item-name">Verification EUDR</span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link active" aria-current="page" href="#" data-page="dashboard">
+                                <i class="icon">
+                                    <svg width="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class="icon-20">
+                                        <path opacity="0.4" d="M16.0756 2H19.4616C20.8639 2 22.0001 3.14585 22.0001 4.55996V7.97452C22.0001 9.38864 20.8639 10.5345 19.4616 10.5345H16.0756C14.6734 10.5345 13.5371 9.38864 13.5371 7.97452V4.55996C13.5371 3.14585 14.6734 2 16.0756 2Z" fill="currentColor"></path>
+                                        <path fill-rule="evenodd" clip-rule="evenodd" d="M4.53852 2H7.92449C9.32676 2 10.463 3.14585 10.463 4.55996V7.97452C10.463 9.38864 9.32676 10.5345 7.92449 10.5345H4.53852C3.13626 10.5345 2 9.38864 2 7.97452V4.55996C2 3.14585 3.13626 2 4.53852 2ZM4.53852 13.4655H7.92449C9.32676 13.4655 10.463 14.6114 10.463 16.0255V19.44C10.463 20.8532 9.32676 22 7.92449 22H4.53852C3.13626 22 2 20.8532 2 19.44V16.0255C2 14.6114 3.13626 13.4655 4.53852 13.4655ZM19.4615 13.4655H16.0755C14.6732 13.4655 13.537 14.6114 13.537 16.0255V19.44C13.537 20.8532 14.6732 22 16.0755 22H19.4615C20.8637 22 22 20.8532 22 19.44V16.0255C22 14.6114 20.8637 13.4655 19.4615 13.4655Z" fill="currentColor"></path>
+                                    </svg>
+                                </i>
+                                <span class="item-name">Dashboard</span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#" data-page="cooperatives">
+                                <i class="icon">
+                                    <svg width="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class="icon-20">
+                                        <path d="M19 11H5V3h14v8zm-1 7v-6h-4v6h4zm6 0v-6h-4v6h4zm0 4H4v-6h4v2h10v-2h4v6z" fill="currentColor"></path>
+                                    </svg>
+                                </i>
+                                <span class="item-name">Cooperatives</span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#" data-page="users">
+                                <i class="icon">
+                                    <svg width="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class="icon-20">
+                                        <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" fill="currentColor"></path>
+                                    </svg>
+                                </i>
+                                <span class="item-name">Users</span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#" data-page="verification">
+                                <i class="icon">
+                                    <svg width="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class="icon-20">
+                                        <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" fill="currentColor"></path>
+                                    </svg>
+                                </i>
+                                <span class="item-name">Verification EUDR</span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#" data-page="farms">
+                                <i class="icon">
+                                    <svg width="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class="icon-20">
+                                        <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" fill="currentColor"></path>
+                                    </svg>
+                                </i>
+                                <span class="item-name">My Farms</span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#" data-page="profile">
+                                <i class="icon">
+                                    <svg width="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class="icon-20">
+                                        <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" fill="currentColor"></path>
+                                    </svg>
+                                </i>
+                                <span class="item-name">My Profile</span>
+                            </a>
+                        </li>
+                        <li class="nav-item mt-auto">
+                            <a class="nav-link" href="#" id="logoutBtn">
+                                <i class="icon">
+                                    <svg width="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class="icon-20">
+                                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" fill="currentColor"></path>
+                                        <polyline points="16 17 21 12 16 7" fill="currentColor"></polyline>
+                                        <line x1="21" y1="12" x2="9" y2="12" fill="currentColor"></line>
+                                    </svg>
+                                </i>
+                                <span class="item-name">Logout</span>
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+            <div class="sidebar-footer"></div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <div class="position-relative iq-banner">
+                <!--Nav Start-->
+                <nav class="nav navbar navbar-expand-lg iq-navbar" style="background: linear-gradient(135deg, #6f4e37 0%, #8b4513 100%);">
+                    <div class="container-fluid navbar-inner">
+                        <div class="d-flex align-items-center gap-3">
+                            <!-- Hamburger Menu Button (visible on all devices) -->
+                            <button id="navbarSidebarToggle" class="btn btn-sm d-flex align-items-center justify-content-center" data-toggle="sidebar" data-active="true" style="width: 40px; height: 40px; background: linear-gradient(135deg, #daa520 0%, #cd853f 100%); border: none; color: #3d2515; border-radius: 8px;">
+                                <i class="bi bi-list" style="font-size: 1.25rem;"></i>
+                            </button>
+                            <h5 class="mb-0" id="pageTitle" style="color: #f5f5dc; font-weight: 600;">Dashboard</h5>
+                        </div>
+                        <div class="d-flex align-items-center gap-2">
+                            <!-- Search -->
+                            <div class="input-group search-input d-none d-lg-flex">
+                                <span class="input-group-text" id="search-input">
+                                    <svg class="icon-18" width="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                        <circle cx="11.7669" cy="11.7666" r="8.98856" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></circle>
+                                        <path d="M18.0186 18.4851L21.5426 22" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path>
+                                    </svg>
+                                </span>
+                                <input type="search" class="form-control" placeholder="Search...">
+                            </div>
+                            <!-- Notifications Bell -->
+                            <li class="nav-item">
+                                <a href="#" class="nav-link position-relative" id="notifBellBtn"
+                                   data-bs-toggle="modal" data-bs-target="#notificationsModal"
+                                   onclick="app.loadNotifications()">
+                                    <svg class="icon-24" width="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                        <path d="M19.7695 11.6453C19.039 10.7923 18.7071 10.0531 18.7071 8.79716V8.37013C18.7071 6.73354 18.3304 5.67907 17.5115 4.62459C16.2493 2.98699 14.1244 2 12.0442 2H11.9558C9.91935 2 7.86106 2.94167 6.577 4.5128C5.71333 5.58842 5.29293 6.68822 5.29293 8.37013V8.79716C5.29293 10.0531 4.98284 10.7923 4.23049 11.6453C3.67691 12.2738 3.5 13.0815 3.5 13.9557C3.5 14.8309 3.78723 15.6598 4.36367 16.3336C5.11602 17.1413 6.17846 17.6569 7.26375 17.7466C8.83505 17.9258 10.4063 17.9933 12.0005 17.9933C13.5937 17.9933 15.165 17.8805 16.7372 17.7466C17.8215 17.6569 18.884 17.1413 19.6363 16.3336C20.2118 15.6598 20.5 14.8309 20.5 13.9557C20.5 13.0815 20.3231 12.2738 19.7695 11.6453Z" fill="currentColor"></path>
+                                        <path opacity="0.4" d="M14.0088 19.2283C13.5088 19.1215 10.4627 19.1215 9.96275 19.2283C9.53539 19.327 9.07324 19.5566 9.07324 20.0602C9.09809 20.5406 9.37935 20.9646 9.76895 21.2335L9.76795 21.2345C10.2718 21.6273 10.8632 21.877 11.4824 21.9667C11.8123 22.012 12.1482 22.01 12.4901 21.9667C13.1083 21.877 13.6997 21.6273 14.2036 21.2345L14.2026 21.2335C14.5922 20.9646 14.8734 20.5406 14.8983 20.0602C14.8983 19.5566 14.4361 19.327 14.0088 19.2283Z" fill="currentColor"></path>
+                                    </svg>
+                                    <span id="notifBadge" class="position-absolute top-0 start-75 translate-middle badge rounded-pill bg-danger d-none" style="font-size:0.6rem;padding:3px 5px"></span>
+                                </a>
+                            </li>
+                            <span id="userRole" class="badge bg-success"></span>
+                            <span id="offlineStatus" class="badge bg-warning d-none">
+                                <i class="bi bi-wifi-off"></i> Offline
+                            </span>
+                        </div>
+                    </div>
+                </nav>
+                <!-- Nav Header Component Start -->
+                <div class="iq-navbar-header" style="height: 215px;">
+                    <div class="container-fluid iq-container">
+                        <div class="row">
+                            <div class="col-md-12">
+                                <div class="flex-wrap d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h1 class="text-white" id="headerBrandTitle">Plotra Platform</h1>
+                                        <p class="text-white">Ensuring EUDR Compliance & Traceability for the Coffee Supply Chain.</p>
+                                    </div>
+                                    <div>
+                                        <a href="javascript:void(0)" class="btn btn-link btn-soft-light" onclick="app.loadPage('compliance')">
+                                            <svg class="icon-20" width="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                                <path d="M11.8251 15.2171H12.1748C14.0987 15.2171 15.731 13.985 16.3054 12.2764C16.3887 12.0276 16.1979 11.7713 15.9334 11.7713H14.8562C14.5133 11.7713 14.2362 11.4977 14.2362 11.16C14.2362 10.8213 14.5133 10.5467 14.8562 10.5467H15.9005C16.2463 10.5467 16.5263 10.2703 16.5263 9.92875C16.5263 9.58722 16.2463 9.31075 15.9005 9.31075H14.8562C14.5133 9.31075 14.2362 9.03619 14.2362 8.69849C14.2362 8.35984 14.5133 8.08528 14.8562 8.08528H15.9005C16.2463 8.08528 16.5263 7.8088 16.5263 7.46728C16.5263 7.12575 16.2463 6.84928 15.9005 6.84928H14.8562C14.5133 6.84928 14.2362 6.57472 14.2362 6.23606C14.2362 5.89837 14.5133 5.62381 14.8562 5.62381H15.9886C16.2483 5.62381 16.4343 5.3789 16.3645 5.13113C15.8501 3.32401 14.1694 2 12.1748 2H11.8251C9.42172 2 7.47363 3.92287 7.47363 6.29729V10.9198C7.47363 13.2933 9.42172 15.2171 11.8251 15.2171Z" fill="currentColor"></path>
+                                                <path opacity="0.4" d="M19.5313 9.82568C18.9966 9.82568 18.5626 10.2533 18.5626 10.7823C18.5626 14.3554 15.6186 17.2627 12.0005 17.2627C8.38136 17.2627 5.43743 14.3554 5.43743 10.7823C5.43743 10.2533 5.00345 9.82568 4.46872 9.82568C3.93398 9.82568 3.5 10.2533 3.5 10.7823C3.5 15.0873 6.79945 18.6413 11.0318 19.1186V21.0434C11.0318 21.5715 11.4648 22.0001 12.0005 22.0001C12.5352 22.0001 12.9692 21.5715 12.9692 21.0434V19.1186C17.2006 18.6413 20.5 15.0873 20.5 10.7823C20.5 10.2533 20.066 9.82568 19.5313 9.82568Z" fill="currentColor"></path>
+                                            </svg>
+                                            Compliance Report
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="iq-header-img">
+                        <img src="hope-ui/assets/images/dashboard/top-header.png" alt="header" class="theme-color-default-img img-fluid w-100 h-100 animated-scaleX">
+                    </div>
+                </div>
+                <!-- Nav Header Component End -->
+                <!--Nav End-->
+            </div>
+
+            <!-- Page Content -->
+            <div class="container-fluid content-inner mt-n5 py-0" id="pageContent">
+                <!-- Dynamic content loaded here -->
+            </div>
+        </main>
+    </div>
+
+    <!-- Toast Container -->
+    <div class="toast-container position-fixed bottom-0 end-0 p-3"></div>
+
+    <!-- ApexCharts -->
+    <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+    <!-- Hope UI Library / Plugin JS Build -->
+    <script src="hope-ui/assets/js/core/libs.min.js"></script>
+    
+    <!-- AOS Animation Plugin -->
+    <script src="hope-ui/assets/vendor/aos/dist/aos.js"></script>
+    
+
+    
+    <!-- Hope UI Plugins -->
+    <script src="hope-ui/assets/js/plugins/circle-progress.js"></script>
+    <script src="hope-ui/assets/js/plugins/flatpickr.js"></script>
+    <script src="hope-ui/assets/js/plugins/fslightbox.js"></script>
+    
+    <!-- Hope UI Charts -->
+    <script src="hope-ui/assets/js/charts/apexcharts.js"></script>
+    <script src="hope-ui/assets/js/charts/dashboard.js"></script>
+    <script src="hope-ui/assets/js/charts/widgetcharts.js"></script>
+    
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+    <!-- Chart JS -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- QR Code -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <!-- Password Toggle -->
+    <script>
+        function togglePassword(inputId, iconId) {
+            const input = document.getElementById(inputId);
+            const icon = document.getElementById(iconId);
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.classList.remove('bi-eye');
+                icon.classList.add('bi-eye-slash');
+            } else {
+                input.type = 'password';
+                icon.classList.remove('bi-eye-slash');
+                icon.classList.add('bi-eye');
+            }
+        }
+    </script>
+    <!-- Farm Form Step Navigation Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Tab 1 Step Navigation
+            const tab1Steps = document.querySelectorAll('#tab1Steps .step-content');
+            const tab1StepItems = document.querySelectorAll('#tab1 .step-indicator .step-item');
+            const tab1PrevBtn = document.getElementById('tab1PrevBtn');
+            const tab1NextBtn = document.getElementById('tab1NextBtn');
+            let tab1CurrentStep = 1;
+            const tab1TotalSteps = tab1Steps.length;
+
+            // Tab 2 Step Navigation
+            const tab2Steps = document.querySelectorAll('#tab2Steps .step-content');
+            const tab2StepItems = document.querySelectorAll('#tab2 .step-indicator .step-item');
+            const tab2PrevBtn = document.getElementById('tab2PrevBtn');
+            const tab2NextBtn = document.getElementById('tab2NextBtn');
+            let tab2CurrentStep = 1;
+            const tab2TotalSteps = tab2Steps.length;
+
+            // GPS Polygon Validation for Tab 1
+            let gpsPolygonValid = false;
+
+            // Tab 1 Navigation Functions
+            function updateTab1Steps() {
+                // Update step contents
+                tab1Steps.forEach((step, index) => {
+                    if (index + 1 === tab1CurrentStep) {
+                        step.classList.add('active');
+                    } else {
+                        step.classList.remove('active');
+                    }
+                });
+
+                // Update step indicators
+                tab1StepItems.forEach((item, index) => {
+                    if (index + 1 < tab1CurrentStep) {
+                        item.classList.add('completed');
+                        item.classList.remove('active');
+                    } else if (index + 1 === tab1CurrentStep) {
+                        item.classList.add('active');
+                        item.classList.remove('completed');
+                    } else {
+                        item.classList.remove('active', 'completed');
+                    }
+                });
+
+                // Update buttons — hide Back on step 1, show from step 2 onward
+                tab1PrevBtn.style.visibility = tab1CurrentStep === 1 ? 'hidden' : 'visible';
+
+                if (tab1CurrentStep === tab1TotalSteps) {
+                    tab1NextBtn.innerHTML = 'Next Tab <i class="bi bi-arrow-right"></i>';
+                    populateTab1Review();
+                } else {
+                    tab1NextBtn.innerHTML = 'Next <i class="bi bi-arrow-right"></i>';
+                }
+            }
+
+            function validateTab1Step(step) {
+                const stepEl = document.querySelector(`#tab1Steps .step-content[data-step="${step}"]`);
+                const requiredFields = stepEl.querySelectorAll('[required]');
+                let isValid = true;
+
+                requiredFields.forEach(field => {
+                    if (!field.value.trim()) {
+                        field.classList.add('is-invalid');
+                        isValid = false;
+                    } else {
+                        field.classList.remove('is-invalid');
+                    }
+                });
+
+                // GPS polygon is optional — always allow next on step 4
+                if (step === 4) {
+                    document.getElementById('gpsPolygonError').style.display = 'none';
+                }
+
+                return isValid;
+            }
+
+            function populateTab1Review() {
+                const reviewContent = document.getElementById('tab1ReviewContent');
+                const farmData = {
+                    'Full Name': document.getElementById('farmerFullName')?.value || '-',
+                    'Phone': document.getElementById('farmerPhone')?.value || '-',
+                    'National ID': document.getElementById('farmerNationalId')?.value ? 'Provided (SHA-256 hashed)' : '-',
+                    'Gender': document.getElementById('farmerGender')?.value || '-',
+                    'Cooperative Member No': document.getElementById('cooperativeMemberNo')?.value || '-',
+                    'Data Consent': document.getElementById('dataConsent')?.checked ? 'Yes' : 'No',
+                    'Farm Name': document.getElementById('farmName')?.value || '-',
+                    'Location': document.getElementById('farmLocation')?.value || '-',
+                    'Approx. Size': document.getElementById('farmAreaEstimate')?.value ? document.getElementById('farmAreaEstimate').value + ' ha' : '-',
+                    'Ownership Type': document.getElementById('landOwnershipType')?.value || '-',
+                    'Coffee Variety': document.getElementById('coffeeVariety')?.value || '-',
+                    'Est. Annual Yield': document.getElementById('estimatedYield')?.value ? document.getElementById('estimatedYield').value + ' kg' : '-',
+                    'Farming Method': document.getElementById('farmingMethod')?.value || '-',
+                    'GPS Points': document.getElementById('pointCount')?.innerText || '0',
+                    'Calculated Area': document.getElementById('calculatedArea')?.innerText || '--'
+                };
+
+                let html = '';
+                Object.entries(farmData).forEach(([key, value]) => {
+                    html += `
+                        <div class="col-md-6">
+                            <div class="p-2 bg-light rounded">
+                                <small class="text-muted d-block">${key}</small>
+                                <strong>${value}</strong>
+                            </div>
+                        </div>
+                    `;
+                });
+                reviewContent.innerHTML = html;
+            }
+
+            tab1NextBtn.addEventListener('click', function() {
+                if (tab1CurrentStep < tab1TotalSteps) {
+                    if (validateTab1Step(tab1CurrentStep)) {
+                        tab1CurrentStep++;
+                        updateTab1Steps();
+                    }
+                } else {
+                    // Go to Tab 2
+                    document.getElementById('tab2-tab').click();
+                }
+            });
+
+            tab1PrevBtn.addEventListener('click', function() {
+                if (tab1CurrentStep > 1) {
+                    tab1CurrentStep--;
+                    updateTab1Steps();
+                }
+            });
+
+            // Click on step indicators to navigate
+            tab1StepItems.forEach((item, index) => {
+                item.addEventListener('click', function() {
+                    const targetStep = index + 1;
+                    // Only allow going back or to current completed step
+                    if (targetStep < tab1CurrentStep) {
+                        tab1CurrentStep = targetStep;
+                        updateTab1Steps();
+                    }
+                });
+            });
+
+            // Tab 2 Navigation Functions
+            function updateTab2Steps() {
+                // Update step contents
+                tab2Steps.forEach((step, index) => {
+                    if (index + 1 === tab2CurrentStep) {
+                        step.classList.add('active');
+                    } else {
+                        step.classList.remove('active');
+                    }
+                });
+
+                // Update step indicators
+                tab2StepItems.forEach((item, index) => {
+                    if (index + 1 < tab2CurrentStep) {
+                        item.classList.add('completed');
+                        item.classList.remove('active');
+                    } else if (index + 1 === tab2CurrentStep) {
+                        item.classList.add('active');
+                        item.classList.remove('completed');
+                    } else {
+                        item.classList.remove('active', 'completed');
+                    }
+                });
+
+                // Update buttons — hide Back on step 1
+                tab2PrevBtn.style.visibility = tab2CurrentStep === 1 ? 'hidden' : 'visible';
+
+                if (tab2CurrentStep === tab2TotalSteps) {
+                    tab2NextBtn.innerHTML = 'Submit <i class="bi bi-check"></i>';
+                    populateTab2Review();
+                } else {
+                    tab2NextBtn.innerHTML = 'Next <i class="bi bi-arrow-right"></i>';
+                }
+            }
+
+            function calculateTab2Progress() {
+                const totalFields = 12; // Total optional fields in Tab 2
+                let filledFields = 0;
+
+                const fields = [
+                    'documentUpload', 'parentParcelLink', 'intercroppedSpecies',
+                    'shadeTreesYes', 'coffeeTreeCount', 'agroforestryStartYear',
+                    'lastPruningDate', 'lastHarvestingDate', 'plantingDate',
+                    'farmEstablishedYear', 'previousLandUse', 'certificationStatus'
+                ];
+
+                fields.forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el) {
+                        if (el.type === 'checkbox' || el.type === 'radio') {
+                            if (el.checked) filledFields++;
+                        } else if (el.value.trim()) {
+                            if (id === 'intercroppedSpecies' || id === 'certificationStatus') {
+                                filledFields += el.selectedOptions.length;
+                            } else {
+                                filledFields++;
+                            }
+                        }
+                    }
+                });
+
+                return Math.min(100, Math.round((filledFields / totalFields) * 100));
+            }
+
+            function populateTab2Review() {
+                const reviewContent = document.getElementById('tab2ReviewContent');
+                const progress = calculateTab2Progress();
+                
+                document.getElementById('tab2ProgressBar').style.width = progress + '%';
+                document.getElementById('tab2ProgressBar').innerText = progress + '% Complete';
+
+                const farmData = {
+                    'Document Upload': document.getElementById('documentUpload')?.files?.[0]?.name || 'Not uploaded',
+                    'Parent Parcel': document.getElementById('parentParcelLink')?.value || 'None',
+                    'Intercropped Species': Array.from(document.getElementById('intercroppedSpecies')?.selectedOptions || []).map(o => o.value).join(', ') || 'None',
+                    'Shade Trees': document.querySelector('input[name="shadeTrees"]:checked')?.value === 'yes' ? 'Yes' : 'No',
+                    'Coffee Trees': document.getElementById('coffeeTreeCount')?.value || '-',
+                    'Agroforestry Start': document.getElementById('agroforestryStartYear')?.value || '-',
+                    'Last Pruning': document.getElementById('lastPruningDate')?.value || '-',
+                    'Last Harvest': document.getElementById('lastHarvestingDate')?.value || '-',
+                    'Farm Established': document.getElementById('farmEstablishedYear')?.value || '-',
+                    'Previous Land Use': document.getElementById('previousLandUse')?.value || '-',
+                    'Certification': Array.from(document.getElementById('certificationStatus')?.selectedOptions || []).map(o => o.value).join(', ') || 'None',
+                    'NGO Support': document.getElementById('ngoSupport')?.value || 'None'
+                };
+
+                let html = '';
+                Object.entries(farmData).forEach(([key, value]) => {
+                    html += `
+                        <div class="col-md-6">
+                            <div class="p-2 bg-light rounded">
+                                <small class="text-muted d-block">${key}</small>
+                                <strong>${value}</strong>
+                            </div>
+                        </div>
+                    `;
+                });
+                reviewContent.innerHTML = html;
+            }
+
+            tab2NextBtn.addEventListener('click', function() {
+                if (tab2CurrentStep < tab2TotalSteps) {
+                    tab2CurrentStep++;
+                    updateTab2Steps();
+                } else {
+                    // Submit - collect all data and submit
+                    document.getElementById('addFarmForm').dispatchEvent(new Event('submit'));
+                }
+            });
+
+            tab2PrevBtn.addEventListener('click', function() {
+                if (tab2CurrentStep > 1) {
+                    tab2CurrentStep--;
+                    updateTab2Steps();
+                } else {
+                    // Go back to Tab 1
+                    document.getElementById('tab1-tab').click();
+                }
+            });
+
+            // Click on step indicators to navigate
+            tab2StepItems.forEach((item, index) => {
+                item.addEventListener('click', function() {
+                    const targetStep = index + 1;
+                    if (targetStep < tab2CurrentStep) {
+                        tab2CurrentStep = targetStep;
+                        updateTab2Steps();
+                    }
+                });
+            });
+
+            // Shade trees toggle
+            const shadeTreesYes = document.getElementById('shadeTreesYes');
+            const shadeTreesNo = document.getElementById('shadeTreesNo');
+            const shadeTreeCanopy = document.getElementById('shadeTreeCanopy');
+
+            if (shadeTreesYes && shadeTreesNo && shadeTreeCanopy) {
+                shadeTreesYes.addEventListener('change', function() {
+                    shadeTreeCanopy.disabled = !this.checked;
+                });
+                shadeTreesNo.addEventListener('change', function() {
+                    if (this.checked) {
+                        shadeTreeCanopy.disabled = true;
+                        shadeTreeCanopy.value = '';
+                    }
+                });
+            }
+
+            // Listen for GPS point updates
+            window.addEventListener('gpsPointsUpdated', function(e) {
+                const pointCount = e.detail?.count || 0;
+                document.getElementById('pointCount').innerText = pointCount;
+                gpsPolygonValid = pointCount >= 4;
+                if (pointCount >= 4) {
+                    document.getElementById('gpsPolygonError').style.display = 'none';
+                }
+            });
+
+            // Reset form when modal is closed
+            const addFarmModal = document.getElementById('addFarmModal');
+            if (addFarmModal) {
+                addFarmModal.addEventListener('hidden.bs.modal', function() {
+                    tab1CurrentStep = 1;
+                    tab2CurrentStep = 1;
+                    updateTab1Steps();
+                    updateTab2Steps();
+                    gpsPolygonValid = false;
+                });
+                
+                // Reset on modal open
+                addFarmModal.addEventListener('shown.bs.modal', function() {
+                    tab1CurrentStep = 1;
+                    tab2CurrentStep = 1;
+                    updateTab1Steps();
+                    updateTab2Steps();
+                    gpsPolygonValid = false;
+                    
+                    // Clear any invalid states
+                    document.querySelectorAll('#addFarmForm .is-invalid').forEach(el => {
+                        el.classList.remove('is-invalid');
+                    });
+                    document.getElementById('gpsPolygonError').style.display = 'none';
+                });
+            }
+
+            // Expose reset function for external calls
+            window.resetFarmFormSteps = function() {
+                tab1CurrentStep = 1;
+                tab2CurrentStep = 1;
+                updateTab1Steps();
+                updateTab2Steps();
+                gpsPolygonValid = false;
+            };
+
+            // Initialize
+            updateTab1Steps();
+            updateTab2Steps();
+        });
+    </script>
+    <!-- html2canvas for screenshots -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <!-- App JS -->
+    <script src="js/api.js"></script>
+    <script src="js/app.js"></script>
+    <script src="js/farmer-profile.js"></script>
+</body>
+</html>

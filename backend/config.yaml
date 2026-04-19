@@ -1,0 +1,63 @@
+# Plotra Platform Configuration
+# EUDR Compliance & Traceability Platform
+
+app:
+  name: "Plotra Platform"
+  version: "1.0.0"
+  debug: true
+  secret_key: "your-secret-key-change-in-production"
+  algorithm: "HS256"
+  access_token_expire_minutes: 30
+
+database:
+  host: "localhost"
+  port: 5432
+  username: "postgres"
+  password: "postgres"
+  name: plotra_db
+  pool_size: 10
+  max_overflow: 20
+
+postgis:
+  enabled: true
+  srid: 4326  # WGS84
+
+satellite:
+  provider: "sentinel_hub"  # Options: sentinel_hub, landsat, copernicus
+  api_key: "${SENTINEL_API_KEY}"
+  base_url: "https://services.sentinel-hub.com"
+  simulation_mode: true  # Set to false for production
+  ndvi_threshold: 0.65
+  deforestation_baseline_year: 2020
+
+eudr:
+  compliance_status: "Under Review"
+  certificate_validity_days: 365
+  dds_version: "1.0"
+
+geospatial:
+  gps_accuracy_threshold_meters: 10
+  min_polygon_area_hectares: 0.1
+  max_farm_polygons_per_farmer: 10
+
+storage:
+  documents_path: "./uploads/documents"
+  certificates_path: "./uploads/certificates"
+  max_file_size_mb: 50
+
+cors:
+  allowed_origins:
+    - "http://localhost"
+    - "http://localhost:3000"
+    - "http://localhost:8080"
+    - "http://localhost:8000"
+    - "http://127.0.0.1"
+    - "http://127.0.0.1:8080"
+    - "http://127.0.0.1:8000"
+    - "https://dev.plotra.eu"
+    - "https://plotra.eu"
+  allow_credentials: true
+
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"

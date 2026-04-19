@@ -1,0 +1,1370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Plotra - EUDR Compliance & Traceability</title>
+    
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --primary: #2d5016;
+            --primary-light: #4a7c24;
+            --secondary: #8b5a2b;
+            --accent: #f4ece1;
+            --text-dark: #212529;
+            --text-muted: #6c757d;
+            --plotra-gold: #d4a853;
+            --plotra-gold-light: #e8c97a;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            color: #ffffff;
+            background: #0a0a0a;
+            overflow-x: hidden;
+            line-height: 1.6;
+        }
+
+        ::selection {
+            background: rgba(212, 168, 83, 0.3);
+            color: #fff;
+        }
+
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #0a0a0a;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: linear-gradient(180deg, var(--plotra-gold), var(--plotra-gold-light));
+            border-radius: 4px;
+        }
+
+        .bg-light {
+            background: linear-gradient(180deg, #0d0d0d 0%, #141414 50%, #0d0d0d 100%) !important;
+        }
+
+        .text-muted {
+            color: #8a8a8a !important;
+        }
+
+        .text-primary {
+            color: var(--plotra-gold) !important;
+        }
+
+        h1, h2, h3, h4, h5, h6 {
+            color: #ffffff;
+        }
+
+        .display-5, .display-4, .display-3 {
+            color: #ffffff;
+        }
+
+        /* Entrance Animations */
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(40px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes fadeInScale {
+            from {
+                opacity: 0;
+                transform: scale(0.9);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        @keyframes slideInLeft {
+            from {
+                opacity: 0;
+                transform: translateX(-60px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        @keyframes slideInRight {
+            from {
+                opacity: 0;
+                transform: translateX(60px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        @keyframes shimmerGlow {
+            0% {
+                box-shadow: 0 0 20px rgba(212, 168, 83, 0.1);
+            }
+            50% {
+                box-shadow: 0 0 40px rgba(212, 168, 83, 0.3);
+            }
+            100% {
+                box-shadow: 0 0 20px rgba(212, 168, 83, 0.1);
+            }
+        }
+
+        @keyframes floatY {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-15px); }
+        }
+
+        @keyframes gradientMotion {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        @keyframes pulseGlow {
+            0%, 100% { 
+                opacity: 0.5;
+                transform: scale(1);
+            }
+            50% { 
+                opacity: 1;
+                transform: scale(1.05);
+            }
+        }
+
+        @keyframes textReveal {
+            0% {
+                clip-path: inset(0 100% 0 0);
+            }
+            100% {
+                clip-path: inset(0 0 0 0);
+            }
+        }
+
+        @keyframes borderDraw {
+            0% {
+                stroke-dashoffset: 1000;
+            }
+            100% {
+                stroke-dashoffset: 0;
+            }
+        }
+
+        .animate-hero {
+            animation: fadeInUp 1s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+            opacity: 0;
+        }
+
+        .animate-delay-1 { animation-delay: 0.1s; }
+        .animate-delay-2 { animation-delay: 0.2s; }
+        .animate-delay-3 { animation-delay: 0.3s; }
+        .animate-delay-4 { animation-delay: 0.4s; }
+        .animate-delay-5 { animation-delay: 0.5s; }
+
+        /* Navbar - Amber Folio Dark Style */
+        .navbar {
+            background: rgba(10, 10, 10, 0.95) !important;
+            backdrop-filter: blur(10px);
+            padding: 1rem 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            box-shadow: none !important;
+        }
+
+        .navbar-brand span {
+            color: rgba(255, 255, 255, 0.85) !important;
+        }
+
+        .navbar-brand img {
+            height: 40px;
+        }
+
+        .nav-link {
+            color: rgba(255, 255, 255, 0.6) !important;
+            font-weight: 500;
+            padding: 10px 18px !important;
+            border-radius: 6px;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .nav-link:hover {
+            color: rgba(255, 255, 255, 0.9) !important;
+            background: linear-gradient(135deg, rgba(243, 156, 18, 0.08) 0%, rgba(243, 156, 18, 0.03) 100%);
+        }
+
+        .navbar-toggler {
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+
+        .navbar-toggler-icon {
+            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='rgba(255, 255, 255, 0.7)' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2' d='M4 7h22M4 15h22M4 23h22'/%3e%3c/svg%3e");
+        }
+
+        .btn-plotra-primary {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+            color: white;
+            border-radius: 12px;
+            padding: 1rem 2rem;
+            font-weight: 700;
+            font-size: 1.1rem;
+            transition: all 0.3s ease;
+            border: none;
+            box-shadow: 0 4px 15px rgba(45, 80, 22, 0.3);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn-plotra-primary::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            transition: left 0.5s;
+        }
+
+        .btn-plotra-primary:hover::before {
+            left: 100%;
+        }
+
+        .btn-plotra-primary:hover {
+            background: linear-gradient(135deg, var(--primary-light) 0%, var(--primary) 100%);
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(45, 80, 22, 0.4);
+        }
+
+        .btn-plotra-outline {
+            border: 3px solid var(--primary);
+            color: var(--primary);
+            background: transparent;
+            border-radius: 12px;
+            padding: 1rem 2rem;
+            font-weight: 700;
+            font-size: 1.1rem;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .btn-plotra-outline::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            border-radius: 9px;
+        }
+
+        .btn-plotra-outline:hover::before {
+            opacity: 1;
+        }
+
+        .btn-plotra-outline:hover {
+            color: white;
+            border-color: var(--primary);
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(45, 80, 22, 0.3);
+        }
+
+        .btn-plotra-outline span {
+            position: relative;
+            z-index: 1;
+        }
+
+        /* Hero Section - Premium Modern Style */
+        .hero-section {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            background: linear-gradient(180deg, #080808 0%, #0d0d0d 30%, #0a0a0a 70%, #080808 100%);
+            padding: 0;
+            overflow: hidden;
+        }
+
+        .hero-section .hero-bg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-image:
+                radial-gradient(circle at 20% 80%, rgba(212, 168, 83, 0.08) 0%, transparent 40%),
+                radial-gradient(circle at 80% 20%, rgba(212, 168, 83, 0.06) 0%, transparent 40%),
+                radial-gradient(circle at 50% 50%, rgba(30, 30, 30, 0.5) 0%, transparent 70%);
+            animation: bgShift 15s ease-in-out infinite;
+        }
+
+        @keyframes bgShift {
+            0%, 100% { opacity: 0.8; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.1); }
+        }
+
+        .hero-grid {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-image:
+                linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+            background-size: 60px 60px;
+            mask-image: radial-gradient(ellipse at center, black 30%, transparent 70%);
+            -webkit-mask-image: radial-gradient(ellipse at center, black 30%, transparent 70%);
+        }
+
+        .hero-section::before {
+            content: '';
+            position: absolute;
+            top: 15%;
+            right: 15%;
+            width: 400px;
+            height: 400px;
+            border: 1px solid rgba(212, 168, 83, 0.12);
+            border-radius: 30% 70% 70% 30% / 30% 30% 70% 70%;
+            animation: morphShape 25s ease-in-out infinite;
+            background: radial-gradient(circle at 30% 50%, rgba(212, 168, 83, 0.06), transparent 60%);
+            filter: blur(1px);
+        }
+
+        .hero-section::after {
+            content: '';
+            position: absolute;
+            bottom: 20%;
+            left: 10%;
+            width: 300px;
+            height: 300px;
+            border: 1px solid rgba(212, 168, 83, 0.08);
+            border-radius: 50%;
+            animation: rotateShape 30s linear infinite;
+            background: radial-gradient(circle at 50% 50%, rgba(212, 168, 83, 0.04), transparent 50%);
+            box-shadow: 0 0 60px rgba(212, 168, 83, 0.08);
+            filter: blur(2px);
+        }
+
+        .hero-shapes {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+
+        .floating-accent {
+            position: absolute;
+            border: 1px solid rgba(243, 156, 18, 0.1);
+            animation: float 15s ease-in-out infinite;
+        }
+
+        .accent-1 {
+            top: 20%;
+            left: 10%;
+            width: 150px;
+            height: 150px;
+            border-radius: 50%;
+            animation-delay: 0s;
+        }
+
+        .accent-2 {
+            bottom: 30%;
+            right: 15%;
+            width: 100px;
+            height: 100px;
+            border-radius: 30% 70% 70% 30%;
+            animation-delay: -5s;
+        }
+
+        .accent-3 {
+            top: 50%;
+            right: 30%;
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            animation-delay: -10s;
+            border-color: rgba(255, 255, 255, 0.05);
+        }
+
+        @keyframes morphShape {
+            0%, 100% { border-radius: 30% 70% 70% 30% / 30% 30% 70% 70%; transform: rotate(0deg) scale(1); }
+            33% { border-radius: 70% 30% 30% 70% / 70% 70% 30% 30%; transform: rotate(120deg) scale(1.1); }
+            66% { border-radius: 30% 70% 40% 60% / 60% 30% 70% 40%; transform: rotate(240deg) scale(0.95); }
+        }
+
+        @keyframes rotateShape {
+            0% { transform: rotate(0deg) scale(1); }
+            50% { transform: rotate(180deg) scale(1.05); }
+            100% { transform: rotate(360deg) scale(1); }
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0) translateX(0) rotate(0deg); }
+            25% { transform: translateY(-20px) translateX(10px) rotate(90deg); }
+            50% { transform: translateY(10px) translateX(-10px) rotate(180deg); }
+            75% { transform: translateY(-10px) translateX(5px) rotate(270deg); }
+        }
+
+        .hero-content {
+            text-align: center;
+            z-index: 1;
+            padding: 0 20px;
+            position: relative;
+            z-index: 2;
+        }
+
+        .hero-title {
+            font-size: clamp(2.5rem, 6vw, 4.5rem);
+            font-weight: 800;
+            letter-spacing: -2px;
+            margin-bottom: 24px;
+            background: linear-gradient(135deg, #ffffff 0%, #e8e8e8 50%, #c4c4b8 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            line-height: 1.1;
+            position: relative;
+        }
+
+        .hero-title::after {
+            content: '';
+            position: absolute;
+            bottom: -10px;
+            left: 0;
+            width: 80px;
+            height: 4px;
+            background: linear-gradient(90deg, var(--plotra-gold), var(--plotra-gold-light));
+            border-radius: 2px;
+            animation: expandLine 1s ease-out 0.8s forwards;
+            transform: scaleX(0);
+            transform-origin: left;
+        }
+
+        @keyframes expandLine {
+            to { transform: scaleX(1); }
+        }
+
+        .hero-subtitle {
+            font-size: clamp(1rem, 2vw, 1.25rem);
+            color: #8a8a8a;
+            margin-bottom: 40px;
+            font-weight: 300;
+            letter-spacing: 0.5px;
+            max-width: 650px;
+            margin-left: auto;
+            margin-right: auto;
+            line-height: 1.8;
+        }
+
+        .cta-button {
+            display: inline-block;
+            padding: 18px 45px;
+            background: linear-gradient(135deg, var(--plotra-gold) 0%, var(--plotra-gold-light) 100%);
+            color: #0a0a0a;
+            text-decoration: none;
+            font-weight: 700;
+            font-size: 14px;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            border-radius: 12px;
+            transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            position: relative;
+            overflow: hidden;
+            border: none;
+            box-shadow: 
+                0 4px 20px rgba(212, 168, 83, 0.3),
+                inset 0 1px 0 rgba(255, 255, 255, 0.2);
+        }
+
+        .cta-button::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 300%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            transform: skewX(-20deg);
+            transition: left 0.6s;
+        }
+
+        .cta-button:hover {
+            transform: translateY(-4px);
+            box-shadow: 
+                0 20px 40px rgba(212, 168, 83, 0.4),
+                inset 0 1px 0 rgba(255, 255, 255, 0.3);
+            color: #0a0a0a;
+        }
+
+        .cta-button:hover::before {
+            left: 100%;
+        }
+
+        .cta-button.secondary {
+            background: transparent;
+            border: 2px solid rgba(212, 168, 83, 0.4);
+            color: var(--plotra-gold);
+        }
+
+        .cta-button.secondary:hover {
+            background: rgba(212, 168, 83, 0.1);
+            border-color: var(--plotra-gold);
+            color: var(--plotra-gold);
+        }
+
+        .hero-buttons {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .hero-image-container {
+            position: relative;
+            z-index: 2;
+        }
+
+        .hero-image-container::before {
+            content: '';
+            position: absolute;
+            top: -20px;
+            left: -20px;
+            right: 20px;
+            bottom: 20px;
+            border: 2px solid rgba(243, 156, 18, 0.3);
+            border-radius: 20px;
+            z-index: -1;
+        }
+
+        /* Responsive Styles */
+        @media (max-width: 768px) {
+            .hero-section {
+                padding: 100px 0 60px;
+            }
+
+            .hero-title {
+                font-size: 2.5rem;
+                margin-bottom: 1.5rem;
+            }
+
+            .hero-subtitle {
+                font-size: 1.1rem;
+                margin-bottom: 2rem;
+            }
+
+            .navbar {
+                padding: 0.75rem 0;
+            }
+
+            .navbar-brand img {
+                height: 35px;
+            }
+
+            .btn-plotra-primary,
+            .btn-plotra-outline {
+                padding: 0.8rem 1.5rem;
+                font-size: 1rem;
+            }
+
+            .stats-section {
+                padding: 50px 0;
+            }
+
+            .stat-item h2 {
+                font-size: 2rem;
+            }
+
+            .feature-card {
+                padding: 2rem;
+            }
+
+            .testimonial-card {
+                margin-bottom: 1.5rem;
+            }
+        }
+
+        @media (max-width: 576px) {
+            .hero-section {
+                padding: 80px 0 50px;
+            }
+
+            .hero-title {
+                font-size: 2rem;
+                letter-spacing: -0.01em;
+            }
+
+            .hero-subtitle {
+                font-size: 1rem;
+            }
+
+            .btn-plotra-primary,
+            .btn-plotra-outline {
+                padding: 0.75rem 1.25rem;
+                font-size: 0.95rem;
+                width: 100%;
+                margin-bottom: 0.5rem;
+            }
+
+            .d-flex.gap-3 {
+                flex-direction: column;
+                gap: 0.5rem !important;
+            }
+
+            .stats-section {
+                padding: 40px 0;
+            }
+
+            .stat-item h2 {
+                font-size: 1.75rem;
+            }
+
+            .feature-card {
+                padding: 1.5rem;
+                margin-bottom: 1.5rem;
+            }
+
+            .feature-icon {
+                width: 60px;
+                height: 60px;
+                font-size: 1.5rem;
+            }
+
+            .testimonial-card .d-flex {
+                flex-direction: column;
+                text-align: center;
+            }
+
+            .testimonial-card img {
+                margin-bottom: 1rem;
+                margin-left: auto;
+                margin-right: auto;
+            }
+        }
+
+        /* Features - Premium Glassmorphism Cards */
+        .feature-card {
+            padding: 2.5rem;
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 20px;
+            background: linear-gradient(145deg, rgba(20, 20, 20, 0.8), rgba(30, 30, 30, 0.4));
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            box-shadow: 
+                0 10px 40px rgba(0, 0, 0, 0.3),
+                inset 0 1px 0 rgba(255, 255, 255, 0.05);
+            transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+            height: 100%;
+            position: relative;
+            overflow: hidden;
+            opacity: 0;
+            transform: translateY(40px);
+        }
+
+        .feature-card.revealed {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .feature-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, rgba(212, 168, 83, 0.08) 0%, transparent 60%);
+            opacity: 0;
+            transition: opacity 0.5s ease;
+        }
+
+        .feature-card::after {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(212, 168, 83, 0.1) 0%, transparent 50%);
+            opacity: 0;
+            transition: opacity 0.5s ease;
+            transform: scale(0.5);
+        }
+
+        .feature-card:hover::before {
+            opacity: 1;
+        }
+
+        .feature-card:hover::after {
+            opacity: 1;
+            transform: scale(1);
+        }
+
+        .feature-card:hover {
+            transform: translateY(-15px);
+            box-shadow: 
+                0 30px 60px rgba(0, 0, 0, 0.4),
+                0 0 40px rgba(212, 168, 83, 0.1),
+                inset 0 1px 0 rgba(255, 255, 255, 0.08);
+            border-color: rgba(212, 168, 83, 0.25);
+        }
+
+        .feature-icon {
+            width: 70px;
+            height: 70px;
+            background: linear-gradient(135deg, rgba(212, 168, 83, 0.15), rgba(212, 168, 83, 0.05));
+            color: var(--plotra-gold);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 18px;
+            font-size: 1.8rem;
+            margin-bottom: 1.5rem;
+            transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+            box-shadow: 
+                0 4px 20px rgba(212, 168, 83, 0.15),
+                inset 0 1px 0 rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(212, 168, 83, 0.2);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .feature-icon::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 200%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent);
+            transform: skewX(-20deg);
+            transition: left 0.6s;
+        }
+
+        .feature-card:hover .feature-icon::before {
+            left: 100%;
+        }
+
+        .feature-card:hover .feature-icon {
+            transform: scale(1.1) rotate(3deg) translateY(-3px);
+            box-shadow: 
+                0 12px 35px rgba(212, 168, 83, 0.25),
+                inset 0 1px 0 rgba(255, 255, 255, 0.15);
+            background: linear-gradient(135deg, rgba(212, 168, 83, 0.25), rgba(212, 168, 83, 0.1));
+        }
+
+        .feature-card h3 {
+            color: #ffffff;
+            font-weight: 600;
+            margin-bottom: 0.75rem;
+            transition: color 0.3s ease;
+        }
+
+        .feature-card:hover h3 {
+            color: var(--plotra-gold-light);
+        }
+
+        .feature-card p {
+            color: #8a8a8a;
+            line-height: 1.7;
+        }
+
+        /* Testimonials - Premium Cards */
+        .testimonial-card {
+            transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            background: linear-gradient(145deg, rgba(20, 20, 20, 0.6), rgba(25, 25, 25, 0.3));
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            opacity: 0;
+            transform: translateY(30px);
+        }
+
+        .testimonial-card.revealed {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .testimonial-card:hover {
+            transform: translateY(-8px);
+            box-shadow: 
+                0 20px 50px rgba(0, 0, 0, 0.35),
+                0 0 30px rgba(212, 168, 83, 0.08);
+            border-color: rgba(212, 168, 83, 0.2);
+        }
+
+        .testimonial-card h6 {
+            color: #ffffff;
+            font-weight: 600;
+        }
+
+        .testimonial-card p {
+            color: #8a8a8a;
+            font-size: 0.95rem;
+            line-height: 1.7;
+        }
+
+        .testimonial-card .small {
+            color: #6a6a6a;
+        }
+
+        .testimonial-card img {
+            border: 2px solid rgba(212, 168, 83, 0.3);
+            transition: border-color 0.3s ease;
+        }
+
+        .testimonial-card:hover img {
+            border-color: rgba(212, 168, 83, 0.6);
+        }
+
+        /* Stats Section - Premium Style */
+        .stats-section {
+            background: linear-gradient(180deg, #0d0d0d 0%, #111111 50%, #0d0d0d 100%);
+            color: white;
+            padding: 80px 0;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .stats-section::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(212, 168, 83, 0.3), transparent);
+        }
+
+        .stats-section::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(212, 168, 83, 0.3), transparent);
+        }
+
+        .stats-section .stat-item {
+            position: relative;
+        }
+
+        .stats-section .stat-item::before {
+            content: '';
+            position: absolute;
+            right: -1px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 1px;
+            height: 40px;
+            background: linear-gradient(180deg, transparent, rgba(212, 168, 83, 0.3), transparent);
+        }
+
+        .stats-section .stat-item:last-child::before {
+            display: none;
+        }
+
+        .stats-section .stat-item h2 {
+            background: linear-gradient(135deg, var(--plotra-gold), var(--plotra-gold-light));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            font-weight: 700;
+            font-size: 3rem;
+        }
+
+        .stats-section .stat-item p {
+            color: #8a8a8a;
+            font-weight: 500;
+            letter-spacing: 1px;
+        }
+        }
+
+        .stat-item h2 {
+            font-weight: 800;
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        /* CTA Section - Premium Gradient */
+        .cta-section {
+            padding: 100px 0;
+            background: linear-gradient(135deg, #1a1510 0%, #252017 50%, #1a1510 100%);
+            color: white;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .cta-section::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle at center, rgba(212, 168, 83, 0.1) 0%, transparent 50%);
+            animation: ctaGlow 8s ease-in-out infinite;
+        }
+
+        @keyframes ctaGlow {
+            0%, 100% { opacity: 0.3; transform: scale(1); }
+            50% { opacity: 0.6; transform: scale(1.1); }
+        }
+
+        .cta-section .container {
+            position: relative;
+            z-index: 1;
+        }
+
+        .cta-section h2 {
+            font-weight: 700;
+            letter-spacing: -1px;
+        }
+
+        .cta-section .lead {
+            color: #8a8a8a;
+        }
+
+        footer {
+            background-color: #f8f9fa;
+            padding: 60px 0 30px;
+            border-top: 1px solid #eee;
+        }
+
+        .footer-link {
+            color: var(--text-muted);
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+
+        .footer-link:hover {
+            color: var(--primary);
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Navbar - Amber Folio Dark Style -->
+    <nav class="navbar navbar-expand-lg sticky-top">
+        <div class="container">
+            <a class="navbar-brand d-flex align-items-center" href="#">
+                <img src="Logo_for_coffee_202604042236.jpeg" alt="Plotra Logo" class="me-2">
+                <span class="fw-bold fs-4">Plotra</span>
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto align-items-center">
+                    <li class="nav-item"><a class="nav-link" href="#features">Features</a></li>
+                    <li class="nav-item"><a class="nav-link" href="#how-it-works">How it Works</a></li>
+                    <li class="nav-item"><a class="nav-link" href="#impact">Impact</a></li>
+                    <li class="nav-item ms-lg-3">
+                        <a href="app.html" class="btn" style="border: 2px solid rgba(243, 156, 18, 0.5); color: #f39c12; border-radius: 8px; padding: 8px 20px; font-weight: 600;">Log In</a>
+                    </li>
+                    <li class="nav-item ms-lg-2">
+                        <a href="app.html" class="btn" style="background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%); color: #0a0a0a; border-radius: 8px; padding: 8px 20px; font-weight: 700;">Get Started</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section - Amber Folio Style -->
+    <header class="hero-section">
+        <div class="hero-bg"></div>
+        <div class="hero-shapes">
+            <div class="floating-accent accent-1"></div>
+            <div class="floating-accent accent-2"></div>
+            <div class="floating-accent accent-3"></div>
+        </div>
+        <div class="container">
+            <div class="row align-items-center min-vh-100">
+                <div class="col-lg-6">
+                    <div class="hero-content text-start">
+                        <h1 class="hero-title">Verifiable Sustainability from Farm to Cup</h1>
+                        <p class="hero-subtitle">The leading platform for EUDR compliance and coffee traceability in East Africa. We bridge the gap between smallholder farmers and global markets through satellite mapping and digital transparency.</p>
+                        <div class="hero-buttons">
+                            <a href="app.html" class="cta-button">Register Your Farm</a>
+                            <a href="app.html" class="btn btn-outline-light btn-lg px-4 py-3" style="border-radius: 8px; font-weight: 600;">Login</a>
+                        </div>
+                        <p class="mt-4 text-muted small">Already have an account? <a href="app.html" class="text-warning fw-bold text-decoration-none">Sign in here</a></p>
+                    </div>
+                </div>
+                <div class="col-lg-6 d-none d-lg-block">
+                    <div class="hero-image-container">
+                        <img src="https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?auto=format&fit=crop&q=80&w=800" alt="Coffee Farming" class="img-fluid rounded-4 shadow-lg" style="border: 3px solid rgba(255,255,255,0.1);">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Stats Section -->
+    <section class="stats-section">
+        <div class="container">
+            <div class="row text-center">
+                <div class="col-md-4 stat-item">
+                    <h2 data-counter="50000">50,000+</h2>
+                    <p class="mb-0">Farmers Mapped</p>
+                </div>
+                <div class="col-md-4 stat-item">
+                    <h2>100%</h2>
+                    <p class="mb-0">EUDR Compliant</p>
+                </div>
+                <div class="col-md-4 stat-item">
+                    <h2 data-counter="15">15+</h2>
+                    <p class="mb-0">Cooperatives Active</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Testimonials Section -->
+    <section class="py-5 bg-light">
+        <div class="container">
+            <div class="text-center mb-5">
+                <h6 class="text-uppercase fw-bold text-primary mb-2">Success Stories</h6>
+                <h2 class="display-5 fw-bold">What Farmers Say</h2>
+            </div>
+            <div class="row g-4">
+                <div class="col-md-4">
+                    <div class="testimonial-card p-4 rounded-4 h-100">
+                        <div class="d-flex align-items-center mb-3">
+                            <img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=100&h=100&crop=face" alt="Farmer" class="rounded-circle me-3" style="width: 60px; height: 60px; object-fit: cover;">
+                            <div>
+                                <h6 class="mb-0 fw-bold">James Kiprop</h6>
+                                <small class="text-muted">Coffee Farmer, Nakuru</small>
+                            </div>
+                        </div>
+                        <p class="text-muted mb-0">"Plotra helped me get better prices for my coffee by proving it's sustainably grown. The mapping was easy and now I have direct access to international buyers."</p>
+                        <div class="mt-3">
+                            <i class="bi bi-star-fill text-warning"></i>
+                            <i class="bi bi-star-fill text-warning"></i>
+                            <i class="bi bi-star-fill text-warning"></i>
+                            <i class="bi bi-star-fill text-warning"></i>
+                            <i class="bi bi-star-fill text-warning"></i>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="testimonial-card p-4 rounded-4 h-100">
+                        <div class="d-flex align-items-center mb-3">
+                            <img src="https://images.unsplash.com/photo-1494790108755-2616b612b47c?auto=format&fit=crop&q=80&w=100&h=100&crop=face" alt="Cooperative Leader" class="rounded-circle me-3" style="width: 60px; height: 60px; object-fit: cover;">
+                            <div>
+                                <h6 class="mb-0 fw-bold">Grace Wanjiku</h6>
+                                <small class="text-muted">Cooperative Chair, Kiambu</small>
+                            </div>
+                        </div>
+                        <p class="text-muted mb-0">"Our cooperative went from struggling to export to having contracts with major roasters. Plotra's traceability gives us the credibility we needed."</p>
+                        <div class="mt-3">
+                            <i class="bi bi-star-fill text-warning"></i>
+                            <i class="bi bi-star-fill text-warning"></i>
+                            <i class="bi bi-star-fill text-warning"></i>
+                            <i class="bi bi-star-fill text-warning"></i>
+                            <i class="bi bi-star-fill text-warning"></i>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="testimonial-card p-4 rounded-4 h-100">
+                        <div class="d-flex align-items-center mb-3">
+                            <img src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&q=80&w=100&h=100&crop=face" alt="Exporter" class="rounded-circle me-3" style="width: 60px; height: 60px; object-fit: cover;">
+                            <div>
+                                <h6 class="mb-0 fw-bold">David Mwangi</h6>
+                                <small class="text-muted">Export Manager, Nairobi</small>
+                            </div>
+                        </div>
+                        <p class="text-muted mb-0">"Plotra automated our due diligence process. What used to take weeks now happens in minutes. It's a game-changer for East African coffee exports."</p>
+                        <div class="mt-3">
+                            <i class="bi bi-star-fill text-warning"></i>
+                            <i class="bi bi-star-fill text-warning"></i>
+                            <i class="bi bi-star-fill text-warning"></i>
+                            <i class="bi bi-star-fill text-warning"></i>
+                            <i class="bi bi-star-fill text-warning"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section id="features" class="py-5 my-5">
+        <div class="container">
+            <div class="text-center mb-5">
+                <h6 class="text-uppercase fw-bold text-primary mb-2">Our Capabilities</h6>
+                <h2 class="display-5 fw-bold">Everything you need for EUDR</h2>
+            </div>
+            <div class="row g-4">
+                <div class="col-md-4">
+                    <div class="feature-card">
+                        <div class="feature-icon"><i class="bi bi-geo-alt"></i></div>
+                        <h4>Polygon Mapping</h4>
+                        <p class="text-muted">High-precision GPS mapping of farm boundaries to satisfy EUDR geolocation requirements.</p>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="feature-card">
+                        <div class="feature-icon"><i class="bi bi-satellite"></i></div>
+                        <h4>Deforestation Analysis</h4>
+                        <p class="text-muted">Real-time satellite monitoring and historical analysis to verify zero-deforestation since Dec 2020.</p>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="feature-card">
+                        <div class="feature-icon"><i class="bi bi-qr-code-scan"></i></div>
+                        <h4>Full Traceability</h4>
+                        <p class="text-muted">Digital chain of custody from the cherry collection center to the export warehouse.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- How it Works -->
+    <section id="how-it-works" class="py-5 bg-light">
+        <div class="container">
+            <div class="row align-items-center">
+                <div class="col-lg-5">
+                    <h2 class="display-6 fw-bold mb-4">How Plotra Works</h2>
+                    <div class="d-flex mb-4">
+                        <div class="me-3">
+                            <span class="badge rounded-circle bg-primary p-2 px-3 fs-5">1</span>
+                        </div>
+                        <div>
+                            <h5>Digital Registration</h5>
+                            <p class="text-muted">Farmers and cooperatives are onboarded via our mobile-first platform.</p>
+                        </div>
+                    </div>
+                    <div class="d-flex mb-4">
+                        <div class="me-3">
+                            <span class="badge rounded-circle bg-primary p-2 px-3 fs-5">2</span>
+                        </div>
+                        <div>
+                            <h5>Farm Verification</h5>
+                            <p class="text-muted">Mobile field officers map farm polygons, which are verified against satellite imagery.</p>
+                        </div>
+                    </div>
+                    <div class="d-flex mb-4">
+                        <div class="me-3">
+                            <span class="badge rounded-circle bg-primary p-2 px-3 fs-5">3</span>
+                        </div>
+                        <div>
+                            <h5>Compliant Export</h5>
+                            <p class="text-muted">Automated generation of due diligence statements ready for EU customs.</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-7">
+                    <img src="https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?auto=format&fit=crop&q=80&w=800" alt="Platform UI" class="img-fluid rounded-4 shadow">
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA -->
+    <section class="cta-section">
+        <div class="container">
+            <h2 class="display-5 fw-bold mb-4">Ready to secure your market access?</h2>
+            <p class="lead mb-5 opacity-75">Join thousands of farmers already using Plotra to verify their sustainability.</p>
+            <a href="app.html" class="btn btn-light btn-lg px-5 py-3 fw-bold text-primary">Get Started Now</a>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+        <div class="container">
+            <div class="row g-4">
+                <div class="col-lg-4">
+                    <div class="d-flex align-items-center mb-3">
+                        <img src="Logo_for_coffee_202604042236.jpeg" alt="Plotra Logo" height="30" class="me-2">
+                        <span class="fw-bold fs-5">Plotra</span>
+                    </div>
+                    <p class="text-muted">Empowering East African farmers with digital tools for global compliance and sustainable growth.</p>
+                </div>
+                <div class="col-md-4 col-lg-2 ms-auto">
+                    <h6>Platform</h6>
+                    <ul class="list-unstyled">
+                        <li><a href="app.html" class="footer-link">Dashboard</a></li>
+                        <li><a href="#features" class="footer-link">Features</a></li>
+                        <li><a href="#" class="footer-link">Mobile App</a></li>
+                    </ul>
+                </div>
+                <div class="col-md-4 col-lg-2">
+                    <h6>Company</h6>
+                    <ul class="list-unstyled">
+                        <li><a href="#" class="footer-link">About Us</a></li>
+                        <li><a href="#" class="footer-link">Impact</a></li>
+                        <li><a href="#" class="footer-link">Contact</a></li>
+                    </ul>
+                </div>
+                <div class="col-md-4 col-lg-3">
+                    <h6>Contact Us</h6>
+                    <p class="text-muted mb-1"><i class="bi bi-geo-alt me-2"></i> Nairobi, Kenya</p>
+                    <p class="text-muted mb-1"><i class="bi bi-envelope me-2"></i> info@plotra.ai</p>
+                </div>
+            </div>
+            <hr class="my-4">
+            <div class="row">
+                <div class="col-md-6 text-center text-md-start">
+                    <p class="text-muted small mb-0">&copy; 2026 Plotra Platform. All rights reserved.</p>
+                </div>
+                <div class="col-md-6 text-center text-md-end">
+                    <a href="#" class="footer-link small me-3">Privacy Policy</a>
+                    <a href="#" class="footer-link small">Terms of Service</a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Bootstrap Bundle with Popper -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+        // Smooth scrolling for navigation links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
+                }
+            });
+        });
+
+        // Animated counters for stats
+        function animateCounters() {
+            const counters = document.querySelectorAll('[data-counter]');
+            const speed = 200;
+
+            counters.forEach(counter => {
+                const target = parseInt(counter.getAttribute('data-counter'));
+                const count = +counter.innerText.replace(/[^\d]/g, '');
+                const increment = target / speed;
+
+                if (count < target) {
+                    counter.innerText = Math.ceil(count + increment) + '+';
+                    setTimeout(animateCounters, 1);
+                } else {
+                    counter.innerText = target + '+';
+                }
+            });
+        }
+
+        // Intersection Observer for animations
+        const observerOptions = {
+            threshold: 0.1,
+            rootMargin: '0px 0px -50px 0px'
+        };
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('animate-in');
+                }
+            });
+        }, observerOptions);
+
+        // Observe elements for animation
+        document.querySelectorAll('.feature-card, .testimonial-card').forEach(card => {
+            observer.observe(card);
+        });
+
+        // Trigger counter animation when stats section is visible
+        const statsSection = document.querySelector('.stats-section');
+        const statsObserver = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    animateCounters();
+                    statsObserver.unobserve(entry.target);
+                }
+            });
+        }, { threshold: 0.5 });
+
+        if (statsSection) {
+            statsObserver.observe(statsSection);
+        }
+
+        // Add CSS animations
+        const style = document.createElement('style');
+        style.textContent = `
+            .animate-in {
+                animation: fadeInUp 0.6s ease-out forwards;
+            }
+
+            @keyframes fadeInUp {
+                from {
+                    opacity: 0;
+                    transform: translateY(30px);
+                }
+                to {
+                    opacity: 1;
+                    transform: translateY(0);
+                }
+            }
+
+            .feature-card, .testimonial-card {
+                opacity: 0;
+                transform: translateY(30px);
+                transition: all 0.6s ease-out;
+            }
+
+            .feature-card.animate-in, .testimonial-card.animate-in {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        `;
+        document.head.appendChild(style);
+
+        // Navbar scroll effect
+        window.addEventListener('scroll', () => {
+            const navbar = document.querySelector('.navbar');
+            if (window.scrollY > 100) {
+                navbar.style.background = 'rgba(10, 10, 10, 0.98) !important';
+                navbar.style.backdropFilter = 'blur(10px)';
+            } else {
+                navbar.style.background = 'rgba(10, 10, 10, 0.95) !important';
+                navbar.style.backdropFilter = 'blur(10px)';
+            }
+        });
+    </script>
+</body>
+</html>

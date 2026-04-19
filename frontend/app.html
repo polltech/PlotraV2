@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#2d5016">
+    <meta name="description" content="Plotra Platform - EUDR Compliance & Traceability for East African Coffee">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Plotra">
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="Logo_for_coffee_202604042236.jpeg">
+    <link rel="icon" type="image/jpeg" href="Logo_for_coffee_202604042236.jpeg">
+    <link rel="shortcut icon" href="Logo_for_coffee_202604042236.ico">
+    
+    <title>Plotra Platform</title>
+    
+    <!-- Bootstrap Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+    <!-- Styles -->
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <div id="app">
+        <!-- Offline indicator -->
+        <div id="offline-indicator" class="hidden">
+            <span>📴 You are offline</span>
+        </div>
+        
+        <!-- Main content -->
+        <main id="main-content">
+            <!-- Dynamic content loaded here -->
+        </main>
+        
+        <!-- Navigation -->
+        <nav id="bottom-nav" class="hidden">
+            <button class="nav-btn active" data-page="dashboard">
+                <span class="icon">🏠</span>
+                <span class="label">Home</span>
+            </button>
+            <button class="nav-btn" data-page="map">
+                <span class="icon">🗺️</span>
+                <span class="label">Map</span>
+            </button>
+            <button class="nav-btn" data-page="deliveries">
+                <span class="icon">📦</span>
+                <span class="label">Deliveries</span>
+            </button>
+            <button class="nav-btn" data-page="profile">
+                <span class="icon">👤</span>
+                <span class="label">Profile</span>
+            </button>
+        </nav>
+        
+        <!-- Loading overlay -->
+        <div id="loading-overlay" class="hidden">
+            <div class="spinner"></div>
+        </div>
+    </div>
+    
+    <!-- Outlook-Style Auth Pages -->
+    <template id="login-template">
+        <div class="auth-container">
+            <!-- Left Side - Branding -->
+            <div class="auth-branding">
+                <div class="branding-content">
+                    <img src="Logo_for_coffee_202604042236.jpeg" alt="Plotra Logo" class="branding-logo">
+                    <h1 class="branding-title">Plotra</h1>
+                    <p class="branding-subtitle">EUDR Compliance & Traceability</p>
+                    <div class="branding-features">
+                        <div class="feature-item">
+                            <i class="bi bi-geo-alt-fill"></i>
+                            <span>Farm Mapping</span>
+                        </div>
+                        <div class="feature-item">
+                            <i class="bi bi-box-seam-fill"></i>
+                            <span>Delivery Tracking</span>
+                        </div>
+                        <div class="feature-item">
+                            <i class="bi bi-shield-check"></i>
+                            <span>EUDR Compliance</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="branding-pattern"></div>
+            </div>
+            
+            <!-- Right Side - Login Form -->
+            <div class="auth-form-container">
+                    <div class="auth-form-wrapper">
+                        <!-- Back to Home Link -->
+                        <div class="text-center mb-4">
+                            <a href="index.html" class="text-muted small">
+                                <i class="bi bi-arrow-left me-1"></i>Back to Home
+                            </a>
+                        </div>
+
+                        <!-- Login Step 1: Email -->
+                        <div id="loginStep1" class="step-content active">
+                            <div class="step-indicator">Step 1 of 2</div>
+                            <h2 class="form-title">Sign in</h2>
+                            <p class="form-subtitle">Use your Plotra account</p>
+                        
+                        <form id="login-form-step1" class="auth-form">
+                            <div class="form-group">
+                                <input type="email" id="loginEmail" class="form-input" placeholder="Email" required autocomplete="email">
+                            </div>
+                            
+                            <div class="form-actions">
+                                <button type="button" class="btn btn-link" onclick="app.showRegisterFromLogin()">Create account</button>
+                                <button type="button" class="btn btn-primary" id="btnNextLogin">Next</button>
+                            </div>
+                        </form>
+                    </div>
+                    
+                    <!-- Login Step 2: Password -->
+                    <div id="loginStep2" class="step-content">
+                        <div class="step-indicator">Step 2 of 2</div>
+                        <a href="javascript:void(0)" class="back-link" id="btnBackLogin">
+                            <i class="bi bi-arrow-left"></i> <span id="displayLoginEmail"></span>
+                        </a>
+                        <h2 class="form-title">Enter password</h2>
+                        
+                        <form id="login-form" class="auth-form">
+                            <div class="form-group">
+                                <div class="password-input-wrapper">
+                                    <input type="password" id="loginPassword" class="form-input" placeholder="Password" required autocomplete="current-password">
+                                    <button type="button" class="password-toggle" onclick="app.togglePassword('loginPassword', 'loginPasswordToggle')">
+                                        <i class="bi bi-eye" id="loginPasswordToggle"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <div class="form-actions">
+                                <button type="submit" class="btn btn-primary btn-full">Sign in</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </template>
+    
+    <!-- Register Template -->
+    <template id="register-template">
+        <div class="auth-container">
+            <!-- Left Side - Branding -->
+            <div class="auth-branding">
+                <div class="branding-content">
+                    <img src="Logo_for_coffee_202604042236.jpeg" alt="Plotra Logo" class="branding-logo">
+                    <h1 class="branding-title">Plotra</h1>
+                    <p class="branding-subtitle">Join the EUDR Compliance Platform</p>
+                    <div class="branding-features">
+                        <div class="feature-item">
+                            <i class="bi bi-geo-alt-fill"></i>
+                            <span>Farm Mapping</span>
+                        </div>
+                        <div class="feature-item">
+                            <i class="bi bi-box-seam-fill"></i>
+                            <span>Delivery Tracking</span>
+                        </div>
+                        <div class="feature-item">
+                            <i class="bi bi-shield-check"></i>
+                            <span>EUDR Compliance</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="branding-pattern"></div>
+            </div>
+            
+            <!-- Right Side - Register Form -->
+            <div class="auth-form-container">
+                <div class="auth-form-wrapper">
+                    <!-- Back to Home Link -->
+                    <div class="text-center mb-4">
+                        <a href="index.html" class="text-muted small">
+                            <i class="bi bi-arrow-left me-1"></i>Back to Home
+                        </a>
+                    </div>
+
+                    <!-- Register Step 1: Personal Info -->
+                    <div id="regStep1" class="step-content active">
+                        <div class="step-indicator">Step 1 of 3</div>
+                        <h2 class="form-title">Create account</h2>
+                        <p class="form-subtitle">Personal Details</p>
+                        
+                        <form id="register-form-step1" class="auth-form">
+                            <div class="form-row-2">
+                                <div class="form-group">
+                                    <input type="text" id="regFirstName" class="form-input" placeholder="First Name" required>
+                                </div>
+                                <div class="form-group">
+                                    <input type="text" id="regLastName" class="form-input" placeholder="Last Name" required>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <input type="email" id="regEmail" class="form-input" placeholder="Email" required>
+                            </div>
+                            <div class="form-group">
+                                <input type="tel" id="regPhone" class="form-input" placeholder="Phone Number (+254...)">
+                            </div>
+                            
+                            <div class="form-actions">
+                                <button type="button" class="btn btn-link" onclick="app.showLoginFromRegister()">Sign in instead</button>
+                                <button type="button" class="btn btn-primary" id="btnNextReg1">Next</button>
+                            </div>
+                        </form>
+                    </div>
+                    
+                    <!-- Register Step 2: Password -->
+                    <div id="regStep2" class="step-content">
+                        <div class="step-indicator">Step 2 of 3</div>
+                        <a href="javascript:void(0)" class="back-link" onclick="app.goToRegStep1()">
+                            <i class="bi bi-arrow-left"></i> Personal Info
+                        </a>
+                        <h2 class="form-title">Create a password</h2>
+                        <p class="form-subtitle">Enter a secure password for your account</p>
+                        
+                        <form id="register-form-step2" class="auth-form">
+                            <div class="form-group">
+                                <div class="password-input-wrapper">
+                                    <input type="password" id="regPassword" class="form-input" placeholder="Password" required minlength="8">
+                                    <button type="button" class="password-toggle" onclick="app.togglePassword('regPassword', 'regPasswordToggle')">
+                                        <i class="bi bi-eye" id="regPasswordToggle"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <div class="password-input-wrapper">
+                                    <input type="password" id="regConfirmPassword" class="form-input" placeholder="Confirm Password" required>
+                                    <button type="button" class="password-toggle" onclick="app.togglePassword('regConfirmPassword', 'regConfirmPasswordToggle')">
+                                        <i class="bi bi-eye" id="regConfirmPasswordToggle"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <div class="form-actions">
+                                <button type="button" class="btn btn-primary btn-full" id="btnNextReg2">Next</button>
+                            </div>
+                        </form>
+                    </div>
+                    
+                    <!-- Register Step 3: Role & Location -->
+                    <div id="regStep3" class="step-content">
+                        <div class="step-indicator">Step 3 of 3</div>
+                        <a href="javascript:void(0)" class="back-link" onclick="app.goToRegStep2()">
+                            <i class="bi bi-arrow-left"></i> Security
+                        </a>
+                        <h2 class="form-title">Final Details</h2>
+                        <p class="form-subtitle">Tell us about your role and location</p>
+                        
+                        <form id="register-form" class="auth-form">
+                            <div class="form-group">
+                                <label class="form-label-small">Your Role</label>
+                                <select id="regRole" class="form-input form-select" required>
+                                    <option value="farmer">Farmer</option>
+                                    <option value="cooperative_officer">Cooperative Admin</option>
+                                    <option value="plotra_admin">Platform Admin</option>
+                                </select>
+                            </div>
+                            <div class="form-row-2">
+                                <div class="form-group">
+                                    <label class="form-label-small">Country</label>
+                                    <select id="regCountry" class="form-input form-select">
+                                        <option value="Kenya" selected>Kenya</option>
+                                        <option value="Uganda">Uganda</option>
+                                        <option value="Tanzania">Tanzania</option>
+                                        <option value="Ethiopia">Ethiopia</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label-small">Region</label>
+                                    <input type="text" id="regRegion" class="form-input" placeholder="Region">
+                                </div>
+                            </div>
+                            <div class="form-group form-check-wrapper">
+                                <input type="checkbox" id="regTerms" class="form-check-input" required>
+                                <label for="regTerms" class="form-check-label">
+                                    I agree to the <a href="#" onclick="return false;">Terms and Conditions</a>
+                                </label>
+                            </div>
+                            
+                            <div class="form-actions">
+                                <button type="submit" class="btn btn-primary btn-full">Create Account</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </template>
+    
+    <template id="dashboard-template">
+        <div class="dashboard">
+            <header class="page-header">
+                <h1>Dashboard</h1>
+                <button id="logout-btn" class="btn btn-outline">Logout</button>
+            </header>
+            
+            <div class="dashboard-cards">
+                <div class="card">
+                    <h3>Farm Status</h3>
+                    <p class="status-text" id="farm-status">Loading...</p>
+                </div>
+                
+                <div class="card">
+                    <h3>Compliance</h3>
+                    <p class="status-text" id="compliance-status">Loading...</p>
+                </div>
+                
+                <div class="card">
+                    <h3>Deliveries</h3>
+                    <p class="stat-number" id="delivery-count">0</p>
+                </div>
+                
+                <div class="card">
+                    <h3>Documents</h3>
+                    <p class="stat-number" id="document-count">0</p>
+                </div>
+            </div>
+            
+            <div class="dashboard-actions">
+                <h2>Quick Actions</h2>
+                <div class="action-grid">
+                    <button class="action-btn" data-action="map-farm">
+                        <span class="icon">📍</span>
+                        <span>Map Farm</span>
+                    </button>
+                    <button class="action-btn" data-action="record-delivery">
+                        <span class="icon">📝</span>
+                        <span>Record Delivery</span>
+                    </button>
+                    <button class="action-btn" data-action="upload-document">
+                        <span class="icon">📄</span>
+                        <span>Upload Document</span>
+                    </button>
+                    <button class="action-btn" data-action="view-compliance">
+                        <span class="icon">✅</span>
+                        <span>Compliance</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </template>
+    
+    <template id="map-template">
+        <div class="map-page">
+            <header class="page-header">
+                <h1>Farm Map</h1>
+                <button id="add-parcel-btn" class="btn btn-primary">+ Add Parcel</button>
+            </header>
+            
+            <div id="map-container">
+                <div id="map"></div>
+            </div>
+            
+            <div id="parcel-form" class="modal hidden">
+                <div class="modal-content">
+                    <h2>Add Farm Parcel</h2>
+                    <form id="parcel-form-element">
+                        <div class="form-group">
+                            <label for="parcel-name">Parcel Name</label>
+                            <input type="text" id="parcel-name" name="parcelName">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>Record GPS Boundary</label>
+                            <button type="button" id="start-gps-btn" class="btn btn-secondary">
+                                📍 Start GPS Recording
+                            </button>
+                            <div id="gps-status"></div>
+                        </div>
+                        
+                        <div id="gps-points-container" class="hidden">
+                            <p>Points recorded: <span id="point-count">0</span></p>
+                        </div>
+                        
+                        <div class="form-actions">
+                            <button type="button" id="cancel-parcel-btn" class="btn btn-outline">Cancel</button>
+                            <button type="submit" class="btn btn-primary">Save Parcel</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </template>
+    
+    <template id="deliveries-template">
+        <div class="deliveries-page">
+            <header class="page-header">
+                <h1>Deliveries</h1>
+                <button id="new-delivery-btn" class="btn btn-primary">+ New Delivery</button>
+            </header>
+            
+            <div id="deliveries-list">
+                <!-- Dynamic content -->
+            </div>
+            
+            <div id="delivery-form-modal" class="modal hidden">
+                <div class="modal-content">
+                    <h2>Record Delivery</h2>
+                    <form id="delivery-form">
+                        <div class="form-group">
+                            <label for="delivery-farm">Farm</label>
+                            <select id="delivery-farm" name="farmId" required></select>
+                        </div>
+                        
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="gross-weight">Gross Weight (kg)</label>
+                                <input type="number" id="gross-weight" name="grossWeight" step="0.1" required>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="tare-weight">Tare Weight (kg)</label>
+                                <input type="number" id="tare-weight" name="tareWeight" step="0.1" value="0">
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="moisture-content">Moisture Content (%)</label>
+                            <input type="number" id="moisture-content" name="moistureContent" step="0.1">
+                        </div>
+                        
+                        <div class="form-actions">
+                            <button type="button" id="cancel-delivery-btn" class="btn btn-outline">Cancel</button>
+                            <button type="submit" class="btn btn-primary">Record Delivery</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </template>
+    
+    <template id="profile-template">
+        <div class="profile-page">
+            <header class="page-header">
+                <h1>Profile</h1>
+            </header>
+            
+            <div class="profile-header">
+                <div class="avatar" id="user-avatar">👤</div>
+                <h2 id="user-name">Loading...</h2>
+                <p id="user-role" class="role-badge">Loading...</p>
+            </div>
+            
+            <div class="profile-section">
+                <h3>Account Information</h3>
+                <div class="info-list">
+                    <div class="info-item">
+                        <span class="label">Email</span>
+                        <span class="value" id="user-email">Loading...</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="label">Phone</span>
+                        <span class="value" id="user-phone">Loading...</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="label">Verification</span>
+                        <span class="value" id="user-verification">Loading...</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="profile-section">
+                <h3>Farm Information</h3>
+                <div class="info-list">
+                    <div class="info-item">
+                        <span class="label">Total Area</span>
+                        <span class="value" id="farm-area">Loading...</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="label">Parcels</span>
+                        <span class="value" id="farm-parcels">Loading...</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="profile-actions">
+                <button class="btn btn-outline btn-block" id="edit-profile-btn">Edit Profile</button>
+                <button class="btn btn-outline btn-block" id="change-password-btn">Change Password</button>
+            </div>
+        </div>
+    </template>
+    
+    <!-- Scripts -->
+    <script src="js/config.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/gps.js"></script>
+    <script src="js/app.js"></script>
+    <script>
+        // Register Service Worker for PWA
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js')
+                    .then(registration => {
+                        console.log('ServiceWorker registered:', registration.scope);
+                    })
+                    .catch(error => {
+                        console.log('ServiceWorker registration failed:', error);
+                    });
+            });
+        }
+    </script>
+</body>
+</html>

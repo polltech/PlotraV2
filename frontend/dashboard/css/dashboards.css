@@ -1,0 +1,156 @@
+/* Advanced Dashboard Layouts */
+:root {
+    --card-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.04), 0 4px 6px -2px rgba(0, 0, 0, 0.02);
+    --glass-bg: rgba(255, 255, 255, 0.8);
+    --glass-border: rgba(255, 255, 255, 0.4);
+    
+    /* Font - Match Farmer Dashboard */
+    --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* Apply Inter font to all elements */
+.dashboard-grid, .dashboard-card, .activity-item, .activity-icon, 
+.dashboard-card h1, .dashboard-card h2, .dashboard-card h3, .dashboard-card h4, 
+.dashboard-card h5, .dashboard-card h6, .dashboard-card p, .dashboard-card span,
+.dashboard-card .value, .dashboard-card .trend, .dashboard-card label {
+    font-family: var(--font-family);
+}
+
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+/* Responsive Grid */
+@media (max-width: 1199px) {
+    .dashboard-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 1.25rem;
+    }
+}
+
+@media (max-width: 767px) {
+    .dashboard-grid {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+}
+
+@media (max-width: 575px) {
+    .dashboard-grid {
+        gap: 0.75rem;
+        margin-bottom: 1.5rem;
+    }
+}
+
+.dashboard-card {
+    background: var(--glass-bg);
+    backdrop-filter: blur(10px);
+    border: 1px solid var(--glass-border);
+    border-radius: 20px;
+    padding: 1.5rem;
+    box-shadow: var(--card-shadow);
+}
+
+@media (max-width: 575px) {
+    .dashboard-card {
+        padding: 1rem;
+        border-radius: 16px;
+    }
+}
+
+.dashboard-card h6 {
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #64748b;
+    margin-bottom: 1.25rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.dashboard-card .value {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #1e293b;
+}
+
+@media (max-width: 575px) {
+    .dashboard-card .value {
+        font-size: 1.5rem;
+    }
+}
+
+.dashboard-card .trend {
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 0.25rem 0.6rem;
+    border-radius: 50px;
+}
+
+.trend.up { background: #dcfce7; color: #166534; }
+.trend.down { background: #fee2e2; color: #991b1b; }
+
+/* Role Specific Dashboards */
+.status-pill {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+    margin-right: 8px;
+}
+
+.chart-placeholder {
+    height: 200px;
+    background: linear-gradient(180deg, rgba(248, 250, 252, 0.5) 0%, rgba(241, 245, 249, 0.5) 100%);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #94a3b8;
+    font-size: 0.85rem;
+    border: 1px dashed #cbd5e1;
+}
+
+@media (max-width: 575px) {
+    .chart-placeholder {
+        height: 150px;
+        font-size: 0.8rem;
+    }
+}
+
+/* Activity Feed */
+.activity-item {
+    display: flex;
+    gap: 1rem;
+    padding: 1rem 0;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+.activity-item:last-child { border-bottom: none; }
+
+.activity-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+@media (max-width: 575px) {
+    .activity-item {
+        gap: 0.75rem;
+        padding: 0.75rem 0;
+    }
+    
+    .activity-icon {
+        width: 32px;
+        height: 32px;
+    }
+}

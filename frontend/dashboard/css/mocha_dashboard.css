@@ -1,0 +1,328 @@
+/* Mocha High-End Dashboard Design */
+:root {
+    --mocha-brown: #6f4e37;
+    --mocha-light: #efebe9;
+    --mocha-accent: #8d6e63;
+    --mocha-card-bg: #ffffff;
+    --mocha-sidebar-bg: #fdfcfb;
+    --mocha-radius: 24px;
+    --mocha-shadow: 0 10px 30px rgba(0,0,0,0.05);
+    
+    /* Font - Match Farmer Dashboard */
+    --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* Apply Inter font to all elements */
+.mocha-dashboard, .stat-card-mocha, .swap-card, .quick-action-mocha, .info-pill, .countdown-box,
+.mocha-dashboard h1, .mocha-dashboard h2, .mocha-dashboard h3, .mocha-dashboard h4,
+.mocha-dashboard h5, .mocha-dashboard h6, .mocha-dashboard p, .mocha-dashboard span,
+.mocha-dashboard label, .mocha-dashboard input, .mocha-dashboard button,
+.stat-card-mocha .stat-label-mocha, .stat-card-mocha .stat-value-mocha,
+.swap-card label, .swap-card input, .swap-card button,
+.quick-action-mocha h6, .countdown-box .timer-val, .countdown-box .timer-lbl {
+    font-family: var(--font-family);
+}
+
+.mocha-dashboard {
+    padding: 2rem;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+/* Responsive Layout */
+@media (max-width: 1199px) {
+    .mocha-dashboard {
+        padding: 1.5rem;
+    }
+    .mocha-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 991px) {
+    .mocha-dashboard {
+        padding: 1.25rem;
+    }
+    .swap-card {
+        padding: 1.5rem;
+    }
+    .payment-method-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+@media (max-width: 767px) {
+    .mocha-dashboard {
+        padding: 1rem;
+    }
+    .info-pill {
+        padding: 0.375rem 1rem;
+        font-size: 0.8rem;
+    }
+    .stat-card-mocha {
+        padding: 1.25rem;
+    }
+    .stat-value-mocha {
+        font-size: 1.5rem;
+    }
+    .swap-card {
+        padding: 1.25rem;
+        border-radius: 16px;
+    }
+    .payment-method-grid {
+        grid-template-columns: repeat(3, 1fr);
+        gap: 0.5rem;
+    }
+    .pay-method-btn {
+        padding: 0.75rem 0.25rem;
+        border-radius: 12px;
+    }
+    .input-container-mocha {
+        padding: 0.75rem;
+        border-radius: 12px;
+    }
+    .quick-action-mocha {
+        padding: 1.25rem;
+        border-radius: 16px;
+    }
+    .countdown-box {
+        padding: 1.25rem;
+        border-radius: 12px;
+    }
+    .btn-mocha-primary {
+        padding: 0.875rem;
+    }
+}
+
+@media (max-width: 575px) {
+    .mocha-dashboard {
+        padding: 0.75rem;
+    }
+    .info-pill {
+        padding: 0.25rem 0.75rem;
+        font-size: 0.75rem;
+    }
+    .stat-card-mocha {
+        padding: 1rem;
+        border-radius: 16px;
+    }
+    .stat-label-mocha {
+        font-size: 0.75rem;
+    }
+    .stat-value-mocha {
+        font-size: 1.25rem;
+    }
+    .trend-badge {
+        font-size: 0.65rem;
+        padding: 0.15rem 0.4rem;
+    }
+    .swap-card {
+        padding: 1rem;
+    }
+    .payment-method-grid {
+        grid-template-columns: repeat(3, 1fr);
+        gap: 0.375rem;
+        margin: 1rem 0;
+    }
+    .pay-method-btn {
+        padding: 0.5rem 0.25rem;
+        border-radius: 10px;
+    }
+    .pay-method-btn img {
+        height: 20px;
+    }
+    .input-container-mocha {
+        padding: 0.625rem;
+        margin-bottom: 0.75rem;
+        border-radius: 10px;
+    }
+    .input-container-mocha input {
+        font-size: 0.9rem;
+    }
+    .quick-action-mocha {
+        padding: 1rem;
+    }
+    .quick-action-mocha h6 {
+        font-size: 0.9rem;
+    }
+    .countdown-box {
+        padding: 1rem;
+    }
+    .countdown-timer {
+        gap: 0.5rem;
+    }
+    .timer-val {
+        font-size: 1.25rem;
+    }
+    .timer-lbl {
+        font-size: 0.55rem;
+    }
+    .btn-mocha-primary {
+        padding: 0.75rem;
+        border-radius: 40px;
+    }
+}
+
+@media (max-width: 400px) {
+    .payment-method-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+/* Header Pills */
+.info-pill {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 50px;
+    padding: 0.5rem 1.25rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #1e293b;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.pill-value {
+    color: #10b981;
+}
+
+/* Top Stats Cards */
+.stat-card-mocha {
+    background: var(--mocha-card-bg);
+    border-radius: var(--mocha-radius);
+    padding: 1.5rem;
+    border: 1px solid #f1f5f9;
+    box-shadow: var(--mocha-shadow);
+}
+
+.stat-label-mocha {
+    font-size: 0.85rem;
+    color: #64748b;
+    font-weight: 500;
+}
+
+.stat-value-mocha {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: #1e293b;
+    margin: 0.5rem 0;
+}
+
+.trend-badge {
+    background: #dcfce7;
+    color: #166534;
+    font-size: 0.75rem;
+    padding: 0.2rem 0.5rem;
+    border-radius: 50px;
+    font-weight: 600;
+}
+
+/* Main Layout Grid */
+.mocha-grid {
+    display: grid;
+    grid-template-columns: 1fr 380px;
+    gap: 2rem;
+    margin-top: 2rem;
+}
+
+/* Swap Card */
+.swap-card {
+    background: white;
+    border-radius: var(--mocha-radius);
+    padding: 2rem;
+    box-shadow: var(--mocha-shadow);
+    border: 1px solid #f1f5f9;
+}
+
+.payment-method-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.75rem;
+    margin: 1.5rem 0;
+}
+
+.pay-method-btn {
+    border: 1px solid #e2e8f0;
+    border-radius: 16px;
+    padding: 1rem 0.5rem;
+    text-align: center;
+    background: none;
+    transition: all 0.2s;
+}
+
+.pay-method-btn.active {
+    border-color: var(--mocha-brown);
+    background: var(--mocha-light);
+}
+
+.pay-method-btn img {
+    height: 24px;
+    margin-bottom: 0.5rem;
+}
+
+.input-container-mocha {
+    background: #f8fafc;
+    border-radius: 16px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+/* Quick Actions Card */
+.quick-action-mocha {
+    background: white;
+    border-radius: var(--mocha-radius);
+    padding: 1.5rem;
+    box-shadow: var(--mocha-shadow);
+    margin-top: 1.5rem;
+}
+
+.countdown-box {
+    background: #fffbeb;
+    border: 1px solid #fef3c7;
+    border-radius: 16px;
+    padding: 1.5rem;
+    text-align: center;
+}
+
+.countdown-timer {
+    display: flex;
+    justify-content: center;
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.timer-unit {
+    text-align: center;
+}
+
+.timer-val {
+    font-size: 1.5rem;
+    font-weight: 700;
+    display: block;
+}
+
+.timer-lbl {
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    color: #92400e;
+}
+
+/* Primary Button Mocha */
+.btn-mocha-primary {
+    background: #1a2e05;
+    color: white;
+    border-radius: 50px;
+    padding: 1rem;
+    width: 100%;
+    font-weight: 600;
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+}
+
+.btn-mocha-primary:hover {
+    background: #2d5016;
+}

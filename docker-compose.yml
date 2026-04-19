@@ -1,0 +1,71 @@
+# Plotra Platform — Docker Compose (development defaults)
+# For production use:  docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+# Copy .env.example → .env before first run
+
+services:
+  postgres:
+    image: postgis/postgis:15-3.3
+    container_name: plotra-postgres
+    environment:
+      POSTGRES_USER:     ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB:       ${POSTGRES_DB:-plotra_db}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: plotra-backend
+    env_file:
+      - path: .env
+        required: false     # dev: falls back to inline environment below
+    environment:
+      - PLOTRA_DATABASE__HOST=postgres
+      - PLOTRA_DATABASE__PORT=5432
+      - PLOTRA_DATABASE__USERNAME=${POSTGRES_USER:-postgres}
+      - PLOTRA_DATABASE__PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - PLOTRA_DATABASE__NAME=${POSTGRES_DB:-plotra_db}
+      - PLOTRA_APP__DEBUG=${PLOTRA_APP__DEBUG:-true}
+      - PLOTRA_APP__SECRET_KEY=${PLOTRA_APP__SECRET_KEY:-dev-secret-change-in-production}
+      - UVICORN_WORKERS=${UVICORN_WORKERS:-1}
+      - PYTHONPATH=/app
+    ports:
+      - "8000:8000"
+    volumes:
+      - uploads_data:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    command: >
+      sh -c "python -m uvicorn app.main:app
+             --host 0.0.0.0
+             --port 8000
+             --workers 1
+             --proxy-headers
+             --forwarded-allow-ips='*'"
+
+  dashboard:
+    build:
+      context: ./frontend/dashboard
+      dockerfile: Dockerfile
+    container_name: plotra-dashboard
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  uploads_data:

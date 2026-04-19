@@ -1,0 +1,675 @@
+<!-- Farmer Profile Page - PLOTRA EUDR Compliance Platform -->
+<div id="farmer-profile-page" class="page-content">
+    <div class="container-fluid">
+        <!-- Back Button -->
+        <div class="mb-3">
+            <button type="button" class="btn btn-outline-secondary btn-sm" id="backToDashboardBtn">
+                <i class="bi bi-arrow-left"></i> Back to Dashboard
+            </button>
+        </div>
+
+        <!-- Header -->
+        <div class="profile-header mb-5">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1 class="page-title mb-2">Farmer Farming Profile</h1>
+                    <p class="text-muted">Complete your farming profile for EUDR compliance and traceability</p>
+                </div>
+                <div class="profile-status">
+                    <span id="profileStatusBadge" class="badge badge-warning">In Progress</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Progress Indicator -->
+        <div class="progress-container mb-4">
+            <div class="progress">
+                <div id="profileProgressBar" class="progress-bar bg-success" role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+            </div>
+            <p class="text-center mt-2"><small id="profileProgressText">0% Complete</small></p>
+        </div>
+
+        <form id="farmerProfileForm" class="farmer-profile-form">
+            <!-- ============================================================ -->
+            <!-- SECTION 1: FARMER'S PERSONAL DETAILS -->
+            <!-- ============================================================ -->
+            <div class="section-card mb-5">
+                <div class="section-header">
+                    <div class="section-number">1</div>
+                    <div>
+                        <h2 class="section-title">Farmer's Personal Details</h2>
+                        <p class="section-subtitle">Your basic information and contact details</p>
+                    </div>
+                    <div class="section-toggle">
+                        <i class="bi bi-chevron-up toggle-icon"></i>
+                    </div>
+                </div>
+
+                <div class="section-content">
+                    <div class="row">
+                        <!-- Name Fields -->
+                        <div class="col-md-6 mb-3">
+                            <label for="firstName" class="form-label">First Name <span class="required">*</span></label>
+                            <input type="text" class="form-control" id="firstName" name="firstName" placeholder="Enter first name" required>
+                            <small class="form-text text-muted">As it appears on your national ID</small>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="lastName" class="form-label">Last Name <span class="required">*</span></label>
+                            <input type="text" class="form-control" id="lastName" name="lastName" placeholder="Enter last name" required>
+                            <small class="form-text text-muted">As it appears on your national ID</small>
+                        </div>
+
+                        <!-- Contact Information -->
+                        <div class="col-md-6 mb-3">
+                            <label for="email" class="form-label">Email Address <span class="required">*</span></label>
+                            <input type="email" class="form-control" id="email" name="email" placeholder="your.email@example.com" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="phone" class="form-label">Phone Number <span class="required">*</span></label>
+                            <input type="tel" class="form-control" id="phone" name="phone" placeholder="+254712345678" required>
+                        </div>
+
+                        <!-- Date of Birth -->
+                        <div class="col-md-6 mb-3">
+                            <label for="dob" class="form-label">Date of Birth</label>
+                            <input type="date" class="form-control" id="dob" name="dob">
+                        </div>
+
+                        <!-- National ID -->
+                        <div class="col-md-6 mb-3">
+                            <label for="nationalId" class="form-label">National ID Number</label>
+                            <input type="text" class="form-control" id="nationalId" name="nationalId" placeholder="e.g., 12345678">
+                        </div>
+
+                        <!-- Address Section -->
+                        <div class="col-12 mt-4 mb-3">
+                            <div class="address-header">
+                                <h5 class="mb-0"><i class="bi bi-geo-alt"></i> Address Information</h5>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label for="county" class="form-label">County <span class="required">*</span></label>
+                            <select class="form-control" id="county" name="county" required>
+                                <option value="">Select County</option>
+                                <option value="Nairobi">Nairobi</option>
+                                <option value="Kiambu">Kiambu</option>
+                                <option value="Nakuru">Nakuru</option>
+                                <option value="Nyandarua">Nyandarua</option>
+                                <option value="Nyeri">Nyeri</option>
+                                <option value="Muranga">Muranga</option>
+                                <option value="Kisii">Kisii</option>
+                                <option value="Kericho">Kericho</option>
+                                <option value="Bomet">Bomet</option>
+                                <option value="Elgeyo-Marakwet">Elgeyo-Marakwet</option>
+                                <option value="Uasin-Gishu">Uasin-Gishu</option>
+                                <option value="West-Pokot">West-Pokot</option>
+                                <option value="Kapsabet">Kapsabet</option>
+                                <option value="Trans-Nzoia">Trans-Nzoia</option>
+                            </select>
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label for="district" class="form-label">District / Sub-County <span class="required">*</span></label>
+                            <input type="text" class="form-control" id="district" name="district" placeholder="e.g., Limuru" required>
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label for="ward" class="form-label">Ward</label>
+                            <input type="text" class="form-control" id="ward" name="ward" placeholder="e.g., Karura">
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label for="address" class="form-label">Physical Address</label>
+                            <textarea class="form-control" id="address" name="address" rows="2" placeholder="Enter your complete residential address"></textarea>
+                        </div>
+
+                        <!-- Cooperative Membership -->
+                        <div class="col-12 mt-4 mb-3">
+                            <div class="membership-header">
+                                <h5 class="mb-0"><i class="bi bi-people"></i> Cooperative Membership</h5>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label for="memberOfCoop" class="form-control-label">Member of a Cooperative / FBO? <span class="required">*</span></label>
+                            <div class="btn-group-toggle d-flex gap-2" role="group">
+                                <input type="radio" class="btn-check" name="memberOfCoop" id="coopYes" value="yes">
+                                <label class="btn btn-outline-primary" for="coopYes">Yes</label>
+                                <input type="radio" class="btn-check" name="memberOfCoop" id="coopNo" value="no">
+                                <label class="btn btn-outline-primary" for="coopNo">No</label>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6 mb-3" id="cooperativeNameField" style="display: none;">
+                            <label for="cooperativeName" class="form-label">Cooperative Name</label>
+                            <input type="text" class="form-control" id="cooperativeName" name="cooperativeName" placeholder="Enter cooperative name">
+                        </div>
+
+                        <div class="col-md-6 mb-3" id="coopRegNumberField" style="display: none;">
+                            <label for="coopRegNumber" class="form-label">Cooperative Registration Number</label>
+                            <input type="text" class="form-control" id="coopRegNumber" name="coopRegNumber" placeholder="Official registration reference">
+                        </div>
+
+                        <!-- Section Complete Checkbox -->
+                        <div class="col-12 mt-4">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="section1Complete" name="section1Complete">
+                                <label class="form-check-label" for="section1Complete">
+                                    I confirm that all my personal details are accurate
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ============================================================ -->
+            <!-- SECTION 2: FARM DETAILS & EUDR COMPLIANCE -->
+            <!-- ============================================================ -->
+            <div class="section-card mb-5">
+                <div class="section-header">
+                    <div class="section-number">2</div>
+                    <div>
+                        <h2 class="section-title">Farm Details & EUDR Compliance</h2>
+                        <p class="section-subtitle">Your farming information and sustainability practices</p>
+                    </div>
+                    <div class="section-toggle">
+                        <i class="bi bi-chevron-up toggle-icon"></i>
+                    </div>
+                </div>
+
+                <div class="section-content">
+                    <!-- ========== SUBSECTION 2A: LAND & PARCEL INFORMATION ========== -->
+                    <div class="subsection mb-4">
+                        <h4 class="subsection-title"><i class="bi bi-map"></i> Land & Parcel Information</h4>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="farmName" class="form-label">Farm / Parcel Name <span class="required">*</span></label>
+                                <input type="text" class="form-control" id="farmName" name="farmName" placeholder="e.g., Kimunyu Farm, North Parcel" required>
+                                <small class="form-text text-muted">Farmer-assigned label for the plot</small>
+                            </div>
+
+                            <div class="col-md-6 mb-3">
+                                <label for="farmType" class="form-label">Farm Type <span class="required">*</span></label>
+                                <select class="form-control" id="farmType" name="farmType" required>
+                                    <option value="">Select Farm Type</option>
+                                    <option value="owned">Owned</option>
+                                    <option value="leased">Leased</option>
+                                    <option value="communal">Communal</option>
+                                    <option value="inherited">Inherited</option>
+                                </select>
+                                <small class="form-text text-muted">Land ownership classification</small>
+                            </div>
+
+                            <div class="col-md-6 mb-3">
+                                <label for="landRegNumber" class="form-label">Land Registration Number</label>
+                                <input type="text" class="form-control" id="landRegNumber" name="landRegNumber" placeholder="Title deed or government-issued ID">
+                                <small class="form-text text-muted">Title deed or government-issued ID</small>
+                            </div>
+
+                            <div class="col-md-6 mb-3">
+                                <label for="totalArea" class="form-label">Total Parcel Area (hectares) <span class="required">*</span></label>
+                                <input type="number" class="form-control" id="totalArea" name="totalArea" placeholder="0.0" step="0.01" min="0" required>
+                                <small class="form-text text-muted">Total area of this parcel</small>
+                            </div>
+
+                            <div class="col-md-6 mb-3">
+                                <label for="altitude" class="form-label">Altitude (m above sea level)</label>
+                                <input type="number" class="form-control" id="altitude" name="altitude" placeholder="e.g., 1850" step="10" min="0">
+                                <small class="form-text text-muted">Important for coffee quality classification</small>
+                            </div>
+
+                            <div class="col-md-6 mb-3">
+                                <label for="soilType" class="form-label">Soil Type <span class="required">*</span></label>
+                                <select class="form-control" id="soilType" name="soilType" required>
+                                    <option value="">Select Soil Type</option>
+                                    <option value="clay">Clay</option>
+                                    <option value="loam">Loam</option>
+                                    <option value="sandy">Sandy</option>
+                                    <option value="unknown">Unknown</option>
+                                </select>
+                            </div>
+
+                            <div class="col-md-6 mb-3">
+                                <label for="terrain" class="form-label">Terrain / Slope <span class="required">*</span></label>
+                                <select class="form-control" id="terrain" name="terrain" required>
+                                    <option value="">Select Terrain</option>
+                                    <option value="flat">Flat</option>
+                                    <option value="gentle_slope">Gentle Slope</option>
+                                    <option value="steep">Steep</option>
+                                </select>
+                            </div>
+
+                            <!-- GPS Mapping -->
+                            <div class="col-12 mt-4 mb-3">
+                                <label for="gpsMapping" class="form-label">GPS Parcel Boundary Mapping <span class="required">*</span></label>
+                                <div id="gpsMapContainer" style="height: 400px; border: 2px dashed #ddd; border-radius: 8px; margin-bottom: 10px;">
+                                    <!-- Leaflet map will be initialized here -->
+                                </div>
+                                <button type="button" class="btn btn-sm btn-outline-primary" id="captureGPS">
+                                    <i class="bi bi-geo-alt"></i> Capture GPS Points
+                                </button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary" id="clearGPS">
+                                    <i class="bi bi-trash"></i> Clear Boundary
+                                </button>
+                                <small class="form-text d-block mt-2">Draw or pin parcel boundaries on the map above</small>
+                                <input type="hidden" id="boundaryGeojson" name="boundaryGeojson">
+                                <input type="hidden" id="areaCalculated" name="areaCalculated">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ========== SUBSECTION 2B: COFFEE FARMING DETAILS ========== -->
+                    <div class="subsection mb-4">
+                        <h4 class="subsection-title"><i class="bi bi-tree"></i> Coffee Farming Details</h4>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="coffeeVariety" class="form-label">Coffee Variety <span class="required">*</span></label>
+                                <select class="form-control" id="coffeeVariety" name="coffeeVariety" multiple required>
+                                    <option value="SL28">SL28</option>
+                                    <option value="SL34">SL34</option>
+                                    <option value="Ruiru11">Ruiru 11</option>
+                                    <option value="Batian">Batian</option>
+                                    <option value="Other">Other</option>
+                                </select>
+                                <small class="form-text text-muted">Select all varieties grown on this parcel</small>
+                            </div>
+
+                            <div class="col-md-6 mb-3">
+                                <label for="yearCoffeePlanted" class="form-label">Year Coffee First Planted <span class="required">*</span></label>
+                                <input type="number" class="form-control" id="yearCoffeePlanted" name="yearCoffeePlanted" placeholder="e.g., 2015" min="1990" max="" required>
+                                <small class="form-text text-muted">Baseline for satellite validation</small>
+                            </div>
+
+                            <div class="col-md-6 mb-3">
+                                <label for="coffeeTreeCount" class="form-label">Estimated Coffee Plants</label>
+                                <input type="number" class="form-control" id="coffeeTreeCount" name="coffeeTreeCount" placeholder="Approximate count" min="0" step="1">
+                                <small class="form-text text-muted">Count of productive trees</small>
+                            </div>
+
+                            <div class="col-md-6 mb-3">
+                                <label for="farmStatus" class="form-label">Coffee Farm Status <span class="required">*</span></label>
+                                <select class="form-control" id="farmStatus" name="farmStatus" required>
+                                    <option value="">Select Status</option>
+                                    <option value="active">Active</option>
+                                    <option value="rehabilitating">Rehabilitating</option>
+                                    <option value="abandoned">Abandoned</option>
+                                </select>
+                            </div>
+
+                            <div class="col-md-6 mb-3">
+                                <label for="plantingMethod" class="form-label">Planting Method <span class="required">*</span></label>
+                                <select class="form-control" id="plantingMethod" name="plantingMethod" required>
+                                    <option value="">Select Planting Method</option>
+                                    <option value="monoculture">Monoculture</option>
+                                    <option value="intercropped">Intercropped</option>
+                                    <option value="agroforestry">Agroforestry</option>
+                                </select>
+                            </div>
+
+                            <div class="col-md-6 mb-3">
+                                <label for="irrigationUsed" class="form-label">Irrigation Used <span class="required">*</span></label>
+                                <div class="btn-group-toggle d-flex gap-2" role="group">
+                                    <input type="radio" class="btn-check" name="irrigationUsed" id="irrigYes" value="yes">
+                                    <label class="btn btn-outline-primary" for="irrigYes">Yes</label>
+                                    <input type="radio" class="btn-check" name="irrigationUsed" id="irrigNo" value="no">
+                                    <label class="btn btn-outline-primary" for="irrigNo">No</label>
+                                </div>
+                            </div>
+
+                            <div class="col-md-6 mb-3" id="irrigationTypeField" style="display: none;">
+                                <label for="irrigationType" class="form-label">Irrigation Type</label>
+                                <select class="form-control" id="irrigationType" name="irrigationType">
+                                    <option value="">Select Type</option>
+                                    <option value="drip">Drip Irrigation</option>
+                                    <option value="furrow">Furrow Irrigation</option>
+                                    <option value="rain_fed">Rain-fed</option>
+                                </select>
+                            </div>
+
+                            <div class="col-md-6 mb-3">
+                                <label for="estimatedYield" class="form-label">Estimated Annual Yield (kg)</label>
+                                <input type="number" class="form-control" id="estimatedYield" name="estimatedYield" placeholder="Previous season yield" min="0" step="0.1">
+                                <small class="form-text text-muted">Previous season yield for traceability</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ========== SUBSECTION 2C: MIXED FARMING DECLARATION ★ EUDR CRITICAL ========== -->
+                    <div class="subsection eudr-critical mb-4">
+                        <h4 class="subsection-title"><i class="bi bi-exclamation-triangle"></i> Mixed Farming Declaration ★ EUDR CRITICAL</h4>
+                        <p class="eudr-note">Your answers here are required for EUDR compliance verification</p>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="mixedFarming" class="form-label">Do you practice mixed farming on this parcel? <span class="required">*</span></label>
+                                <div class="btn-group-toggle d-flex gap-2" role="group">
+                                    <input type="radio" class="btn-check" name="mixedFarming" id="mixedYes" value="yes">
+                                    <label class="btn btn-outline-danger" for="mixedYes">Yes</label>
+                                    <input type="radio" class="btn-check" name="mixedFarming" id="mixedNo" value="no">
+                                    <label class="btn btn-outline-primary" for="mixedNo">No</label>
+                                </div>
+                                <small class="form-text d-block mt-2">Triggers additional crop and livestock fields if Yes</small>
+                            </div>
+
+                            <div class="col-md-6 mb-3" id="coffeePercentField" style="display: none;">
+                                <label for="coffeePercent" class="form-label">% of Parcel Under Coffee</label>
+                                <div class="input-group">
+                                    <input type="range" class="form-range" id="coffeePercent" name="coffeePercent" min="0" max="100" value="100">
+                                    <span class="input-group-text ms-2"><span id="coffeePercentValue">100</span>%</span>
+                                </div>
+                                <small class="form-text">e.g., 60% coffee, 40% other crops</small>
+                            </div>
+
+                            <div class="col-12 mb-3" id="otherCropsField" style="display: none;">
+                                <label for="otherCrops" class="form-label">Other Crops Grown</label>
+                                <div class="crop-checkboxes">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="otherCrops" value="maize" id="crop_maize">
+                                        <label class="form-check-label" for="crop_maize">Maize</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="otherCrops" value="banana" id="crop_banana">
+                                        <label class="form-check-label" for="crop_banana">Banana</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="otherCrops" value="beans" id="crop_beans">
+                                        <label class="form-check-label" for="crop_beans">Beans</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="otherCrops" value="vegetables" id="crop_vegetables">
+                                        <label class="form-check-label" for="crop_vegetables">Vegetables</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="otherCrops" value="other" id="crop_other">
+                                        <label class="form-check-label" for="crop_other">Other</label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="col-md-6 mb-3" id="livestockField" style="display: none;">
+                                <label for="livstock" class="form-label">Livestock on Parcel?</label>
+                                <div class="btn-group-toggle d-flex gap-2" role="group">
+                                    <input type="radio" class="btn-check" name="livestock" id="livestockYes" value="yes">
+                                    <label class="btn btn-outline-primary" for="livestockYes">Yes</label>
+                                    <input type="radio" class="btn-check" name="livestock" id="livestockNo" value="no">
+                                    <label class="btn btn-outline-primary" for="livestockNo">No</label>
+                                </div>
+                            </div>
+
+                            <div class="col-md-6 mb-3" id="livestockTypeField" style="display: none;">
+                                <label for="livestockType" class="form-label">Livestock Type</label>
+                                <div class="livestock-checkboxes">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="livestockType" value="cattle" id="livestock_cattle">
+                                        <label class="form-check-label" for="livestock_cattle">Cattle</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="livestockType" value="goats" id="livestock_goats">
+                                        <label class="form-check-label" for="livestock_goats">Goats</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="livestockType" value="poultry" id="livestock_poultry">
+                                        <label class="form-check-label" for="livestock_poultry">Poultry</label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="col-md-6 mb-3" id="cropRotationField" style="display: none;">
+                                <label for="cropRotation" class="form-label">Crop Rotation Practiced?</label>
+                                <div class="btn-group-toggle d-flex gap-2" role="group">
+                                    <input type="radio" class="btn-check" name="cropRotation" id="cropRotYes" value="yes">
+                                    <label class="btn btn-outline-success" for="cropRotYes">Yes</label>
+                                    <input type="radio" class="btn-check" name="cropRotation" id="cropRotNo" value="no">
+                                    <label class="btn btn-outline-primary" for="cropRotNo">No</label>
+                                </div>
+                                <small class="form-text d-block mt-2">Indicates sustainable land-use practices</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ========== SUBSECTION 2D: TREE COVER & DEFORESTATION ★ EUDR CRITICAL ========== -->
+                    <div class="subsection eudr-critical mb-4">
+                        <h4 class="subsection-title"><i class="bi bi-exclamation-triangle"></i> Tree Cover & Deforestation Declaration ★ EUDR CRITICAL</h4>
+                        <p class="eudr-note">Your answers here may trigger satellite review and compliance actions</p>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="treesPlanedLast5" class="form-label">Trees planted in last 5 years? <span class="required">*</span></label>
+                                <div class="btn-group-toggle d-flex gap-2" role="group">
+                                    <input type="radio" class="btn-check" name="treesPlanedLast5" id="treesPlantedYes" value="yes">
+                                    <label class="btn btn-outline-success" for="treesPlantedYes">Yes</label>
+                                    <input type="radio" class="btn-check" name="treesPlanedLast5" id="treesPlantedNo" value="no">
+                                    <label class="btn btn-outline-primary" for="treesPlantedNo">No</label>
+                                </div>
+                                <small class="form-text d-block mt-2">Triggers satellite cross-check on parcel</small>
+                            </div>
+
+                            <div class="col-md-6 mb-3" id="treeSpeciesField" style="display: none;">
+                                <label for="treeSpecies" class="form-label">Tree Species Planted</label>
+                                <div class="tree-checkboxes">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="treeSpecies" value="grevillea" id="tree_grevillea">
+                                        <label class="form-check-label" for="tree_grevillea">Grevillea</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="treeSpecies" value="macadamia" id="tree_macadamia">
+                                        <label class="form-check-label" for="tree_macadamia">Macadamia</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="treeSpecies" value="eucalyptus" id="tree_eucalyptus">
+                                        <label class="form-check-label" for="tree_eucalyptus">Eucalyptus</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="treeSpecies" value="indigenous" id="tree_indigenous">
+                                        <label class="form-check-label" for="tree_indigenous">Indigenous</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="treeSpecies" value="other" id="tree_other">
+                                        <label class="form-check-label" for="tree_other">Other</label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="col-md-6 mb-3" id="treeCountField" style="display: none;">
+                                <label for="treeCount" class="form-label">Number of Trees Planted</label>
+                                <input type="number" class="form-control" id="treeCount" name="treeCount" placeholder="Approximate count" min="0" step="1">
+                            </div>
+
+                            <div class="col-md-6 mb-3" id="treePlanningReasonField" style="display: none;">
+                                <label for="treePlanningReason" class="form-label">Reason for Planting</label>
+                                <div class="reason-checkboxes">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="treePlanningReason" value="shade" id="reason_shade">
+                                        <label class="form-check-label" for="reason_shade">Shade</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="treePlanningReason" value="windbreak" id="reason_windbreak">
+                                        <label class="form-check-label" for="reason_windbreak">Windbreak</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="treePlanningReason" value="timber" id="reason_timber">
+                                        <label class="form-check-label" for="reason_timber">Timber</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="treePlanningReason" value="soil_health" id="reason_soil_health">
+                                        <label class="form-check-label" for="reason_soil_health">Soil health</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="treePlanningReason" value="compliance" id="reason_compliance">
+                                        <label class="form-check-label" for="reason_compliance">Compliance</label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- HIGH EUDR RISK ALERT -->
+                            <div class="col-12 mb-3">
+                                <label for="treesCleared" class="form-label"><strong>Trees cleared in last 5 years?</strong> <span class="high-risk-badge">HIGH EUDR RISK</span> <span class="required">*</span></label>
+                                <div class="btn-group-toggle d-flex gap-2" role="group">
+                                    <input type="radio" class="btn-check" name="treesCleared" id="treesClearedYes" value="yes">
+                                    <label class="btn btn-outline-danger" for="treesClearedYes">Yes - Triggers Review</label>
+                                    <input type="radio" class="btn-check" name="treesCleared" id="treesClearedNo" value="no">
+                                    <label class="btn btn-outline-success" for="treesClearedNo">No</label>
+                                </div>
+                                <div class="alert alert-danger mt-3" id="treeClearingAlert" style="display: none;">
+                                    <i class="bi bi-exclamation-triangle"></i>
+                                    <strong>⚠️ HIGH EUDR RISK:</strong> Your answer indicates potential deforestation. This flagged for mandatory satellite review before approval.
+                                </div>
+                            </div>
+
+                            <div class="col-md-6 mb-3" id="reasonForClearingField" style="display: none;">
+                                <label for="reasonForClearing" class="form-label">Reason for Clearing</label>
+                                <select class="form-control border-danger" id="reasonForClearing" name="reasonForClearing">
+                                    <option value="">Select Reason</option>
+                                    <option value="expanding_farmland">Expanding farmland</option>
+                                    <option value="disease">Disease</option>
+                                    <option value="construction">Construction</option>
+                                    <option value="other">Other</option>
+                                </select>
+                            </div>
+
+                            <div class="col-md-6 mb-3">
+                                <label for="currentCanopyCover" class="form-label">Current Tree Canopy Cover <span class="required">*</span></label>
+                                <select class="form-control" id="currentCanopyCover" name="currentCanopyCover" required>
+                                    <option value="">Select Coverage</option>
+                                    <option value="none">None (0%)</option>
+                                    <option value="less_than_10">Less than 10%</option>
+                                    <option value="10_to_30">10–30%</option>
+                                    <option value="more_than_30">More than 30%</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ========== SUBSECTION 2E: SATELLITE CONSENT ========== -->
+                    <div class="subsection mb-4">
+                        <h4 class="subsection-title"><i class="bi bi-stars"></i> Satellite Verification Consent</h4>
+                        
+                        <div class="row">
+                            <div class="col-12 mb-3">
+                                <div class="consent-card">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="satelliteConsent" name="satelliteConsent" required>
+                                        <label class="form-check-label" for="satelliteConsent">
+                                            <strong>I consent to Parcel Satellite Monitoring</strong>
+                                            <br>
+                                            <small class="text-muted">Required to proceed with EUDR compliance verification. Satellite imagery will be used to validate your farming declarations.</small>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="col-12 mb-3">
+                                <div class="consent-card">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="historicalImageryConsent" name="historicalImageryConsent" required>
+                                        <label class="form-check-label" for="historicalImageryConsent">
+                                            <strong>I consent to Historical Imagery Analysis (2020–present)</strong>
+                                            <br>
+                                            <small class="text-muted">Aligns with EUDR deforestation baseline of December 31, 2020. Historical imagery will be analyzed to verify compliance.</small>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="col-md-6 mb-3">
+                                <label for="monitoringFrequency" class="form-label">Preferred Monitoring Frequency</label>
+                                <select class="form-control" id="monitoringFrequency" name="monitoringFrequency">
+                                    <option value="">Select Frequency</option>
+                                    <option value="monthly">Monthly</option>
+                                    <option value="quarterly">Quarterly</option>
+                                    <option value="annually">Annually</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ========== SUBSECTION 2F: CERTIFICATIONS ========== -->
+                    <div class="subsection mb-4">
+                        <h4 class="subsection-title"><i class="bi bi-award"></i> Certifications & Compliance History</h4>
+                        
+                        <div class="row">
+                            <div class="col-12 mb-3">
+                                <label for="certifications" class="form-label">Existing Certifications</label>
+                                <div class="cert-checkboxes">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="certifications" value="fairtrade" id="cert_fairtrade">
+                                        <label class="form-check-label" for="cert_fairtrade">Fairtrade</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="certifications" value="rainforest_alliance" id="cert_rainforest">
+                                        <label class="form-check-label" for="cert_rainforest">Rainforest Alliance</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="certifications" value="organic" id="cert_organic">
+                                        <label class="form-check-label" for="cert_organic">Organic</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="certifications" value="utz" id="cert_utz">
+                                        <label class="form-check-label" for="cert_utz">UTZ</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="certifications" value="none" id="cert_none">
+                                        <label class="form-check-label" for="cert_none">None</label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="col-md-6 mb-3">
+                                <label for="certExpiryDate" class="form-label">Certificate Expiry Date</label>
+                                <input type="date" class="form-control" id="certExpiryDate" name="certExpiryDate">
+                                <small class="form-text text-muted">For renewal tracking</small>
+                            </div>
+
+                            <div class="col-md-6 mb-3">
+                                <label for="previousViolations" class="form-label">Previously Flagged for Violations?</label>
+                                <div class="btn-group-toggle d-flex gap-2" role="group">
+                                    <input type="radio" class="btn-check" name="previousViolations" id="violYes" value="yes">
+                                    <label class="btn btn-outline-danger" for="violYes">Yes</label>
+                                    <input type="radio" class="btn-check" name="previousViolations" id="violNo" value="no">
+                                    <label class="btn btn-outline-success" for="violNo">No</label>
+                                </div>
+                                <small class="form-text d-block mt-2">Self-declaration — audited against records</small>
+                            </div>
+
+                            <div class="col-12 mb-3" id="violationDetailsField" style="display: none;">
+                                <label for="violationDetails" class="form-label">Violation Details</label>
+                                <textarea class="form-control border-danger" id="violationDetails" name="violationDetails" rows="3" placeholder="Please describe the violations"></textarea>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ========== SECTION COMPLETE CHECKBOX ========== -->
+                    <div class="col-12 mt-4">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="section2Complete" name="section2Complete">
+                            <label class="form-check-label" for="section2Complete">
+                                I confirm that all my farm details and EUDR compliance information are accurate and complete
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Form Actions -->
+            <div class="form-actions sticky-bottom">
+                <button type="button" class="btn btn-outline-secondary" id="backBtn">
+                    <i class="bi bi-arrow-left"></i> Back
+                </button>
+                <button type="button" class="btn btn-outline-secondary" id="saveDraftBtn2">
+                    <i class="bi bi-download"></i> Save Draft
+                </button>
+                <button type="submit" class="btn btn-success btn-lg" id="submitBtn">
+                    <i class="bi bi-check-circle"></i> Submit Profile
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Map Loading Script -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>

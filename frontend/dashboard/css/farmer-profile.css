@@ -1,0 +1,1000 @@
+/* ===============================================================
+   FARMER PROFILE PAGE - PLOTRA EUDR COMPLIANCE PLATFORM
+   =============================================================== */
+
+/* ========== Page Layout and General Styles ========== */
+#farmer-profile-page {
+    background: #f8f9fa;
+    padding: 2rem 0;
+}
+
+#farmer-profile-page .container-fluid {
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+/* ========== Profile Header ========== */
+.profile-header {
+    background: white;
+    padding: 2rem;
+    border-radius: 12px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    margin-bottom: 2rem;
+}
+
+.profile-header .page-title {
+    color: #1a5f1a;
+    font-size: 1.75rem;
+    font-weight: 600;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.profile-header .page-title::before {
+    content: '';
+    display: inline-block;
+    width: 6px;
+    height: 28px;
+    background: linear-gradient(180deg, #daa520, #cd853f);
+    border-radius: 3px;
+}
+
+.profile-status {
+    font-size: 0.95rem;
+}
+
+/* ========== Progress Bar ========== */
+.progress-container {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.progress-container .progress {
+    height: 8px;
+    background-color: #e9ecef;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.progress-container .progress-bar {
+    background: linear-gradient(90deg, #28a745, #20c997);
+    transition: width 0.3s ease;
+}
+
+.progress-container .progress-bar.complete {
+    background: linear-gradient(90deg, #1a5f1a, #28a745);
+}
+
+/* ========== Form Sections ========== */
+.section-card {
+    background: white;
+    border: 1px solid #e9ecef;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    transition: all 0.3s ease;
+}
+
+.section-card:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.section-card.collapsed .section-content {
+    display: none;
+}
+
+/* ========== Section Headers ========== */
+.section-header {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    padding: 2rem;
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border-bottom: 2px solid #e9ecef;
+    cursor: pointer;
+    transition: background 0.3s ease;
+}
+
+.section-header:hover {
+    background: linear-gradient(135deg, #e9ecef 0%, #dee2e6 100%);
+}
+
+.section-number {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    background: linear-gradient(135deg, #daa520, #cd853f);
+    color: white;
+    border-radius: 50%;
+    font-size: 1.1rem;
+    font-weight: 600;
+    flex-shrink: 0;
+}
+
+.section-header > div:nth-child(2) {
+    flex: 1;
+}
+
+.section-title {
+    margin: 0 0 0.25rem 0;
+    font-size: 1.15rem;
+    font-weight: 600;
+    color: #1a5f1a;
+}
+
+.section-subtitle {
+    margin: 0;
+    font-size: 0.85rem;
+    color: #6c757d;
+}
+
+.section-toggle {
+    color: #6c757d;
+    font-size: 1.25rem;
+    transition: transform 0.3s ease;
+}
+
+.section-card.collapsed .section-toggle {
+    transform: rotate(180deg);
+}
+
+/* ========== Section Content ========== */
+.section-content {
+    padding: 1.5rem;
+}
+
+/* ========== Subsections ========== */
+.subsection {
+    padding: 1.5rem;
+    background: #f8f9fa;
+    border-radius: 8px;
+    border-left: 4px solid #daa520;
+    margin-bottom: 1.5rem;
+}
+
+.subsection-title {
+    margin: 0 0 1.5rem 0;
+    font-size: 1.15rem;
+    font-weight: 600;
+    color: #1a5f1a;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.subsection-title i {
+    color: #daa520;
+    font-size: 1.3rem;
+}
+
+/* ========== EUDR Critical Styling ========== */
+.eudr-critical {
+    background: linear-gradient(135deg, #fff3cd 0%, #ffe69c 100%);
+    border-left: 4px solid #ff6b6b;
+    background-clip: padding-box;
+}
+
+.eudr-critical .subsection-title {
+    color: #d32f2f;
+}
+
+.eudr-critical .subsection-title i {
+    color: #ff6b6b;
+}
+
+.eudr-note {
+    background: #ffebee;
+    padding: 1rem;
+    border-radius: 6px;
+    color: #c62828;
+    font-weight: 500;
+    margin: -1.5rem -1.5rem 1rem -1.5rem;
+    padding: 1rem 1.5rem;
+    border-radius: 8px 8px 0 0;
+}
+
+/* ========== Form Labels ========== */
+.form-label {
+    font-weight: 600;
+    color: #2c3e50;
+    margin-bottom: 0.5rem;
+    display: block;
+}
+
+.form-label .required {
+    color: #ff6b6b;
+    font-weight: bold;
+}
+
+/* ========== Form Controls ========== */
+.form-control {
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    padding: 0.75rem 1rem;
+    font-size: 0.95rem;
+    transition: all 0.3s ease;
+}
+
+.form-control:focus {
+    border-color: #daa520;
+    box-shadow: 0 0 0 0.2rem rgba(218, 165, 32, 0.25);
+    outline: none;
+}
+
+.form-control.border-danger {
+    border-color: #ff6b6b;
+}
+
+.form-control:disabled {
+    background-color: #e9ecef;
+    color: #6c757d;
+}
+
+/* ========== Form Groups ========== */
+.form-text {
+    display: block;
+    margin-top: 0.25rem;
+    font-size: 0.85rem;
+    color: #6c757d;
+}
+
+/* ========== Buttons ========== */
+.btn {
+    border-radius: 6px;
+    padding: 0.75rem 1.5rem;
+    font-weight: 500;
+    transition: all 0.3s ease;
+}
+
+.btn-primary {
+    background-color: #daa520;
+    border-color: #daa520;
+    color: white;
+}
+
+.btn-primary:hover {
+    background-color: #cd853f;
+    border-color: #cd853f;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(218, 165, 32, 0.3);
+}
+
+.btn-success {
+    background: linear-gradient(135deg, #28a745, #20c997);
+    border: none;
+    color: white;
+}
+
+.btn-success:hover {
+    background: linear-gradient(135deg, #1a5f1a, #0fad6d);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(40, 167, 69, 0.3);
+}
+
+.btn-outline-primary {
+    color: #daa520;
+    border-color: #daa520;
+}
+
+.btn-outline-primary:hover,
+.btn-outline-primary.active {
+    background-color: #daa520;
+    border-color: #daa520;
+    color: white;
+}
+
+.btn-outline-danger {
+    color: #ff6b6b;
+    border-color: #ff6b6b;
+}
+
+.btn-outline-danger:hover,
+.btn-outline-danger.active {
+    background-color: #ff6b6b;
+    border-color: #ff6b6b;
+    color: white;
+}
+
+.btn-outline-success {
+    color: #28a745;
+    border-color: #28a745;
+}
+
+.btn-outline-success:hover,
+.btn-outline-success.active {
+    background-color: #28a745;
+    border-color: #28a745;
+    color: white;
+}
+
+.btn-check:checked + .btn,
+.btn.active {
+    background-color: #daa520;
+    border-color: #daa520;
+    color: white;
+}
+
+/* ========== Toggle Buttons (Radio/Checkbox) ========== */
+.btn-group-toggle {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-top: 0.5rem;
+}
+
+/* ========== Checkboxes and Radios ========== */
+.form-check {
+    padding-left: 0;
+    margin-bottom: 1rem;
+}
+
+.form-check-input {
+    width: 1.25em;
+    height: 1.25em;
+    margin-right: 0.75rem;
+    margin-top: 0.125rem;
+    cursor: pointer;
+    border: 2px solid #dee2e6;
+    border-radius: 4px;
+    accent-color: #daa520;
+}
+
+.form-check-input:checked {
+    background-color: #daa520;
+    border-color: #daa520;
+}
+
+.form-check-input:focus {
+    border-color: #daa520;
+    box-shadow: 0 0 0 0.2rem rgba(218, 165, 32, 0.25);
+}
+
+.form-check-label {
+    cursor: pointer;
+    margin-bottom: 0;
+    user-select: none;
+}
+
+/* ========== Checkbox Groups ========== */
+.crop-checkboxes,
+.livestock-checkboxes,
+.tree-checkboxes,
+.reason-checkboxes,
+.cert-checkboxes {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 1rem;
+}
+
+/* ========== Consent Cards ========== */
+.consent-card {
+    background: #f0f7ff;
+    padding: 1.5rem;
+    border-radius: 8px;
+    border: 1px solid #b3d9ff;
+    margin-bottom: 1rem;
+}
+
+.consent-card .form-check-input {
+    width: 1.5em;
+    height: 1.5em;
+}
+
+/* ========== Alert Styling ========== */
+.alert {
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+.alert-danger {
+    background-color: #ffebee;
+    border: 1px solid #ffcdd2;
+    color: #c62828;
+}
+
+.alert i {
+    margin-right: 0.5rem;
+}
+
+/* ========== Badge Styling ========== */
+.badge {
+    padding: 0.5rem 1rem;
+    font-size: 0.9rem;
+    border-radius: 20px;
+}
+
+.badge-warning {
+    background-color: #ffc107;
+    color: #000;
+}
+
+.badge-success {
+    background-color: #28a745;
+    color: white;
+}
+
+.high-risk-badge {
+    display: inline-block;
+    background: #ff6b6b;
+    color: white;
+    padding: 0.25rem 0.75rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    margin-left: 0.5rem;
+}
+
+/* ========== GPS Map Container ========== */
+#gpsMapContainer {
+    border: 2px dashed #daa520;
+    border-radius: 8px;
+    background: #f8f9fa;
+    position: relative;
+}
+
+#gpsMapContainer .leaflet-container {
+    border-radius: 8px;
+}
+
+/* ========== Range Slider ========== */
+.form-range {
+    accent-color: #daa520;
+    height: 0.5rem;
+}
+
+.input-group-text {
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    color: #495057;
+}
+
+/* ========== Address Header ========== */
+.address-header,
+.membership-header {
+    padding-bottom: 1rem;
+    border-bottom: 2px solid #daa520;
+    margin-bottom: 1.5rem;
+}
+
+.address-header h5,
+.membership-header h5 {
+    color: #1a5f1a;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.address-header i,
+.membership-header i {
+    color: #daa520;
+}
+
+/* ========== Form Actions ========== */
+.form-actions {
+    display: flex;
+    gap: 1rem;
+    justify-content: flex-end;
+    margin-top: 2rem;
+    padding: 2rem;
+    background: white;
+    border-top: 1px solid #e9ecef;
+}
+
+.form-actions.sticky-bottom {
+    position: sticky;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.form-actions .btn {
+    min-width: 150px;
+}
+
+/* ========== Loading State ========== */
+.loading-spinner {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border: 3px solid #f3f3f3;
+    border-top: 3px solid #daa520;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-right: 0.5rem;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* ========== Success Message ========== */
+.success-message {
+    background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
+    border: 1px solid #c3e6cb;
+    color: #155724;
+    padding: 1.5rem;
+    border-radius: 8px;
+    display: none;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 2rem;
+}
+
+.success-message.show {
+    display: flex;
+    animation: slideDown 0.3s ease;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* ========== Responsive Design ========== */
+
+/* Tablet Landscape */
+@media (min-width: 992px) and (max-width: 1199px) {
+    .profile-header {
+        padding: 1.75rem;
+    }
+    
+    .profile-header .page-title {
+        font-size: 2.25rem;
+    }
+    
+    .section-header {
+        padding: 1.75rem;
+    }
+    
+    .section-content {
+        padding: 1.75rem;
+    }
+    
+    .crop-checkboxes,
+    .livestock-checkboxes,
+    .tree-checkboxes,
+    .reason-checkboxes,
+    .cert-checkboxes {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+/* Tablet Portrait */
+@media (min-width: 768px) and (max-width: 991px) {
+    .profile-header {
+        padding: 1.5rem;
+    }
+
+    .profile-header .page-title {
+        font-size: 2rem;
+    }
+
+    .section-header {
+        flex-wrap: wrap;
+        gap: 1rem;
+    }
+
+    .section-header > div:nth-child(2) {
+        flex: 1 1 100%;
+    }
+
+    .section-number {
+        width: 44px;
+        height: 44px;
+        font-size: 1.3rem;
+    }
+
+    .section-title {
+        font-size: 1.3rem;
+    }
+
+    .section-content {
+        padding: 1.5rem;
+    }
+
+    .crop-checkboxes,
+    .livestock-checkboxes,
+    .tree-checkboxes,
+    .reason-checkboxes,
+    .cert-checkboxes {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .form-actions {
+        flex-direction: row;
+        flex-wrap: wrap;
+    }
+
+    .form-actions .btn {
+        flex: 1;
+        min-width: 120px;
+    }
+
+    #gpsMapContainer {
+        height: 400px;
+    }
+}
+
+/* Mobile Landscape */
+@media (min-width: 576px) and (max-width: 767px) {
+    .profile-header {
+        padding: 1.25rem;
+    }
+
+    .profile-header .page-title {
+        font-size: 1.75rem;
+    }
+    
+    .profile-header .page-title::before {
+        height: 35px;
+        width: 6px;
+    }
+
+    .profile-status {
+        font-size: 1rem;
+    }
+
+    .progress-container {
+        padding: 1.25rem;
+    }
+
+    .section-header {
+        padding: 1.25rem;
+        gap: 0.75rem;
+    }
+
+    .section-number {
+        width: 40px;
+        height: 40px;
+        font-size: 1.2rem;
+    }
+
+    .section-title {
+        font-size: 1.2rem;
+    }
+
+    .section-subtitle {
+        font-size: 0.9rem;
+    }
+
+    .section-content {
+        padding: 1.25rem 1rem;
+    }
+
+    .subsection {
+        padding: 1.25rem;
+        margin-bottom: 1.25rem;
+    }
+
+    .subsection-title {
+        font-size: 1.1rem;
+    }
+
+    .crop-checkboxes,
+    .livestock-checkboxes,
+    .tree-checkboxes,
+    .reason-checkboxes,
+    .cert-checkboxes {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 0.75rem;
+    }
+
+    .btn-group-toggle {
+        flex-direction: column;
+    }
+
+    .btn-group-toggle .btn {
+        width: 100%;
+    }
+
+    .form-actions {
+        flex-direction: column;
+        padding: 1.5rem;
+    }
+
+    .form-actions .btn {
+        width: 100%;
+    }
+
+    #gpsMapContainer {
+        height: 350px;
+    }
+    
+    .consent-card {
+        padding: 1.25rem;
+    }
+    
+    .eudr-note {
+        padding: 0.75rem 1.25rem;
+    }
+}
+
+/* Mobile Portrait */
+@media (max-width: 575px) {
+    #farmer-profile-page {
+        padding: 0.75rem 0;
+    }
+
+    .container-fluid {
+        padding: 0 0.5rem;
+    }
+
+    .profile-header {
+        padding: 1rem;
+        border-radius: 8px;
+    }
+
+    .profile-header .page-title {
+        font-size: 1.5rem;
+        flex-wrap: wrap;
+    }
+    
+    .profile-header .page-title::before {
+        height: 28px;
+        width: 5px;
+    }
+
+    .profile-status {
+        font-size: 0.9rem;
+    }
+
+    .progress-container {
+        padding: 1rem;
+        border-radius: 8px;
+    }
+
+    .section-card {
+        border-radius: 8px;
+    }
+
+    .section-header {
+        padding: 1rem;
+        gap: 0.75rem;
+    }
+
+    .section-header > div:nth-child(2) {
+        flex: 1 1 100%;
+    }
+
+    .section-number {
+        width: 36px;
+        height: 36px;
+        font-size: 1rem;
+    }
+
+    .section-title {
+        font-size: 1rem;
+    }
+
+    .section-subtitle {
+        font-size: 0.8rem;
+    }
+
+    .section-toggle {
+        font-size: 1.25rem;
+    }
+
+    .section-content {
+        padding: 1rem 0.75rem;
+    }
+
+    .subsection {
+        padding: 1rem;
+        border-radius: 6px;
+        margin-bottom: 1rem;
+    }
+
+    .subsection-title {
+        font-size: 1rem;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+    }
+
+    .subsection-title i {
+        font-size: 1.1rem;
+    }
+
+    .form-label {
+        font-size: 0.9rem;
+    }
+
+    .form-control {
+        padding: 0.625rem 0.875rem;
+        font-size: 0.9rem;
+        border-radius: 6px;
+    }
+
+    .form-text {
+        font-size: 0.8rem;
+    }
+
+    .crop-checkboxes,
+    .livestock-checkboxes,
+    .tree-checkboxes,
+    .reason-checkboxes,
+    .cert-checkboxes {
+        grid-template-columns: 1fr;
+        gap: 0.5rem;
+    }
+
+    .form-check {
+        margin-bottom: 0.75rem;
+    }
+
+    .form-check-input {
+        width: 1.1em;
+        height: 1.1em;
+    }
+
+    .btn {
+        padding: 0.625rem 1rem;
+        font-size: 0.85rem;
+        border-radius: 6px;
+    }
+
+    .btn-group-toggle {
+        width: 100%;
+    }
+
+    .btn-group-toggle .btn {
+        flex: 1;
+        font-size: 0.8rem;
+        padding: 0.5rem;
+    }
+
+    .form-actions {
+        flex-direction: column;
+        padding: 1rem;
+        border-radius: 8px 8px 0 0;
+    }
+
+    .form-actions .btn {
+        width: 100%;
+        min-width: unset;
+    }
+
+    #gpsMapContainer {
+        height: 280px !important;
+        border-radius: 6px;
+    }
+
+    .consent-card {
+        padding: 1rem;
+        border-radius: 6px;
+    }
+
+    .consent-card .form-check-input {
+        width: 1.25em;
+        height: 1.25em;
+    }
+
+    .alert {
+        padding: 0.75rem;
+        font-size: 0.85rem;
+        border-radius: 6px;
+    }
+
+    .badge {
+        padding: 0.375rem 0.75rem;
+        font-size: 0.75rem;
+        border-radius: 12px;
+    }
+
+    .high-risk-badge {
+        font-size: 0.65rem;
+        padding: 0.2rem 0.5rem;
+    }
+
+    .eudr-note {
+        padding: 0.75rem 1rem;
+        border-radius: 6px 6px 0 0;
+        font-size: 0.85rem;
+    }
+
+    .input-group-text {
+        padding: 0.5rem 0.75rem;
+        font-size: 0.85rem;
+    }
+    
+    .form-range {
+        height: 0.4rem;
+    }
+    
+    .address-header h5,
+    .membership-header h5 {
+        font-size: 1rem;
+    }
+}
+
+/* Extra small */
+@media (max-width: 380px) {
+    .profile-header .page-title {
+        font-size: 1.25rem;
+    }
+    
+    .profile-header .page-title::before {
+        height: 24px;
+    }
+
+    .section-number {
+        width: 32px;
+        height: 32px;
+        font-size: 0.9rem;
+    }
+
+    .section-title {
+        font-size: 0.9rem;
+    }
+
+    .stat-card {
+        padding: 0.75rem;
+    }
+    
+    .stat-value {
+        font-size: 1.25rem;
+    }
+}
+
+/* ========== Dark Mode Support ========== */
+@media (prefers-color-scheme: dark) {
+    #farmer-profile-page {
+        background: #1a1a1a;
+    }
+
+    .section-card,
+    .profile-header,
+    .progress-container,
+    .farm-actions {
+        background: #2d2d2d;
+        border-color: #404040;
+        color: #e0e0e0;
+    }
+
+    .section-header {
+        background: linear-gradient(135deg, #404040 0%, #333333 100%);
+        border-bottom-color: #404040;
+    }
+
+    .subsection {
+        background: #333333;
+        border-left-color: #cd853f;
+    }
+
+    .form-control {
+        background: #2d2d2d;
+        border-color: #404040;
+        color: #e0e0e0;
+    }
+
+    .form-control:focus {
+        border-color: #daa520;
+        background: #1a1a1a;
+    }
+
+    .section-subtitle,
+    .form-text {
+        color: #b0b0b0;
+    }
+
+    .consent-card {
+        background: #1e3a5f;
+        border-color: #2d5a8f;
+    }
+}
