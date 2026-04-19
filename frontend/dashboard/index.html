@@ -99,746 +99,298 @@
         html.pre-auth #app-container { display: block !important; }
     </style>
 
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+
     <!-- Landing Page Styles -->
     <style>
-        /* ============ COFFEE PALETTE ============ */
         :root {
-            --coffee-espresso: #2C1A0E;
-            --coffee-dark:     #3D2314;
-            --coffee-brown:    #6F4E37;
-            --coffee-caramel:  #C8956C;
-            --coffee-latte:    #D4A574;
-            --coffee-cream:    #F0D9C4;
-            --coffee-milk:     #FDF6EF;
-            --coffee-white:    #FFFAF6;
+            --lp-black: #0a0806;
+            --lp-amber: #c8956c;
+            --lp-gold:  #d4a574;
+            --lp-gray:  #8a7060;
         }
-
-        /* ============ BASE ============ */
-        .landing-page {
-            min-height: 100vh;
-            background: var(--coffee-white);
-            font-family: 'Segoe UI', system-ui, sans-serif;
-        }
-
-        /* ============ NAVBAR ============ */
-        .lp-nav {
-            background: rgba(255,250,246,0.97);
-            backdrop-filter: blur(10px);
-            border-bottom: 1px solid var(--coffee-cream);
-            z-index: 1000;
-        }
-        .lp-nav-inner {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 1rem 0;
-        }
-        .lp-brand { display: flex; align-items: center; gap: 0.5rem; text-decoration: none; }
-        .lp-logo { height: 36px; }
-        .lp-brand-name { font-weight: 700; font-size: 1.4rem; color: var(--coffee-espresso); }
-        .lp-nav-actions { display: flex; gap: 0.75rem; }
-
-        /* ============ BUTTONS ============ */
-        .lp-btn-primary {
-            background: var(--coffee-brown);
+        #landing-page {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: var(--lp-black);
             color: #fff;
-            border: 2px solid var(--coffee-brown);
-            border-radius: 8px;
-            font-weight: 600;
-            padding: 0.55rem 1.4rem;
-            transition: all .25s;
-        }
-        .lp-btn-primary:hover {
-            background: var(--coffee-espresso);
-            border-color: var(--coffee-espresso);
-            color: #fff;
-            transform: translateY(-1px);
-            box-shadow: 0 6px 18px rgba(44,26,14,.25);
-        }
-        .lp-btn-outline {
-            background: transparent;
-            color: var(--coffee-brown);
-            border: 2px solid var(--coffee-brown);
-            border-radius: 8px;
-            font-weight: 600;
-            padding: 0.55rem 1.4rem;
-            transition: all .25s;
-        }
-        .lp-btn-outline:hover { background: var(--coffee-brown); color: #fff; }
-        .lp-btn-ghost {
-            background: transparent;
-            color: var(--coffee-brown);
-            border: 2px solid transparent;
-            border-radius: 8px;
-            font-weight: 600;
-            padding: 0.55rem 1.4rem;
-            transition: all .25s;
-        }
-        .lp-btn-ghost:hover { border-color: var(--coffee-cream); background: var(--coffee-cream); }
-        .lp-btn-lg { padding: .8rem 2.2rem; font-size: 1.05rem; }
-
-        /* ============ HERO ============ */
-        .lp-hero {
-            padding: 5rem 0 4rem;
-            background: linear-gradient(135deg, var(--coffee-white) 0%, var(--coffee-milk) 60%, #fff 100%);
-            position: relative;
-            overflow: hidden;
-        }
-        .lp-hero::before {
-            content: '';
-            position: absolute;
-            top: -80px; right: -80px;
-            width: 400px; height: 400px;
-            background: radial-gradient(circle, rgba(200,149,108,.18) 0%, transparent 70%);
-            pointer-events: none;
-        }
-        .lp-hero-inner {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 4rem;
-            align-items: center;
-        }
-        .lp-badge {
-            display: inline-block;
-            background: var(--coffee-cream);
-            color: var(--coffee-brown);
-            font-size: .8rem;
-            font-weight: 600;
-            letter-spacing: 1px;
-            text-transform: uppercase;
-            padding: .35rem 1rem;
-            border-radius: 999px;
-            margin-bottom: 1rem;
-        }
-        .lp-hero-title {
-            font-size: 2.5rem;
-            font-weight: 700;
-            line-height: 1.15;
-            color: var(--coffee-espresso);
-            margin-bottom: 1rem;
-        }
-        .lp-accent { color: var(--coffee-caramel); }
-        .lp-hero-sub {
-            font-size: 1rem;
-            color: var(--coffee-brown);
+            overflow-x: hidden;
             line-height: 1.6;
-            margin-bottom: 1.5rem;
-            max-width: 480px;
+            font-size: 16px;
         }
-        .lp-hero-cta { display: flex; gap: 0.75rem; flex-wrap: wrap; }
-        .lp-img-placeholder {
-            background: var(--coffee-cream);
-            border-radius: 12px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            gap: .5rem;
-            color: var(--coffee-caramel);
-            font-size: .85rem;
-            aspect-ratio: 4/3;
-            font-weight: 500;
-        }
-        .lp-img-placeholder i { font-size: 2.5rem; }
-        .lp-img-placeholder.sm { aspect-ratio: unset; height: 140px; border-radius: 12px; }
-        .lp-img-placeholder.md { aspect-ratio: 3/2; border-radius: 12px; }
+        #landing-page * { box-sizing: border-box; }
 
-        /* ============ STATS ============ */
-        .lp-stats { background: var(--coffee-brown); padding: 2.5rem 0; }
-        .lp-stats-grid {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 1rem;
+        /* NAV */
+        #lp-header {
+            position: fixed; top: 0; left: 0; right: 0;
+            background: rgba(10,8,6,0.92);
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+            z-index: 1000;
+            padding: 20px 0;
+            transition: padding .3s, background .3s;
+            border-bottom: 1px solid rgba(200,149,108,.08);
+        }
+        #lp-header.scrolled {
+            padding: 12px 0;
+            background: rgba(10,8,6,0.98);
+            border-bottom-color: rgba(200,149,108,.18);
+        }
+        #lp-nav {
+            max-width: 1320px; margin: 0 auto; padding: 0 36px;
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .lp-logo-wrap { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+        .lp-logo-wrap img { height: 40px; width: 40px; border-radius: 8px; object-fit: cover; }
+        .lp-logo-name { font-size: 22px; font-weight: 800; color: rgba(255,255,255,.85); letter-spacing: -.5px; transition: color .2s; }
+        .lp-logo-wrap:hover .lp-logo-name { color: var(--lp-amber); }
+        .lp-nav-btns { display: flex; gap: 10px; align-items: center; }
+        .lp-nav-btn {
+            display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+            font-size: 12px; font-weight: 600; padding: 6px 14px;
+            border-radius: 7px; cursor: pointer; transition: all .22s;
+            border: 1.5px solid transparent;
+        }
+        .lp-nav-btn--ghost { color: rgba(255,255,255,.6); border-color: rgba(255,255,255,.12); background: transparent; }
+        .lp-nav-btn--ghost:hover { color: rgba(255,255,255,.9); border-color: rgba(200,149,108,.35); background: rgba(200,149,108,.07); }
+        .lp-nav-btn--amber { color: #0a0806; background: var(--lp-amber); border-color: var(--lp-amber); }
+        .lp-nav-btn--amber:hover { background: var(--lp-gold); border-color: var(--lp-gold); transform: translateY(-1px); box-shadow: 0 6px 22px rgba(200,149,108,.4); }
+
+        /* HERO */
+        #lp-hero {
+            height: 100vh;
+            display: flex; align-items: center; justify-content: center;
+            position: relative;
+            background: linear-gradient(135deg, #0a0806 0%, #160d07 50%, #0d0a06 100%);
+            overflow: hidden;
             text-align: center;
         }
-        .lp-stat-num { display: block; font-size: 2rem; font-weight: 800; color: var(--coffee-cream); }
-        .lp-stat-label { display: block; font-size: .85rem; color: rgba(240,217,196,.75); margin-top: .2rem; font-weight: 500; }
+        #lp-hero-bg {
+            position: absolute; inset: 0; opacity: .85;
+            background-image:
+                repeating-linear-gradient(45deg, transparent, transparent 35px, rgba(200,149,108,.022) 35px, rgba(200,149,108,.022) 70px),
+                repeating-linear-gradient(-45deg, transparent, transparent 35px, rgba(255,255,255,.015) 35px, rgba(255,255,255,.015) 70px),
+                repeating-linear-gradient(90deg, transparent, transparent 50px, rgba(200,149,108,.012) 50px, rgba(200,149,108,.012) 100px);
+        }
+        #lp-hero::before {
+            content: ''; position: absolute; top: 8%; right: 8%;
+            width: 320px; height: 320px;
+            border: 2px solid rgba(200,149,108,.12);
+            border-radius: 30% 70% 70% 30% / 30% 30% 70% 70%;
+            background: radial-gradient(circle at 30% 50%, rgba(200,149,108,.04), transparent 70%);
+            animation: lpMorph 20s ease-in-out infinite;
+        }
+        #lp-hero::after {
+            content: ''; position: absolute; bottom: 8%; left: 5%;
+            width: 260px; height: 260px;
+            border: 2px solid rgba(200,149,108,.09); border-radius: 50%;
+            animation: lpRotate 25s linear infinite;
+            box-shadow: 0 0 50px rgba(200,149,108,.08);
+        }
+        .lp-acc { position: absolute; border: 1px solid rgba(200,149,108,.1); animation: lpFloat 15s ease-in-out infinite; pointer-events: none; }
+        .lp-acc-1 { top: 22%; left: 8%; width: 130px; height: 130px; border-radius: 50%; animation-delay: 0s; }
+        .lp-acc-2 { bottom: 28%; right: 12%; width: 90px; height: 90px; border-radius: 30% 70% 70% 30%; animation-delay: -5s; }
+        .lp-acc-3 { top: 52%; right: 28%; width: 70px; height: 70px; border-radius: 50%; animation-delay: -10s; border-color: rgba(255,255,255,.04); }
+        @keyframes lpMorph {
+            0%,100% { border-radius:30% 70% 70% 30%/30% 30% 70% 70%; transform:rotate(0deg) scale(1); }
+            33% { border-radius:70% 30% 30% 70%/70% 70% 30% 30%; transform:rotate(120deg) scale(1.08); }
+            66% { border-radius:30% 70% 40% 60%/60% 30% 70% 40%; transform:rotate(240deg) scale(.95); }
+        }
+        @keyframes lpRotate { from{transform:rotate(0deg) scale(1);} 50%{transform:rotate(180deg) scale(1.05);} to{transform:rotate(360deg) scale(1);} }
+        @keyframes lpFloat {
+            0%,100%{transform:translateY(0) translateX(0) rotate(0deg);}
+            25%{transform:translateY(-18px) translateX(8px) rotate(90deg);}
+            50%{transform:translateY(8px) translateX(-8px) rotate(180deg);}
+            75%{transform:translateY(-8px) translateX(4px) rotate(270deg);}
+        }
+        #lp-hero-content { position: relative; z-index: 2; padding: 0 24px; max-width: 820px; }
+        .lp-eyebrow-badge {
+            display: inline-flex; align-items: center; gap: 6px;
+            background: rgba(200,149,108,.1); border: 1px solid rgba(200,149,108,.22);
+            color: var(--lp-amber); font-size: 10px; font-weight: 700;
+            letter-spacing: 2px; text-transform: uppercase;
+            padding: 4px 12px; border-radius: 999px; margin-bottom: 20px;
+        }
+        .lp-pulse-dot { width:7px; height:7px; background:var(--lp-amber); border-radius:50%; animation:lpPulse 2s ease-in-out infinite; }
+        @keyframes lpPulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.3;transform:scale(.55)} }
+        .lp-hero-title {
+            font-size: clamp(26px, 4vw, 52px);
+            font-weight: 900; letter-spacing: -2px; line-height: 1.1; margin-bottom: 16px;
+            background: linear-gradient(135deg, #fff 0%, rgba(255,255,255,.55) 100%);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+        }
+        .lp-title-amber {
+            background: linear-gradient(135deg, var(--lp-amber) 0%, var(--lp-gold) 100%);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+        }
+        .lp-hero-sub {
+            font-size: 13px; color: var(--lp-gray); line-height: 1.7;
+            margin-bottom: 32px; max-width: 480px; margin-left: auto; margin-right: auto;
+        }
+        .lp-hero-actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+        .lp-btn-primary {
+            display: inline-flex; align-items: center; gap: 6px;
+            background: var(--lp-amber); color: #0a0806;
+            font-size: 13px; font-weight: 700; padding: 9px 22px; border-radius: 8px;
+            border: none; cursor: pointer; transition: all .25s;
+        }
+        .lp-btn-primary:hover { background: var(--lp-gold); transform: translateY(-1px); box-shadow: 0 8px 22px rgba(200,149,108,.4); }
+        .lp-btn-ghost {
+            display: inline-flex; align-items: center; gap: 6px;
+            background: transparent; color: rgba(255,255,255,.6);
+            font-size: 13px; font-weight: 600; padding: 9px 22px; border-radius: 8px;
+            cursor: pointer; border: 1.5px solid rgba(255,255,255,.15); transition: all .25s;
+        }
+        .lp-btn-ghost:hover { color: rgba(255,255,255,.9); border-color: rgba(200,149,108,.4); background: rgba(200,149,108,.06); }
+        .lp-scroll-hint {
+            position: absolute; bottom: 36px; left: 50%; transform: translateX(-50%);
+            display: flex; flex-direction: column; align-items: center; gap: 6px;
+            font-size: 10px; letter-spacing: 2.5px; text-transform: uppercase;
+            color: rgba(255,255,255,.22); z-index: 2;
+            animation: lpFadeIn 1s ease forwards 2s; opacity: 0;
+        }
+        .lp-scroll-line {
+            width: 1px; height: 40px;
+            background: linear-gradient(to bottom, rgba(200,149,108,.6), transparent);
+            animation: lpScrollPulse 2s ease-in-out infinite;
+        }
+        @keyframes lpScrollPulse { 0%,100%{transform:scaleY(1);opacity:.8} 50%{transform:scaleY(.4);opacity:.3} }
+        @keyframes lpFadeIn { to { opacity: 1; } }
+        .lp-reveal { opacity: 0; transform: translateY(30px); transition: opacity .75s ease, transform .75s ease; }
+        .lp-reveal.in { opacity: 1; transform: none; }
 
-        /* ============ SECTIONS SHARED ============ */
-        .lp-section { padding: 3.5rem 0; }
-        .lp-section-head { text-align: center; margin-bottom: 2rem; }
-        .lp-section-title { font-size: 1.75rem; font-weight: 700; color: var(--coffee-espresso); margin-bottom: .5rem; }
-        .lp-section-sub { font-size: 0.95rem; color: var(--coffee-brown); max-width: 500px; margin: 0 auto; line-height: 1.6; }
-
-        /* ============ FEATURES ============ */
-        .lp-features-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.25rem; }
-        .lp-feature-card {
-            background: #fff;
-            border: 1px solid var(--coffee-cream);
-            border-radius: 12px;
-            padding: 1.25rem;
-            transition: all .25s;
+        /* === AUTH MODAL CSS (preserved) === */
+        .auth-modal .modal-close-btn{position:absolute !important;top:20px !important;right:20px !important;z-index:1050 !important;background:transparent !important;border:none !important;width:32px !important;height:32px !important;display:flex !important;align-items:center !important;justify-content:center !important;color:#6f4e37 !important;opacity:1 !important;transition:all .3s ease !important;cursor:pointer !important;font-size:1.2rem !important;}
+        .auth-modal .modal-close-btn:hover{color:#3d2314 !important;transform:scale(1.15) !important;}
+        /* Force coffee color on Bootstrap btn-close SVG in auth modals */
+        /* Replace Bootstrap's black SVG X with coffee-colored one */
+        .auth-modal .btn-close.modal-close-btn {
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M.293.293a1 1 0 0 1 1.414 0L8 6.586 14.293.293a1 1 0 1 1 1.414 1.414L9.414 8l6.293 6.293a1 1 0 0 1-1.414 1.414L8 9.414l-6.293 6.293a1 1 0 0 1-1.414-1.414L6.586 8 .293 1.707a1 1 0 0 1 0-1.414z' fill='%236f4e37'/%3E%3C/svg%3E") !important;
+            filter: none !important;
+            opacity: 1 !important;
         }
-        .lp-feature-card:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 8px 20px rgba(44,26,14,.08);
-            border-color: var(--coffee-latte);
+        .auth-modal .btn-close.modal-close-btn:hover {
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M.293.293a1 1 0 0 1 1.414 0L8 6.586 14.293.293a1 1 0 1 1 1.414 1.414L9.414 8l6.293 6.293a1 1 0 0 1-1.414 1.414L8 9.414l-6.293 6.293a1 1 0 0 1-1.414-1.414L6.586 8 .293 1.707a1 1 0 0 1 0-1.414z' fill='%233d2314'/%3E%3C/svg%3E") !important;
+            filter: none !important;
+            transform: scale(1.15) !important;
         }
-        .lp-feature-icon {
-            width: 44px; height: 44px;
-            background: var(--coffee-cream);
-            border-radius: 10px;
-            display: flex; align-items: center; justify-content: center;
-            font-size: 1.2rem; color: var(--coffee-brown);
-            margin-bottom: 0.75rem;
-            transition: background .25s;
+        .auth-modal .modal-body{padding:5rem 2rem 2rem 2rem !important;width:100% !important;max-width:100% !important;}
+        #loginModal,#registerModal{display:flex !important;align-items:center;justify-content:center;padding:1rem !important;}
+        #loginModal:not(.show),#registerModal:not(.show){display:none !important;}
+        .auth-modal .modal-dialog{margin:0 !important;max-width:480px !important;width:100% !important;}
+        .auth-modal .modal-content{border-radius:12px !important;width:100% !important;max-width:none !important;border-top:4px solid #6f4e37 !important;border-right:1px solid #c49a72 !important;border-bottom:1px solid #c49a72 !important;border-left:1px solid #c49a72 !important;}
+        .auth-modal .form-control,.auth-modal select.form-select{border-top:2px solid #6f4e37 !important;border-right:1px solid #c8a882 !important;border-bottom:1px solid #c8a882 !important;border-left:1px solid #c8a882 !important;border-radius:6px !important;}
+        .auth-modal .form-control:focus,.auth-modal select.form-select:focus{border-top:2px solid #4a2c1a !important;border-right:1px solid #6f4e37 !important;border-bottom:1px solid #6f4e37 !important;border-left:1px solid #6f4e37 !important;box-shadow:0 0 0 3px rgba(111,78,55,.15) !important;}
+        .phone-input-wrap{border-top:2px solid #6f4e37 !important;border-right:1px solid #c8a882 !important;border-bottom:1px solid #c8a882 !important;border-left:1px solid #c8a882 !important;border-radius:6px !important;}
+        .auth-modal .modal-body form{width:100% !important;max-width:100% !important;}
+        .auth-modal .modal-body .text-center{width:100% !important;max-width:100% !important;text-align:center !important;}
+        .auth-modal .modal-body h1.fw-bold,.auth-modal .modal-body h2.fw-bold,.auth-modal .modal-body h3.fw-bold,.auth-modal .modal-body h4.fw-bold{text-align:center !important;}
+        .auth-modal input,.auth-modal .form-control{width:100% !important;max-width:100% !important;box-sizing:border-box !important;}
+        .auth-modal .d-flex{width:100% !important;max-width:100% !important;}
+        .auth-modal .text-center,.auth-modal .mb-4.text-center{width:100% !important;margin-left:auto !important;margin-right:auto !important;}
+        .auth-modal *{box-sizing:border-box !important;}
+        .auth-modal .step-content{width:100% !important;padding:0 !important;box-shadow:none !important;border:none !important;background:transparent !important;display:none !important;}
+        .auth-modal .step-content.active{display:block !important;}
+        .auth-modal h4,.auth-modal h5{font-size:1.1rem !important;}
+        .auth-modal p,.auth-modal .form-label,.auth-modal small{font-size:0.78rem !important;}
+        .auth-modal .form-control,.auth-modal .form-select{font-size:0.82rem !important;padding:0.32rem 0.6rem !important;}
+        .auth-modal .btn:not(.btn-link):not(.phone-country-btn){font-size:0.82rem !important;padding:0.35rem 1rem !important;}
+        .auth-modal .mb-3{margin-bottom:0.55rem !important;}
+        .auth-modal .mb-4{margin-bottom:0.8rem !important;}
+        .auth-modal .otp-box{width:36px !important;height:40px !important;font-size:1.05rem !important;}
+        .phone-input-wrap{position:relative;display:flex;width:100%;border:1px solid #dee2e6;border-radius:.375rem;background:#fff;}
+        .phone-input-wrap:focus-within{border-color:#86b7fe;box-shadow:0 0 0 .25rem rgba(13,110,253,.15);}
+        .phone-country-btn{display:flex;align-items:center;gap:6px;flex-shrink:0;background:#f8f9fa;border:none;border-right:1px solid #dee2e6;border-radius:.375rem 0 0 .375rem;padding:.45rem .75rem;white-space:nowrap;cursor:pointer;}
+        .phone-country-btn:hover{background:#e9ecef;}
+        .phone-country-btn img.phone-flag{width:24px;height:16px;object-fit:cover;border-radius:2px;display:block;}
+        .phone-prefix{font-weight:600;color:#333;font-size:.875rem;}
+        .phone-caret{font-size:.6rem;color:#888;}
+        .phone-input-wrap input[type="tel"]{flex:1;border:none;border-radius:0 .375rem .375rem 0;padding:.45rem .75rem;outline:none;background:transparent;font-size:1rem;min-width:0;}
+        .phone-country-menu{display:none;position:absolute;top:calc(100% + 3px);left:0;z-index:99999;background:#fff;border:1px solid #dee2e6;border-radius:.5rem;min-width:190px;list-style:none;padding:4px 0;margin:0;box-shadow:0 8px 24px rgba(0,0,0,.13);}
+        .phone-country-menu.open{display:block;}
+        .phone-country-menu li a{display:flex;align-items:center;gap:10px;padding:9px 14px;text-decoration:none;color:#212529;font-size:.9rem;}
+        .phone-country-menu li a:hover{background:#f0f4ff;}
+        .phone-country-menu li a img{width:24px;height:16px;object-fit:cover;border-radius:2px;flex-shrink:0;}
+        .reg-field-wrap{position:relative;}
+        .reg-field-icon{position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:.95rem;pointer-events:none;line-height:1;}
+        .reg-field-icon--outside{right:-22px;}
+        .reg-field-icon.valid{color:#6f4e37;}
+        .reg-field-icon.invalid{color:#dc3545;}
+        .reg-field-icon.checking::after{content:'';display:inline-block;width:10px;height:10px;border:2px solid #6f4e37;border-top-color:transparent;border-radius:50%;animation:regSpin .7s linear infinite;}
+        @keyframes regSpin{to{transform:translateY(-50%) rotate(360deg);}}
+        .reg-field-msg{font-size:.75rem;margin-top:3px;min-height:14px;}
+        .reg-field-msg.taken{color:#dc3545;}
+        .reg-field-msg.free{color:#6f4e37;}
+        #regPhoneWrap{flex:1;}
+        .otp-grid{display:flex;gap:8px;justify-content:center;}
+        .otp-box{width:44px;height:52px;text-align:center;font-size:1.4rem;font-weight:700;border:2px solid #dee2e6;border-radius:10px;outline:none;transition:border-color .2s;}
+        .otp-box:focus{border-color:#6f4e37;box-shadow:0 0 0 3px rgba(111,78,55,.15);}
+        .otp-box.filled{border-color:#6f4e37;background:#fffaf6;}
+        .otp-box.error{border-color:#dc3545;background:#fff5f5;}
+        .reg-terms-row{display:flex !important;flex-direction:row !important;align-items:flex-start !important;gap:8px !important;margin:1rem 0 1.5rem !important;width:100% !important;overflow:hidden !important;}
+        .auth-modal .reg-terms-row input[type="checkbox"]{width:16px !important;max-width:16px !important;min-width:16px !important;height:16px !important;flex:0 0 16px !important;flex-shrink:0 !important;cursor:pointer;accent-color:#6f4e37;margin-top:2px !important;display:inline-block !important;}
+        .reg-terms-row .reg-terms-label{flex:1 1 auto !important;min-width:0 !important;max-width:calc(100% - 24px) !important;font-size:.875rem;line-height:1.4;text-align:left !important;white-space:normal !important;word-break:break-word !important;overflow-wrap:break-word !important;display:block !important;cursor:pointer;}
+        @media(max-width:600px){
+            .lp-hero-title{letter-spacing:-1.5px;}
+            .lp-hero-actions{flex-direction:column;align-items:center;}
+            .lp-btn-primary,.lp-btn-ghost{width:100%;justify-content:center;}
+            #lp-nav{padding:0 20px;}
         }
-        .lp-feature-card:hover .lp-feature-icon { background: var(--coffee-brown); color: #fff; }
-        .lp-feature-card h3 { font-size: 1.05rem; font-weight: 700; color: var(--coffee-espresso); margin-bottom: .6rem; }
-        .lp-feature-card p { font-size: .9rem; color: var(--coffee-brown); line-height: 1.6; margin: 0; }
-
-        /* ============ HOW IT WORKS ============ */
-        .lp-how { background: var(--coffee-milk); }
-        .lp-steps { display: flex; align-items: flex-start; gap: 1rem; }
-        .lp-step { flex: 1; text-align: center; }
-        .lp-step-num { font-size: 3rem; font-weight: 900; color: var(--coffee-cream); line-height: 1; margin-bottom: .75rem; }
-        .lp-step-img-wrap { margin-bottom: 1rem; }
-        .lp-step h3 { font-size: 1.1rem; font-weight: 700; color: var(--coffee-espresso); margin-bottom: .5rem; }
-        .lp-step p { font-size: .9rem; color: var(--coffee-brown); line-height: 1.6; }
-        .lp-step-arrow { display: flex; align-items: center; padding-top: 60px; font-size: 1.75rem; color: var(--coffee-caramel); flex-shrink: 0; }
-
-        /* ============ FOR WHO ============ */
-        .lp-forwho-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 2rem; }
-        .lp-forwho-card { background: #fff; border: 1px solid var(--coffee-cream); border-radius: 16px; overflow: hidden; transition: box-shadow .25s; }
-        .lp-forwho-card:hover { box-shadow: 0 12px 32px rgba(44,26,14,.1); }
-        .lp-forwho-img-wrap { overflow: hidden; }
-        .lp-forwho-body { padding: 1.75rem; }
-        .lp-forwho-tag {
-            display: inline-block;
-            background: var(--coffee-cream);
-            color: var(--coffee-brown);
-            font-size: .75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;
-            padding: .25rem .75rem; border-radius: 999px; margin-bottom: .85rem;
-        }
-        .lp-forwho-body h3 { font-size: 1.3rem; font-weight: 800; color: var(--coffee-espresso); margin-bottom: .6rem; }
-        .lp-forwho-body p { color: var(--coffee-brown); font-size: .95rem; line-height: 1.65; margin-bottom: 1.25rem; }
-
-        /* ============ CTA ============ */
-        .lp-cta { background: linear-gradient(135deg, var(--coffee-dark) 0%, var(--coffee-brown) 100%); padding: 5rem 0; text-align: center; }
-        .lp-cta-inner h2 { font-size: 1.75rem; font-weight: 700; color: var(--coffee-cream); margin-bottom: .5rem; }
-        .lp-cta-inner p { color: rgba(240,217,196,.8); font-size: 0.95rem; margin-bottom: 1.25rem; }
-        .lp-cta .lp-btn-primary { background: var(--coffee-caramel); border-color: var(--coffee-caramel); color: var(--coffee-espresso); font-weight: 700; }
-        .lp-cta .lp-btn-primary:hover { background: var(--coffee-cream); border-color: var(--coffee-cream); }
-
-        /* ============ FOOTER ============ */
-        .lp-footer { background: var(--coffee-espresso); padding: 4rem 0 2rem; color: var(--coffee-cream); }
-        .lp-footer-grid { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 2.5rem; margin-bottom: 3rem; }
-        .lp-footer-brand p { font-size: .9rem; color: rgba(240,217,196,.7); line-height: 1.65; margin-top: .5rem; }
-        .lp-footer .lp-brand-name { color: var(--coffee-cream); }
-        .lp-footer-col h6 { font-size: .75rem; text-transform: uppercase; letter-spacing: 1.5px; font-weight: 700; color: var(--coffee-latte); margin-bottom: 1rem; }
-        .lp-footer-col ul { list-style: none; padding: 0; margin: 0; }
-        .lp-footer-col ul li { margin-bottom: .6rem; }
-        .lp-footer-col ul li a { color: rgba(240,217,196,.7); text-decoration: none; font-size: .9rem; transition: color .2s; }
-        .lp-footer-col ul li a:hover { color: var(--coffee-cream); }
-        .lp-footer-bottom { border-top: 1px solid rgba(240,217,196,.15); padding-top: 1.5rem; display: flex; justify-content: space-between; font-size: .85rem; color: rgba(240,217,196,.5); }
-
-        /* ============ ANIMATIONS ============ */
-        .fade-up { opacity: 0; transform: translateY(28px); transition: opacity .65s ease, transform .65s ease; }
-        .fade-up.visible { opacity: 1; transform: translateY(0); }
-
-        /* ============ AUTH MODAL ============ */
-        .auth-modal .modal-close-btn {
-            position: absolute !important; top: 20px !important; right: 20px !important;
-            z-index: 1050 !important; background: transparent !important; border: none !important;
-            width: 32px !important; height: 32px !important;
-            display: flex !important; align-items: center !important; justify-content: center !important;
-            color: #000000 !important; opacity: 0.8 !important;
-            transition: all 0.3s ease !important; cursor: pointer !important; font-size: 1.2rem !important;
-        }
-        .auth-modal .modal-close-btn:hover { opacity: 1 !important; transform: scale(1.1) !important; }
-        .auth-modal .modal-body { padding: 5rem 2rem 2rem 2rem !important; width: 100% !important; max-width: 100% !important; }
-        #loginModal, #registerModal { display: flex !important; align-items: center; justify-content: center; padding: 1rem !important; }
-        #loginModal:not(.show), #registerModal:not(.show) { display: none !important; }
-        .auth-modal .modal-dialog { margin: 0 !important; max-width: 480px !important; width: 100% !important; }
-        .auth-modal .modal-content {
-            border-radius: 12px !important; width: 100% !important; max-width: none !important;
-            border-top: 4px solid #6f4e37 !important;
-            border-right: 1px solid #c49a72 !important;
-            border-bottom: 1px solid #c49a72 !important;
-            border-left: 1px solid #c49a72 !important;
-        }
-        .auth-modal .form-control, .auth-modal select.form-select {
-            border-top: 2px solid #6f4e37 !important;
-            border-right: 1px solid #c8a882 !important;
-            border-bottom: 1px solid #c8a882 !important;
-            border-left: 1px solid #c8a882 !important;
-            border-radius: 6px !important;
-        }
-        .auth-modal .form-control:focus, .auth-modal select.form-select:focus {
-            border-top: 2px solid #4a2c1a !important;
-            border-right: 1px solid #6f4e37 !important;
-            border-bottom: 1px solid #6f4e37 !important;
-            border-left: 1px solid #6f4e37 !important;
-            box-shadow: 0 0 0 3px rgba(111,78,55,0.15) !important;
-        }
-        .phone-input-wrap {
-            border-top: 2px solid #6f4e37 !important;
-            border-right: 1px solid #c8a882 !important;
-            border-bottom: 1px solid #c8a882 !important;
-            border-left: 1px solid #c8a882 !important;
-            border-radius: 6px !important;
-        }
-        .auth-modal .modal-body form { width: 100% !important; max-width: 100% !important; }
-        .auth-modal .modal-body .text-center { width: 100% !important; max-width: 100% !important; text-align: center !important; }
-        .auth-modal .modal-body h1.fw-bold,
-        .auth-modal .modal-body h2.fw-bold,
-        .auth-modal .modal-body h3.fw-bold,
-        .auth-modal .modal-body h4.fw-bold { text-align: center !important; }
-        .auth-modal input, .auth-modal .form-control { width: 100% !important; max-width: 100% !important; box-sizing: border-box !important; }
-        .auth-modal .d-flex { width: 100% !important; max-width: 100% !important; }
-        .auth-modal .text-center, .auth-modal .mb-4.text-center { width: 100% !important; margin-left: auto !important; margin-right: auto !important; }
-        .auth-modal * { box-sizing: border-box !important; }
-        .auth-modal .step-content {
-            width: 100% !important; padding: 0 !important; box-shadow: none !important;
-            border: none !important; background: transparent !important; display: none !important;
-        }
-        .auth-modal .step-content.active { display: block !important; }
-        .auth-modal h4, .auth-modal h5 { font-size: 1.1rem !important; }
-        .auth-modal p, .auth-modal .form-label, .auth-modal small { font-size: 0.78rem !important; }
-        .auth-modal .form-control, .auth-modal .form-select { font-size: 0.82rem !important; padding: 0.32rem 0.6rem !important; }
-        .auth-modal .btn:not(.btn-link):not(.phone-country-btn) { font-size: 0.82rem !important; padding: 0.35rem 1rem !important; }
-        .auth-modal .mb-3 { margin-bottom: 0.55rem !important; }
-        .auth-modal .mb-4 { margin-bottom: 0.8rem !important; }
-        .auth-modal .otp-box { width: 36px !important; height: 40px !important; font-size: 1.05rem !important; }
-
-        /* ============ PHONE INPUT ============ */
-        .phone-input-wrap { position: relative; display: flex; width: 100%; border: 1px solid #dee2e6; border-radius: 0.375rem; background: #fff; }
-        .phone-input-wrap:focus-within { border-color: #86b7fe; box-shadow: 0 0 0 0.25rem rgba(13,110,253,.15); }
-        .phone-country-btn {
-            display: flex; align-items: center; gap: 6px; flex-shrink: 0;
-            background: #f8f9fa; border: none; border-right: 1px solid #dee2e6;
-            border-radius: 0.375rem 0 0 0.375rem;
-            padding: 0.45rem 0.75rem; white-space: nowrap; cursor: pointer;
-        }
-        .phone-country-btn:hover { background: #e9ecef; }
-        .phone-country-btn img.phone-flag { width: 24px; height: 16px; object-fit: cover; border-radius: 2px; display: block; }
-        .phone-prefix { font-weight: 600; color: #333; font-size: 0.875rem; }
-        .phone-caret { font-size: 0.6rem; color: #888; }
-        .phone-input-wrap input[type="tel"] {
-            flex: 1; border: none; border-radius: 0 0.375rem 0.375rem 0;
-            padding: 0.45rem 0.75rem; outline: none; background: transparent; font-size: 1rem; min-width: 0;
-        }
-        .phone-country-menu {
-            display: none; position: absolute; top: calc(100% + 3px); left: 0;
-            z-index: 99999; background: #fff;
-            border: 1px solid #dee2e6; border-radius: 0.5rem;
-            min-width: 190px; list-style: none; padding: 4px 0; margin: 0;
-            box-shadow: 0 8px 24px rgba(0,0,0,0.13);
-        }
-        .phone-country-menu.open { display: block; }
-        .phone-country-menu li a { display: flex; align-items: center; gap: 10px; padding: 9px 14px; text-decoration: none; color: #212529; font-size: 0.9rem; }
-        .phone-country-menu li a:hover { background: #f0f4ff; }
-        .phone-country-menu li a img { width: 24px; height: 16px; object-fit: cover; border-radius: 2px; flex-shrink: 0; }
-
-        /* ============ REGISTRATION FIELD VALIDATION ============ */
-        .reg-field-wrap { position: relative; }
-        .reg-field-icon {
-            position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
-            font-size: .95rem; pointer-events: none; line-height: 1;
-        }
-        .reg-field-icon--outside { right: -22px; }
-        .reg-field-icon.valid  { color: #6f4e37; }
-        .reg-field-icon.invalid{ color: #dc3545; }
-        .reg-field-icon.checking::after { content:''; display:inline-block; width:10px;height:10px; border:2px solid #6f4e37; border-top-color:transparent; border-radius:50%; animation:spin .7s linear infinite; }
-        @keyframes spin { to { transform: translateY(-50%) rotate(360deg); } }
-        .reg-field-msg { font-size:.75rem; margin-top:3px; min-height:14px; }
-        .reg-field-msg.taken  { color:#dc3545; }
-        .reg-field-msg.free   { color:#6f4e37; }
-        /* phone wrap: icon sits outside */
-        #regPhoneWrap { flex: 1; }
-
-        /* ============ OTP INPUTS ============ */
-        .otp-grid { display:flex; gap:8px; justify-content:center; }
-        .otp-box {
-            width:44px; height:52px; text-align:center; font-size:1.4rem; font-weight:700;
-            border:2px solid #dee2e6; border-radius:10px; outline:none;
-            transition:border-color .2s;
-        }
-        .otp-box:focus { border-color:#6f4e37; box-shadow:0 0 0 3px rgba(111,78,55,.15); }
-        .otp-box.filled { border-color:#6f4e37; background:#fffaf6; }
-        .otp-box.error  { border-color:#dc3545; background:#fff5f5; }
-        .reg-terms-row { display:flex !important; flex-direction:row !important; align-items:flex-start !important; gap:8px !important; margin:1rem 0 1.5rem !important; width:100% !important; overflow:hidden !important; }
-        .auth-modal .reg-terms-row input[type="checkbox"] { width:16px !important; max-width:16px !important; min-width:16px !important; height:16px !important; flex:0 0 16px !important; flex-shrink:0 !important; cursor:pointer; accent-color:#6f4e37; margin-top:2px !important; display:inline-block !important; }
-        .reg-terms-row .reg-terms-label { flex:1 1 auto !important; min-width:0 !important; max-width:calc(100% - 24px) !important; font-size:.875rem; line-height:1.4; text-align:left !important; white-space:normal !important; word-break:break-word !important; overflow-wrap:break-word !important; display:block !important; cursor:pointer; }
-
-        /* ============ RESPONSIVE ============ */
-        
-        /* Tablet Landscape (992px - 1199px) */
-        @media (min-width: 992px) and (max-width: 1199px) {
-            .lp-hero-inner { gap: 2rem; }
-            .lp-hero-title { font-size: 2.8rem; }
-            .lp-features-grid { grid-template-columns: repeat(2, 1fr); }
-            .lp-footer-grid { grid-template-columns: 1.5fr 1fr 1fr 1fr; gap: 1.5rem; }
-        }
-        
-        /* Tablet Portrait (768px - 991px) */
-        @media (min-width: 768px) and (max-width: 991px) {
-            .lp-hero-inner { grid-template-columns: 1fr; gap: 2rem; }
-            .lp-hero-title { font-size: 2.4rem; }
-            .lp-hero-sub { max-width: 100%; }
-            .lp-features-grid { grid-template-columns: repeat(2, 1fr); gap: 1rem; }
-            .lp-stats-grid { grid-template-columns: repeat(2, 1fr); gap: 1rem; }
-            .lp-steps { flex-wrap: wrap; justify-content: center; }
-            .lp-step { flex: 0 0 45%; }
-            .lp-step-arrow { display: none; }
-            .lp-forwho-grid { grid-template-columns: 1fr; gap: 1.5rem; }
-            .lp-footer-grid { grid-template-columns: 1fr 1fr; gap: 1.5rem; }
-            .lp-section { padding: 3rem 0; }
-        }
-        
-        /* Mobile Landscape (576px - 767px) */
-        @media (min-width: 576px) and (max-width: 767px) {
-            .lp-hero { padding: 3rem 0 2rem; }
-            .lp-hero-inner { grid-template-columns: 1fr; gap: 1.5rem; }
-            .lp-hero-title { font-size: 2rem; }
-            .lp-hero-sub { font-size: 1rem; margin-bottom: 1.5rem; }
-            .lp-hero-cta { flex-direction: column; gap: 0.75rem; }
-            .lp-hero-cta .btn { width: 100%; }
-            .lp-features-grid { grid-template-columns: 1fr 1fr; gap: 1rem; }
-            .lp-stats { padding: 1.5rem 0; }
-            .lp-stats-grid { grid-template-columns: repeat(2, 1fr); gap: 1rem; }
-            .lp-stat-num { font-size: 1.5rem; }
-            .lp-stat-label { font-size: 0.75rem; }
-            .lp-section { padding: 2.5rem 0; }
-            .lp-section-title { font-size: 1.75rem; }
-            .lp-steps { flex-direction: column; align-items: center; gap: 0.5rem; }
-            .lp-step { width: 100%; max-width: 300px; }
-            .lp-step-arrow { transform: rotate(90deg); padding: 0.5rem 0; }
-            .lp-forwho-grid { grid-template-columns: 1fr; gap: 1.5rem; }
-            .lp-forwho-card { flex-direction: column; }
-            .lp-img-placeholder.md { aspect-ratio: 16/9; }
-            .lp-footer-grid { grid-template-columns: 1fr 1fr; gap: 1rem; }
-            .lp-footer-col h6 { font-size: 0.9rem; }
-            .lp-nav-actions { gap: 0.5rem; }
-            .lp-btn-lg { padding: 0.7rem 1.5rem; font-size: 0.95rem; }
-        }
-        
-        /* Mobile Portrait (320px - 575px) */
-        @media (max-width: 575px) {
-            .lp-nav-inner { flex-wrap: wrap; gap: 0.75rem; }
-            .lp-logo { height: 28px; }
-            .lp-brand-name { font-size: 1.1rem; }
-            .lp-nav-actions { width: 100%; justify-content: center; }
-            .lp-nav-actions .btn { padding: 0.5rem 1rem; font-size: 0.85rem; }
-            
-            .lp-hero { padding: 2rem 0 1.5rem; }
-            .lp-hero-inner { grid-template-columns: 1fr; gap: 1.5rem; }
-            .lp-hero-text { text-align: center; }
-            .lp-badge { font-size: 0.7rem; padding: 0.25rem 0.75rem; }
-            .lp-hero-title { font-size: 1.75rem; line-height: 1.2; }
-            .lp-hero-sub { font-size: 0.95rem; line-height: 1.6; margin-bottom: 1.25rem; }
-            .lp-hero-cta { flex-direction: column; gap: 0.5rem; }
-            .lp-hero-cta .btn { width: 100%; }
-            .lp-img-placeholder { border-radius: 12px; }
-            .lp-img-placeholder i { font-size: 2rem; }
-            .lp-img-placeholder span { font-size: 0.8rem; }
-            
-            .lp-stats { padding: 1.25rem 0; }
-            .lp-stats-grid { grid-template-columns: repeat(2, 1fr); gap: 0.75rem; }
-            .lp-stat { padding: 0.75rem 0.5rem; }
-            .lp-stat-num { font-size: 1.25rem; }
-            .lp-stat-label { font-size: 0.65rem; }
-            
-            .lp-section { padding: 2rem 0; }
-            .lp-section-head { margin-bottom: 1.5rem; }
-            .lp-section-title { font-size: 1.5rem; }
-            .lp-section-sub { font-size: 0.9rem; }
-            
-            .lp-features-grid { grid-template-columns: 1fr; gap: 1rem; }
-            .lp-feature-card { padding: 1.25rem; }
-            .lp-feature-icon { width: 48px; height: 48px; font-size: 1.25rem; }
-            .lp-feature-card h3 { font-size: 1.1rem; }
-            .lp-feature-card p { font-size: 0.85rem; }
-            
-            .lp-how { padding: 1.5rem 0; }
-            .lp-steps { gap: 0; }
-            .lp-step { width: 100%; max-width: 280px; padding: 1rem; }
-            .lp-step-num { font-size: 1.5rem; width: 36px; height: 36px; }
-            .lp-step-img-wrap .lp-img-placeholder.sm { height: 100px; }
-            .lp-step h3 { font-size: 1rem; }
-            .lp-step p { font-size: 0.8rem; }
-            .lp-step-arrow { transform: rotate(90deg); padding: 0.25rem 0; }
-            .lp-step-arrow i { font-size: 1.25rem; }
-            
-            .lp-forwho { padding: 1.5rem 0; }
-            .lp-forwho-grid { gap: 1rem; }
-            .lp-forwho-card { flex-direction: column; border-radius: 12px; }
-            .lp-forwho-img-wrap { width: 100%; }
-            .lp-img-placeholder.md { aspect-ratio: 16/9; border-radius: 12px 12px 0 0; }
-            .lp-forwho-body { padding: 1.25rem; }
-            .lp-forwho-tag { font-size: 0.7rem; padding: 0.25rem 0.5rem; }
-            .lp-forwho-body h3 { font-size: 1.1rem; }
-            .lp-forwho-body p { font-size: 0.85rem; }
-            .lp-forwho-body .btn { width: 100%; }
-            
-            .lp-cta { padding: 2rem 0; }
-            .lp-cta-inner { padding: 1.5rem 1rem; border-radius: 12px; }
-            .lp-cta h2 { font-size: 1.5rem; }
-            .lp-cta p { font-size: 0.9rem; margin-bottom: 1.5rem; }
-            .lp-cta .btn { width: 100%; }
-            
-            .lp-footer { padding: 2rem 0 1rem; }
-            .lp-footer-grid { grid-template-columns: 1fr; gap: 1.5rem; text-align: center; }
-            .lp-footer-brand { margin-bottom: 1rem; }
-            .lp-footer-col h6 { font-size: 0.9rem; margin-bottom: 0.75rem; }
-            .lp-footer-col ul li { margin-bottom: 0.5rem; }
-            .lp-footer-col a { font-size: 0.85rem; }
-            .lp-footer-bottom { flex-direction: column; gap: 0.5rem; font-size: 0.8rem; }
-        }
-        
-        /* Extra small devices */
-        @media (max-width: 380px) {
-            .lp-hero-title { font-size: 1.5rem; }
-            .lp-section-title { font-size: 1.35rem; }
-            .lp-stat-num { font-size: 1.1rem; }
-            .lp-badge { font-size: 0.65rem; }
-        }
-        
-        /* Landscape orientation */
-        @media (max-width: 767px) and (orientation: landscape) {
-            .lp-hero { padding: 2rem 0; }
-            .lp-hero-inner { grid-template-columns: 1fr 1fr; gap: 1rem; }
-            .lp-hero-text { text-align: left; }
-            .lp-hero-title { font-size: 1.75rem; }
-            .lp-features-grid { grid-template-columns: repeat(3, 1fr); }
-            .lp-stats-grid { grid-template-columns: repeat(4, 1fr); }
-        }
-        
-        /* Touch devices */
-        @media (hover: none) and (pointer: coarse) {
-            .lp-btn-primary, .lp-btn-outline, .lp-btn-ghost {
-                min-height: 44px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-            }
-            .lp-nav-actions .btn {
-                min-height: 40px;
-            }
-        }
-        
-        /* Reduced motion */
-        @media (prefers-reduced-motion: reduce) {
-            .fade-up { animation: none; opacity: 1; transform: none; }
-            * { transition-duration: 0.01ms !important; }
+        @media(prefers-reduced-motion:reduce){
+            #lp-hero::before,#lp-hero::after,.lp-acc,.lp-pulse-dot,.lp-scroll-line{animation:none !important;}
+            .lp-reveal{opacity:1;transform:none;}
         }
     </style>
 </head>
 <body>
 
 <!-- Landing Page -->
-    <div id="landing-page" class="landing-page">
+<div id="landing-page">
 
-        <!-- Navbar -->
-        <nav class="lp-nav sticky-top">
-            <div class="container">
-                <div class="lp-nav-inner">
-                    <a class="lp-brand" href="#">
-                        <img src="Logo_for_coffee_202604042330.jpeg" alt="Plotra" class="lp-logo">
-                        <span class="lp-brand-name">Plotra</span>
-                    </a>
-                    <div class="lp-nav-actions">
-                        <button type="button" class="btn lp-btn-outline" onclick="window.app?.showLoginModal()">Sign In</button>
-                        <button type="button" class="btn lp-btn-primary" onclick="window.app?.showRegisterModal()">Get Started</button>
-                    </div>
-                </div>
-            </div>
-        </nav>
-
-        <!-- Hero Section -->
-        <section class="lp-hero">
-            <div class="container">
-                <div class="lp-hero-inner">
-                    <div class="lp-hero-text fade-up">
-                        <span class="lp-badge">Parcel-based EUDR Compliance</span>
-                        <h1 class="lp-hero-title">Grow with confidence.<br><span class="lp-accent">Farm the future.</span></h1>
-                        <p class="lp-hero-sub">Plotra connects coffee farmers, cooperatives and global buyers through digital traceability &mdash; turning your land and harvests into verified, compliant records.</p>
-                        <div class="lp-hero-cta">
-                            <button type="button" class="btn lp-btn-primary lp-btn-lg" onclick="window.app?.showRegisterModal()">Start for Free</button>
-                            <button type="button" class="btn lp-btn-ghost lp-btn-lg" onclick="document.getElementById('lp-features').scrollIntoView({behavior:'smooth'})">Learn More</button>
-                        </div>
-                    </div>
-                    <div class="lp-hero-visual fade-up" style="animation-delay:.2s">
-                        <div class="lp-img-placeholder">
-                            <i class="bi bi-image"></i>
-                            <span>Hero Image</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <!-- Stats Bar -->
-        <div class="lp-stats">
-            <div class="container">
-                <div class="lp-stats-grid">
-                    <div class="lp-stat fade-up"><span class="lp-stat-num" data-target="10000" data-suffix="+" data-final="10K+">10K+</span><span class="lp-stat-label">Farmers Registered</span></div>
-                    <div class="lp-stat fade-up" style="animation-delay:.1s"><span class="lp-stat-num" data-target="50" data-suffix="+" data-final="50+">50+</span><span class="lp-stat-label">Cooperatives</span></div>
-                    <div class="lp-stat fade-up" style="animation-delay:.2s"><span class="lp-stat-num" data-target="3" data-final="3">3</span><span class="lp-stat-label">Countries</span></div>
-                    <div class="lp-stat fade-up" style="animation-delay:.3s"><span class="lp-stat-num" data-target="100" data-suffix="%" data-final="100%">100%</span><span class="lp-stat-label">EUDR Ready</span></div>
-                </div>
+    <!-- Navbar -->
+    <header id="lp-header">
+        <div id="lp-nav">
+            <a class="lp-logo-wrap" href="#">
+                <img src="Logo_for_coffee_202604042330.jpeg" alt="Plotra">
+                <span class="lp-logo-name">Plotra</span>
+            </a>
+            <div class="lp-nav-btns">
+                <button type="button" class="lp-nav-btn lp-nav-btn--ghost" onclick="window.app?.showLoginModal()">Sign In</button>
+                <button type="button" class="lp-nav-btn lp-nav-btn--amber" onclick="window.app?.showRegisterModal()">Get Started</button>
             </div>
         </div>
+    </header>
 
-        <!-- Features Section -->
-        <section class="lp-section" id="lp-features">
-            <div class="container">
-                <div class="lp-section-head fade-up">
-                    <h2 class="lp-section-title">Everything you need</h2>
-                    <p class="lp-section-sub">One platform for the entire coffee value chain &mdash; from farm to export.</p>
-                </div>
-                <div class="lp-features-grid">
-                    <div class="lp-feature-card fade-up">
-                        <div class="lp-feature-icon"><i class="bi bi-geo-alt-fill"></i></div>
-                        <h3>GPS Farm Mapping</h3>
-                        <p>Map every parcel with precision GPS. Every delivery and compliance record is anchored to a verified land boundary.</p>
-                    </div>
-                    <div class="lp-feature-card fade-up" style="animation-delay:.1s">
-                        <div class="lp-feature-icon"><i class="bi bi-shield-check"></i></div>
-                        <h3>EUDR Compliance</h3>
-                        <p>Generate audit-ready EUDR compliance reports automatically. Stay ahead of EU import regulations without extra work.</p>
-                    </div>
-                    <div class="lp-feature-card fade-up" style="animation-delay:.2s">
-                        <div class="lp-feature-icon"><i class="bi bi-graph-up-arrow"></i></div>
-                        <h3>Production Tracking</h3>
-                        <p>Record harvests, deliveries and yields in real-time. Gain insights that help you increase output season after season.</p>
-                    </div>
-                    <div class="lp-feature-card fade-up" style="animation-delay:.3s">
-                        <div class="lp-feature-icon"><i class="bi bi-people-fill"></i></div>
-                        <h3>Cooperative Management</h3>
-                        <p>Connect farmers to cooperatives digitally. Manage members, verify records, and coordinate deliveries seamlessly.</p>
-                    </div>
-                    <div class="lp-feature-card fade-up" style="animation-delay:.4s">
-                        <div class="lp-feature-icon"><i class="bi bi-phone-fill"></i></div>
-                        <h3>Mobile First</h3>
-                        <p>Built for the field. Works on any smartphone. No laptop needed &mdash; manage your farm from anywhere.</p>
-                    </div>
-                    <div class="lp-feature-card fade-up" style="animation-delay:.5s">
-                        <div class="lp-feature-icon"><i class="bi bi-globe2"></i></div>
-                        <h3>Market Access</h3>
-                        <p>Verified compliance opens doors to premium buyers and international markets that require traceability standards.</p>
-                    </div>
-                </div>
+    <!-- Hero -->
+    <section id="lp-hero">
+        <div id="lp-hero-bg"></div>
+        <div class="lp-acc lp-acc-1"></div>
+        <div class="lp-acc lp-acc-2"></div>
+        <div class="lp-acc lp-acc-3"></div>
+        <div id="lp-hero-content" class="lp-reveal">
+            <div class="lp-eyebrow-badge">
+                <span class="lp-pulse-dot"></span>
+                Parcel-based EUDR Compliance
             </div>
-        </section>
-
-        <!-- How It Works -->
-        <section class="lp-section lp-how" id="lp-how">
-            <div class="container">
-                <div class="lp-section-head fade-up">
-                    <h2 class="lp-section-title">How it works</h2>
-                    <p class="lp-section-sub">Three steps to a fully compliant, traceable coffee farm.</p>
-                </div>
-                <div class="lp-steps">
-                    <div class="lp-step fade-up">
-                        <div class="lp-step-num">01</div>
-                        <div class="lp-step-img-wrap"><div class="lp-img-placeholder sm"><i class="bi bi-image"></i></div></div>
-                        <h3>Register &amp; Map</h3>
-                        <p>Sign up with your phone number. Map your farm parcels using GPS &mdash; no paperwork needed.</p>
-                    </div>
-                    <div class="lp-step-arrow"><i class="bi bi-arrow-right"></i></div>
-                    <div class="lp-step fade-up" style="animation-delay:.15s">
-                        <div class="lp-step-num">02</div>
-                        <div class="lp-step-img-wrap"><div class="lp-img-placeholder sm"><i class="bi bi-image"></i></div></div>
-                        <h3>Track &amp; Verify</h3>
-                        <p>Log deliveries and harvests. Your cooperative verifies your records for EUDR compliance.</p>
-                    </div>
-                    <div class="lp-step-arrow"><i class="bi bi-arrow-right"></i></div>
-                    <div class="lp-step fade-up" style="animation-delay:.3s">
-                        <div class="lp-step-num">03</div>
-                        <div class="lp-step-img-wrap"><div class="lp-img-placeholder sm"><i class="bi bi-image"></i></div></div>
-                        <h3>Export &amp; Earn</h3>
-                        <p>Compliant records unlock access to premium international markets and better prices.</p>
-                    </div>
-                </div>
+            <h1 class="lp-hero-title">
+                Farm Smarter.<br><span class="lp-title-amber">Grow Further.</span>
+            </h1>
+            <p class="lp-hero-sub">
+                Plotra connects coffee farmers, cooperatives and global buyers through digital traceability &mdash; turning your land and harvests into verified, compliant records that open international markets.
+            </p>
+            <div class="lp-hero-actions">
+                <button type="button" class="lp-btn-primary" onclick="window.app?.showRegisterModal()">
+                    Get Started <i class="bi bi-arrow-right"></i>
+                </button>
+                <button type="button" class="lp-btn-ghost" onclick="window.app?.showLoginModal()">
+                    Sign In
+                </button>
             </div>
-        </section>
+        </div>
+    </section>
 
-        <!-- For Who -->
-        <section class="lp-section lp-forwho" id="lp-forwho">
-            <div class="container">
-                <div class="lp-section-head fade-up">
-                    <h2 class="lp-section-title">Built for everyone in the chain</h2>
-                </div>
-                <div class="lp-forwho-grid">
-                    <div class="lp-forwho-card fade-up">
-                        <div class="lp-forwho-img-wrap">
-                            <div class="lp-img-placeholder md"><i class="bi bi-image"></i><span>Farmer Image</span></div>
-                        </div>
-                        <div class="lp-forwho-body">
-                            <span class="lp-forwho-tag">Farmers</span>
-                            <h3>Grow more, earn more</h3>
-                            <p>Map your farm, track your harvest, and get the certificates that unlock better prices from international buyers.</p>
-                            <button class="btn lp-btn-primary" onclick="window.app?.showRegisterModal()">Join as Farmer</button>
-                        </div>
-                    </div>
-                    <div class="lp-forwho-card fade-up" style="animation-delay:.15s">
-                        <div class="lp-forwho-img-wrap">
-                            <div class="lp-img-placeholder md"><i class="bi bi-image"></i><span>Cooperative Image</span></div>
-                        </div>
-                        <div class="lp-forwho-body">
-                            <span class="lp-forwho-tag">Cooperatives</span>
-                            <h3>Manage with ease</h3>
-                            <p>Onboard members digitally, verify compliance, coordinate deliveries &mdash; all from a single dashboard.</p>
-                            <button class="btn lp-btn-outline" onclick="window.app?.showLoginModal()">Sign In</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <!-- CTA Section -->
-        <section class="lp-cta">
-            <div class="container">
-                <div class="lp-cta-inner fade-up">
-                    <h2>Ready to transform your farm?</h2>
-                    <p>Join thousands of farmers already using Plotra to grow smarter.</p>
-                    <button class="btn lp-btn-primary lp-btn-lg" onclick="window.app?.showRegisterModal()">Get Started &mdash; It&apos;s Free</button>
-                </div>
-            </div>
-        </section>
-
-        <!-- Footer -->
-        <footer class="lp-footer">
-            <div class="container">
-                <div class="lp-footer-grid">
-                    <div class="lp-footer-brand">
-                        <div class="lp-brand mb-2">
-                            <img src="Logo_for_coffee_202604042330.jpeg" alt="Plotra" class="lp-logo">
-                            <span class="lp-brand-name">Plotra</span>
-                        </div>
-                        <p>Parcel-based infrastructure for EUDR compliance and coffee supply chain traceability.</p>
-                    </div>
-                    <div class="lp-footer-col">
-                        <h6>Platform</h6>
-                        <ul>
-                            <li><a href="javascript:void(0)" onclick="document.getElementById('lp-features').scrollIntoView({behavior:'smooth'})">Features</a></li>
-                            <li><a href="javascript:void(0)" onclick="document.getElementById('lp-how').scrollIntoView({behavior:'smooth'})">How it works</a></li>
-                            <li><a href="javascript:void(0)" onclick="document.getElementById('lp-forwho').scrollIntoView({behavior:'smooth'})">Who is it for</a></li>
-                        </ul>
-                    </div>
-                    <div class="lp-footer-col">
-                        <h6>Company</h6>
-                        <ul>
-                            <li><a href="#">About Terraxis</a></li>
-                            <li><a href="mailto:hello@plotra.africa">Contact</a></li>
-                        </ul>
-                    </div>
-                    <div class="lp-footer-col">
-                        <h6>Legal</h6>
-                        <ul>
-                            <li><a href="privacy.html">Privacy Policy</a></li>
-                            <li><a href="terms.html">Terms of Service</a></li>
-                        </ul>
-                    </div>
-                </div>
-                <div class="lp-footer-bottom">
-                    <span>&copy; 2026 Terraxis SRL. All rights reserved.</span>
-                    <span>Plotra Platform</span>
-                </div>
-            </div>
-        </footer>
-
+</div>
     </div>
 
     <!-- Login Modal -->
@@ -3039,5 +2591,26 @@
     <script src="js/api.js"></script>
     <script src="js/app.js"></script>
     <script src="js/farmer-profile.js"></script>
+
+    <!-- Landing Page JS -->
+    <script>
+    (function () {
+        // Scroll reveal (.lp-reveal → add .in)
+        const reveals = document.querySelectorAll('.lp-reveal');
+        if ('IntersectionObserver' in window) {
+            const io = new IntersectionObserver(entries => {
+                entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
+            }, { threshold: 0.15 });
+            reveals.forEach(el => io.observe(el));
+        } else {
+            reveals.forEach(el => el.classList.add('in'));
+        }
+        // Nav scroll shadow (#lp-header → .scrolled)
+        const hdr = document.getElementById('lp-header');
+        if (hdr) {
+            window.addEventListener('scroll', () => hdr.classList.toggle('scrolled', window.scrollY > 30), { passive: true });
+        }
+    })();
+    </script>
 </body>
 </html>
