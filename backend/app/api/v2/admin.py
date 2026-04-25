@@ -1166,8 +1166,7 @@ async def create_cooperative_impl(
     # Send welcome emails (fire-and-forget, don't block on failure)
     try:
         from app.core.email import send_cooperative_admin_welcome_email, send_cooperative_contact_welcome_email
-        import os
-        frontend_base = os.getenv("FRONTEND_BASE_URL", "http://localhost")
+        frontend_base = settings.app.frontend_base_url.rstrip('/')
         if admin_user and admin_email:
             reset_link = f"{frontend_base}?token={admin_user.password_reset_token}"
             await send_cooperative_admin_welcome_email(

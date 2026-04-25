@@ -24,7 +24,7 @@ class AppConfig(BaseModel):
     secret_key: str = "change-me-in-production"
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 30
-    frontend_base_url: str = "http://localhost:8080"
+    frontend_base_url: str = "https://dev.plotra.eu"
 
 
 class DatabaseConfig(BaseModel):
