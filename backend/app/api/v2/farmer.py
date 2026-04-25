@@ -11,7 +11,7 @@ from sqlalchemy import select, func
 
 from app.core.database import get_db
 from app.core.auth import get_current_user, require_farmer
-from app.models.user import User
+from app.models.user import User, VerificationStatus
 from app.models.farm import Farm, LandParcel, LandDocument, DocumentType, OwnershipType
 from app.models.traceability import Delivery
 from app.models.payments import PaymentEscrow, PayoutStatus
@@ -135,6 +135,11 @@ async def create_farm(
     db: AsyncSession = Depends(get_db)
 ):
     """Create a new farm with parcel boundaries."""
+    if getattr(current_user, 'verification_status', None) != VerificationStatus.VERIFIED:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Your account must be fully verified by your Cooperative and Kipawa admin before you can register a farm."
+        )
     has_polygon = bool(farm_data.parcels and any(p.boundary_geojson for p in farm_data.parcels))
     initial_status = "pending" if has_polygon else "draft"
 

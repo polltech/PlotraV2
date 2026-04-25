@@ -5174,9 +5174,9 @@ class PlotraDashboard {
                         <div class="card border-0 shadow-sm">
                             <div class="card-header d-flex justify-content-between align-items-center" style="background:linear-gradient(135deg,#3d2314,#6f4e37);color:white;">
                                 <h5 class="mb-0"><i class="bi bi-tree-fill me-2"></i>My Farms</h5>
-                                <button class="btn btn-sm" style="background:#daa520;color:#3d2515;" data-bs-toggle="modal" data-bs-target="#addFarmModal">
-                                    <i class="bi bi-plus-circle me-1"></i>Add Farm
-                                </button>
+                                ${user?.verification_status === 'verified'
+                                    ? `<button class="btn btn-sm" style="background:#daa520;color:#3d2515;" data-bs-toggle="modal" data-bs-target="#addFarmModal"><i class="bi bi-plus-circle me-1"></i>Add Farm</button>`
+                                    : `<span class="badge" style="background:rgba(255,255,255,0.15);color:#fff;font-size:0.72rem;padding:6px 10px;border-radius:20px;"><i class="bi bi-hourglass-split me-1"></i>Pending Verification</span>`}
                             </div>
                             <div class="card-body p-0">
                                 ${farmArray.length > 0 ? `
@@ -5211,9 +5211,12 @@ class PlotraDashboard {
                                 <div class="text-center py-5">
                                     <i class="bi bi-tree fs-1 text-muted"></i>
                                     <p class="text-muted mt-2">No farms registered yet.</p>
-                                    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addFarmModal">
-                                        <i class="bi bi-plus-circle me-1"></i>Register Your First Farm
-                                    </button>
+                                    ${user?.verification_status === 'verified'
+                                        ? `<button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addFarmModal"><i class="bi bi-plus-circle me-1"></i>Register Your First Farm</button>`
+                                        : `<div class="alert alert-warning d-inline-flex align-items-center gap-2 px-4 py-2 rounded-pill mt-1" style="font-size:0.85rem;">
+                                                <i class="bi bi-hourglass-split fs-5"></i>
+                                                <span><strong>Please wait to be verified.</strong> Your account must be approved by your Cooperative and Kipawa admin before you can register a farm.</span>
+                                            </div>`}
                                 </div>`}
                             </div>
                         </div>
