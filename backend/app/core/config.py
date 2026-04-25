@@ -115,15 +115,10 @@ class AuthConfig(BaseModel):
 
 class EmailConfig(BaseModel):
     """Email service configuration"""
-    smtp_server: str = "mail.vegrid.co.ke"
-    smtp_port: int = 587
-    smtp_username: str = "plotra@vegrid.co.ke"
-    smtp_password: str = "Antananarivo086"
+    resend_api_key: str = ""
     from_email: str = "plotra@vegrid.co.ke"
     from_name: str = "Plotra Platform"
-    use_tls: bool = True
     debug_mode: bool = False
-    allow_credentials: bool = True
 
 
 class PaymentsConfig(BaseModel):
