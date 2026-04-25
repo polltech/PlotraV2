@@ -255,6 +255,8 @@ class UserResponse(BaseModel):
     admin_verified_by_name: Optional[str] = None
     admin_verified_at: Optional[datetime] = None
     admin_notes: Optional[str] = None
+    page_permissions: Optional[list] = None
+    cooperative_id: Optional[str] = None
 
     class Config:
         from_attributes = True

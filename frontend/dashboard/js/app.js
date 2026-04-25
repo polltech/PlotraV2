@@ -504,10 +504,11 @@ class PlotraDashboard {
 
         const coopOfficerNav = [
             { id: 'dashboard', icon: 'bi-speedometer2', label: 'Dashboard' },
-            { id: 'farms', icon: 'bi-geo-alt', label: 'Farms' },
+            { id: 'farm-approvals', icon: 'bi-geo-alt-fill', label: 'Farm Approvals' },
+            { id: 'farmer-approvals', icon: 'bi-shield-check', label: 'Farmer Approvals' },
             { id: 'deliveries', icon: 'bi-box-seam', label: 'Deliveries' },
-            { id: 'verification', icon: 'bi-check-circle', label: 'Verification' },
-            { id: 'compliance', icon: 'bi-file-earmark-check', label: 'EUDR' }
+            { id: 'coop-team', icon: 'bi-people-fill', label: 'Cooperative Team' },
+            { id: 'profile', icon: 'bi-person-circle', label: 'My Profile' }
         ];
         
         const eudrReviewerNav = [
@@ -550,7 +551,7 @@ class PlotraDashboard {
     updateSidebarNavigation() {
         const role = this.currentUser?.role || 'FARMER';
         console.log('updateSidebarNavigation: role =', role);
-        const navItems = this.getRoleNavigation(role);
+        const navItems = this.getEffectiveNavItems(this.getRoleNavigation(role));
         const navContainer = document.getElementById('sidebar-menu');
         
         if (!navContainer) {
@@ -1553,9 +1554,21 @@ class PlotraDashboard {
             return true; // All users can access compliance page
         }
         
+        // Cooperative-only pages
+        if (page === 'farm-approvals' || page === 'coop-team') {
+            return role === 'COOPERATIVE_OFFICER';
+        }
+
         return true; // Default allow
     }
-    
+
+    getEffectiveNavItems(navItems) {
+        const perms = this.currentUser?.page_permissions;
+        if (!perms || perms.length === 0) return navItems;
+        // Always show dashboard and profile
+        return navItems.filter(item => item.id === 'dashboard' || item.id === 'profile' || perms.includes(item.id));
+    }
+
     toggleSidebar() {
         const sidebar = document.getElementById('sidebar');
         const overlay = document.querySelector('.sidebar-overlay');
@@ -1647,6 +1660,14 @@ class PlotraDashboard {
                     if (title) title.textContent = 'Farmer Approvals';
                     await this.loadFarmerApprovals(content);
                     break;
+                case 'farm-approvals':
+                    if (title) title.textContent = 'Farm Approvals';
+                    await this.loadFarms(content);
+                    break;
+                case 'coop-team':
+                    if (title) title.textContent = 'Cooperative Team';
+                    await this.loadCoopTeam(content);
+                    break;
                 case 'farms': {
                     const farmsRole = (this.currentUser?.role || '').toUpperCase();
                     const isFarmerRole = ['FARMER'].includes(farmsRole);
@@ -1727,7 +1748,7 @@ class PlotraDashboard {
             await this.renderEUDRReviewerDashboard(content);
         } else if (role === 'COOP_ADMIN' || role === 'COOPERATIVE_ADMIN') {
             await this.renderCoopAdminDashboard(content);
-        } else if (role === 'COOP_OFFICER' || role === 'FACTOR') {
+        } else if (role === 'COOP_OFFICER' || role === 'FACTOR' || role === 'COOPERATIVE_OFFICER') {
             await this.renderCoopOfficerDashboard(content);
         } else if (role === 'PLATFORM_ADMIN' || role === 'SUPER_ADMIN' || role === 'ADMIN' || role === 'PLOTRA_ADMIN') {
             await this.renderAdminDashboard(content);
@@ -2749,6 +2770,307 @@ class PlotraDashboard {
             console.error(error);
             content.innerHTML = `<div class="alert alert-danger">Error loading coop dashboard: ${error.message}</div>`;
         }
+    }
+
+    async renderCoopOfficerDashboard(content) {
+        const coopId = this.currentUser?.cooperative_id;
+        const userName = `${this.currentUser?.first_name || ''} ${this.currentUser?.last_name || ''}`.trim();
+        try {
+            const [farmerApprovals, farmApprovals, deliveries] = await Promise.allSettled([
+                api.getFarmerApprovals ? api.getFarmerApprovals() : Promise.resolve([]),
+                api.request('/admin/farms?page_size=100'),
+                api.getDeliveries({ limit: 5 })
+            ]);
+
+            const farmers = farmerApprovals.value || [];
+            const farms = farmApprovals.value?.farms || [];
+            const recentDeliveries = deliveries.value || [];
+
+            const pendingFarmers = farmers.filter(f => !f.coop_status || f.coop_status === 'pending').length;
+            const pendingFarms = farms.filter(f => f.verification_status === 'pending').length;
+            const totalFarmers = farmers.length;
+            const totalDeliveries = recentDeliveries.length;
+
+            content.innerHTML = `
+                <div class="d-flex align-items-center justify-content-between mb-4">
+                    <div>
+                        <h3 class="mb-1 fw-bold" style="color:#6f4e37;">Cooperative Workplace</h3>
+                        <p class="text-muted mb-0">Welcome back, ${userName}</p>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-sm btn-outline-warning fw-semibold" onclick="app.navigateTo('farmer-approvals')">
+                            <i class="bi bi-shield-check me-1"></i>Approve Farmers
+                            ${pendingFarmers > 0 ? `<span class="badge bg-warning text-dark ms-1">${pendingFarmers}</span>` : ''}
+                        </button>
+                        <button class="btn btn-sm btn-outline-primary fw-semibold" onclick="app.navigateTo('farm-approvals')">
+                            <i class="bi bi-geo-alt-fill me-1"></i>Approve Farms
+                            ${pendingFarms > 0 ? `<span class="badge bg-primary text-white ms-1">${pendingFarms}</span>` : ''}
+                        </button>
+                    </div>
+                </div>
+
+                <div class="row g-3 mb-4">
+                    <div class="col-6 col-md-3">
+                        <div class="card border-0 shadow-sm h-100" style="border-left:4px solid #6f4e37 !important;">
+                            <div class="card-body text-center py-3">
+                                <i class="bi bi-people-fill fs-2 mb-2" style="color:#6f4e37;"></i>
+                                <h3 class="fw-bold mb-0">${totalFarmers}</h3>
+                                <small class="text-muted">Total Farmers</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="card border-0 shadow-sm h-100" style="border-left:4px solid #f86441 !important;">
+                            <div class="card-body text-center py-3">
+                                <i class="bi bi-hourglass-split fs-2 mb-2" style="color:#f86441;"></i>
+                                <h3 class="fw-bold mb-0">${pendingFarmers}</h3>
+                                <small class="text-muted">Pending Farmer Approvals</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="card border-0 shadow-sm h-100" style="border-left:4px solid #1aa053 !important;">
+                            <div class="card-body text-center py-3">
+                                <i class="bi bi-geo-alt-fill fs-2 mb-2" style="color:#1aa053;"></i>
+                                <h3 class="fw-bold mb-0">${pendingFarms}</h3>
+                                <small class="text-muted">Farms Awaiting Approval</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="card border-0 shadow-sm h-100" style="border-left:4px solid #0d6efd !important;">
+                            <div class="card-body text-center py-3">
+                                <i class="bi bi-box-seam fs-2 mb-2" style="color:#0d6efd;"></i>
+                                <h3 class="fw-bold mb-0">${totalDeliveries}</h3>
+                                <small class="text-muted">Recent Deliveries</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row g-4">
+                    <div class="col-lg-8">
+                        <div class="card border-0 shadow-sm">
+                            <div class="card-header bg-transparent d-flex justify-content-between align-items-center">
+                                <h5 class="mb-0 fw-semibold"><i class="bi bi-clock-history me-2 text-primary"></i>Recent Deliveries</h5>
+                                <button class="btn btn-sm btn-outline-primary" onclick="app.navigateTo('deliveries')">View All</button>
+                            </div>
+                            <div class="card-body p-0">
+                                ${recentDeliveries.length === 0 ? `<p class="text-muted text-center py-4">No deliveries yet</p>` : `
+                                <div class="table-responsive">
+                                    <table class="table table-hover mb-0">
+                                        <thead><tr><th>Farmer</th><th>Weight (kg)</th><th>Status</th><th>Date</th></tr></thead>
+                                        <tbody>
+                                            ${recentDeliveries.map(d => `<tr>
+                                                <td class="fw-semibold">${d.farmer_name || 'Farmer'}</td>
+                                                <td>${d.net_weight_kg || 0}</td>
+                                                <td><span class="badge ${this.getDeliveryStatusClass(d.status)}">${d.status}</span></td>
+                                                <td>${new Date(d.created_at).toLocaleDateString()}</td>
+                                            </tr>`).join('')}
+                                        </tbody>
+                                    </table>
+                                </div>`}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-lg-4">
+                        <div class="card border-0 shadow-sm">
+                            <div class="card-header bg-transparent">
+                                <h5 class="mb-0 fw-semibold"><i class="bi bi-lightning-charge-fill me-2 text-warning"></i>Quick Actions</h5>
+                            </div>
+                            <div class="card-body d-grid gap-2">
+                                <button class="btn btn-outline-warning text-start" onclick="app.navigateTo('farmer-approvals')">
+                                    <i class="bi bi-person-check me-2"></i>Review Farmer Applications
+                                </button>
+                                <button class="btn btn-outline-primary text-start" onclick="app.navigateTo('farm-approvals')">
+                                    <i class="bi bi-map me-2"></i>Review Farm Submissions
+                                </button>
+                                <button class="btn btn-outline-success text-start" onclick="app.navigateTo('deliveries')">
+                                    <i class="bi bi-plus-circle me-2"></i>Record Delivery
+                                </button>
+                                <button class="btn btn-outline-secondary text-start" onclick="app.navigateTo('coop-team')">
+                                    <i class="bi bi-people me-2"></i>Manage Team
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>`;
+        } catch (error) {
+            console.error(error);
+            content.innerHTML = `<div class="alert alert-danger">Error loading dashboard: ${error.message}</div>`;
+        }
+    }
+
+    async loadCoopTeam(content) {
+        const coopId = this.currentUser?.cooperative_id;
+        if (!coopId) {
+            content.innerHTML = `<div class="alert alert-warning">No cooperative linked to your account.</div>`;
+            return;
+        }
+
+        const availablePages = [
+            { id: 'farm-approvals', label: 'Farm Approvals' },
+            { id: 'farmer-approvals', label: 'Farmer Approvals' },
+            { id: 'deliveries', label: 'Deliveries' },
+        ];
+
+        let members = [];
+        try { members = await api.request(`/admin/cooperatives/${coopId}/team`); } catch(e) {}
+
+        content.innerHTML = `
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h4 class="fw-bold mb-1">Cooperative Team</h4>
+                    <p class="text-muted mb-0">Manage team members and their page access</p>
+                </div>
+                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addTeamMemberModal">
+                    <i class="bi bi-person-plus-fill me-1"></i>Add Team Member
+                </button>
+            </div>
+            <div class="card border-0 shadow-sm">
+                <div class="card-body p-0">
+                    ${members.length === 0 ? `<p class="text-muted text-center py-5">No team members yet. Add your first team member.</p>` : `
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Role/Title</th><th>Pages Access</th><th>Status</th><th>Actions</th></tr></thead>
+                            <tbody>
+                                ${members.map(m => `<tr>
+                                    <td class="fw-semibold">${m.first_name} ${m.last_name}</td>
+                                    <td>${m.email}</td>
+                                    <td>${m.phone || '-'}</td>
+                                    <td><span class="badge bg-soft-primary text-primary">${m.job_title || 'Team Member'}</span></td>
+                                    <td>${m.page_permissions ? m.page_permissions.map(p => `<span class="badge bg-soft-info text-info me-1">${p}</span>`).join('') : '<span class="badge bg-soft-success text-success">All Pages</span>'}</td>
+                                    <td><span class="badge ${m.status === 'active' ? 'bg-soft-success text-success' : 'bg-soft-warning text-warning'}">${m.status}</span></td>
+                                    <td>
+                                        <button class="btn btn-xs btn-outline-primary" onclick="app.showEditPermissionsModal('${m.id}', '${m.first_name} ${m.last_name}', ${JSON.stringify(m.page_permissions || [])})">
+                                            <i class="bi bi-pencil"></i> Permissions
+                                        </button>
+                                    </td>
+                                </tr>`).join('')}
+                            </tbody>
+                        </table>
+                    </div>`}
+                </div>
+            </div>
+
+            <!-- Add Team Member Modal -->
+            <div class="modal fade" id="addTeamMemberModal" tabindex="-1">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title"><i class="bi bi-person-plus-fill me-2"></i>Add Team Member</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <form id="addTeamMemberForm">
+                                <div class="row g-3">
+                                    <div class="col-6"><label class="form-label">First Name</label><input class="form-control" id="tmFirstName" required></div>
+                                    <div class="col-6"><label class="form-label">Last Name</label><input class="form-control" id="tmLastName" required></div>
+                                    <div class="col-12"><label class="form-label">Email</label><input class="form-control" type="email" id="tmEmail" required></div>
+                                    <div class="col-12"><label class="form-label">Phone</label><input class="form-control" id="tmPhone" required></div>
+                                    <div class="col-12"><label class="form-label">Job Title</label><input class="form-control" id="tmJobTitle" placeholder="e.g. Contact Person, Field Officer"></div>
+                                    <div class="col-12">
+                                        <label class="form-label fw-semibold">Page Access</label>
+                                        <div class="border rounded p-3">
+                                            ${availablePages.map(p => `
+                                            <div class="form-check">
+                                                <input class="form-check-input tm-page-perm" type="checkbox" value="${p.id}" id="perm_${p.id}">
+                                                <label class="form-check-label" for="perm_${p.id}">${p.label}</label>
+                                            </div>`).join('')}
+                                        </div>
+                                        <small class="text-muted">Leave all unchecked to give full access.</small>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                            <button type="button" class="btn btn-primary" onclick="app.submitAddTeamMember('${coopId}')">
+                                <i class="bi bi-person-plus-fill me-1"></i>Add & Send Email
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Edit Permissions Modal -->
+            <div class="modal fade" id="editPermissionsModal" tabindex="-1">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">Edit Page Permissions</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <p class="text-muted" id="editPermMemberName"></p>
+                            <div class="border rounded p-3" id="editPermChecks">
+                                ${availablePages.map(p => `
+                                <div class="form-check">
+                                    <input class="form-check-input edit-perm-check" type="checkbox" value="${p.id}" id="eperm_${p.id}">
+                                    <label class="form-check-label" for="eperm_${p.id}">${p.label}</label>
+                                </div>`).join('')}
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                            <button type="button" class="btn btn-primary" id="savePermissionsBtn">Save Permissions</button>
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+    }
+
+    async submitAddTeamMember(coopId) {
+        const firstName = document.getElementById('tmFirstName')?.value?.trim();
+        const lastName = document.getElementById('tmLastName')?.value?.trim();
+        const email = document.getElementById('tmEmail')?.value?.trim();
+        const phone = document.getElementById('tmPhone')?.value?.trim();
+        const jobTitle = document.getElementById('tmJobTitle')?.value?.trim();
+        const checked = [...document.querySelectorAll('.tm-page-perm:checked')].map(c => c.value);
+
+        if (!firstName || !lastName || !email || !phone) {
+            this.showToast('Please fill in all required fields', 'error');
+            return;
+        }
+
+        try {
+            const formData = new FormData();
+            formData.append('first_name', firstName);
+            formData.append('last_name', lastName);
+            formData.append('email', email);
+            formData.append('phone', phone);
+            formData.append('job_title', jobTitle || '');
+            formData.append('page_permissions', checked.join(','));
+
+            await api.request(`/admin/cooperatives/${coopId}/team`, { method: 'POST', body: formData, headers: {} });
+            bootstrap.Modal.getInstance(document.getElementById('addTeamMemberModal'))?.hide();
+            this.showToast(`Team member added. Setup email sent to ${email}`, 'success');
+            await this.loadCoopTeam(document.getElementById('main-content'));
+        } catch (e) {
+            this.showToast(e.message, 'error');
+        }
+    }
+
+    showEditPermissionsModal(userId, name, currentPerms) {
+        document.getElementById('editPermMemberName').textContent = `Editing permissions for: ${name}`;
+        document.querySelectorAll('.edit-perm-check').forEach(cb => {
+            cb.checked = currentPerms.includes(cb.value);
+        });
+        document.getElementById('savePermissionsBtn').onclick = async () => {
+            const perms = [...document.querySelectorAll('.edit-perm-check:checked')].map(c => c.value);
+            try {
+                await api.request(`/admin/users/${userId}/page-permissions`, {
+                    method: 'PUT',
+                    body: JSON.stringify(perms)
+                });
+                bootstrap.Modal.getInstance(document.getElementById('editPermissionsModal'))?.hide();
+                this.showToast('Permissions updated', 'success');
+                await this.loadCoopTeam(document.getElementById('main-content'));
+            } catch (e) {
+                this.showToast(e.message, 'error');
+            }
+        };
+        new bootstrap.Modal(document.getElementById('editPermissionsModal')).show();
     }
 
     async loadFarmers(content) {
@@ -5543,9 +5865,7 @@ class PlotraDashboard {
     }
 
     async showAddFarmModal() {
-        const role = this.currentUser?.role;
-        const isOfficer = role === 'cooperative_officer' || role === 'COOPERATIVE_OFFICER';
-        if (!isOfficer && this.currentUser?.verification_status !== 'verified') {
+        if (this.currentUser?.verification_status !== 'verified') {
             this.showToast('Your account must be fully verified before you can register a farm.', 'error');
             return;
         }

@@ -161,6 +161,8 @@ class User(BaseModel):
     # Metadata
     kyc_data = Column(JSON, nullable=True)
     profile_photo_url = Column(String(500), nullable=True)
+    page_permissions = Column(JSON, nullable=True)  # list of page IDs; null = full access for role
+    cooperative_id = Column(String(36), nullable=True)  # cooperative this user belongs to
     
     # Relationships
     cooperative_memberships = relationship("CooperativeMember", back_populates="user", cascade="all, delete-orphan")

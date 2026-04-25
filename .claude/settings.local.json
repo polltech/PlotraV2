@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Bash(docker compose *)"
+      "Bash(docker compose *)",
+      "Bash(awk '/async renderCoopAdminDashboard\\\\\\(content\\\\\\)/{start=NR} start && /^    async [a-zA-Z]/{if\\(NR>start\\){print NR; exit}}' frontend/dashboard/js/app.js)"
     ]
   }
 }

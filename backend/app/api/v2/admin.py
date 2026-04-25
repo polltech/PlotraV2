@@ -2241,6 +2241,101 @@ async def upsert_env_credential(
     return {"message": "Credential saved", "credentials": credentials}
 
 
+@router.post("/cooperatives/{coop_id}/team")
+async def add_cooperative_team_member(
+    coop_id: str,
+    first_name: str = Form(...),
+    last_name: str = Form(...),
+    email: str = Form(...),
+    phone: str = Form(...),
+    job_title: str = Form(default=""),
+    page_permissions: str = Form(default=""),  # comma-separated page IDs
+    current_user: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db)
+):
+    """Add a team member to a cooperative and send them a setup email."""
+    import uuid as _uuid
+    from app.core.auth import get_password_hash
+
+    coop_result = await db.execute(select(Cooperative).where(Cooperative.id == coop_id))
+    coop = coop_result.scalar_one_or_none()
+    if not coop:
+        raise HTTPException(status_code=404, detail="Cooperative not found")
+
+    existing = await db.execute(select(User).where(User.email == email))
+    if existing.scalar_one_or_none():
+        raise HTTPException(status_code=400, detail="Email already registered")
+
+    permissions_list = [p.strip() for p in page_permissions.split(",") if p.strip()] if page_permissions else None
+
+    member = User(
+        email=email,
+        password_hash=get_password_hash("TempPass123!"),
+        first_name=first_name,
+        last_name=last_name,
+        phone=phone,
+        role=UserRole.COOPERATIVE_OFFICER,
+        status=UserStatus.PENDING_VERIFICATION,
+        password_reset_token=str(_uuid.uuid4()),
+        password_reset_expires=datetime.utcnow() + timedelta(hours=24),
+        page_permissions=permissions_list,
+        cooperative_id=coop_id,
+        admin_notes=job_title or None,
+    )
+    db.add(member)
+    await db.commit()
+    await db.refresh(member)
+
+    try:
+        from app.core.email import send_email
+        from app.core.config import settings as _settings
+        frontend_base = _settings.app.frontend_base_url.rstrip('/')
+        setup_link = f"{frontend_base}?token={member.password_reset_token}&email={email}"
+        await send_email(
+            to_email=email,
+            subject=f"You've been added to {coop.name} on Plotra",
+            html_content=f"""<p>Hello {first_name},</p>
+<p>You have been added to <strong>{coop.name}</strong> as a team member on Plotra Platform.</p>
+<p><a href="{setup_link}" style="background:#6f4e37;color:#fff;padding:10px 20px;text-decoration:none;border-radius:4px;">Set Up Your Password</a></p>
+<p>This link expires in 24 hours.</p>""",
+        )
+    except Exception as e:
+        print(f"[WARN] Team member email failed: {e}")
+
+    return {"id": str(member.id), "email": member.email, "first_name": member.first_name, "last_name": member.last_name, "page_permissions": member.page_permissions}
+
+
+@router.get("/cooperatives/{coop_id}/team")
+async def get_cooperative_team(
+    coop_id: str,
+    current_user: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db)
+):
+    """List all team members for a cooperative."""
+    result = await db.execute(
+        select(User).where(User.cooperative_id == coop_id, User.role == UserRole.COOPERATIVE_OFFICER)
+    )
+    members = result.scalars().all()
+    return [{"id": str(m.id), "first_name": m.first_name, "last_name": m.last_name, "email": m.email, "phone": m.phone, "job_title": m.admin_notes or "", "page_permissions": m.page_permissions, "status": m.status.value} for m in members]
+
+
+@router.put("/users/{user_id}/page-permissions")
+async def update_user_page_permissions(
+    user_id: str,
+    page_permissions: list = None,
+    current_user: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db)
+):
+    """Update the page access permissions for a cooperative team member."""
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    user.page_permissions = page_permissions
+    await db.commit()
+    return {"message": "Permissions updated", "page_permissions": user.page_permissions}
+
+
 @router.delete("/config/env-credentials/{key}")
 async def delete_env_credential(
     key: str,
