@@ -1169,7 +1169,7 @@ async def create_cooperative_impl(
         from app.core.config import settings as _settings
         frontend_base = _settings.app.frontend_base_url.rstrip('/')
         if admin_user and admin_email:
-            reset_link = f"{frontend_base}?token={admin_user.password_reset_token}"
+            reset_link = f"{frontend_base}?token={admin_user.password_reset_token}&email={admin_email}"
             await send_cooperative_admin_welcome_email(
                 email=admin_email,
                 first_name=admin_first_name or "Admin",
