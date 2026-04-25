@@ -224,6 +224,15 @@ def _normalize_phone(phone: str) -> Optional[str]:
     return None
 
 
+def _to_local_phone(phone: str) -> Optional[str]:
+    """Convert E.164 (+254...) to local (0...) format."""
+    import re
+    digits = re.sub(r'\D', '', phone)
+    if len(digits) == 12 and digits.startswith('254'):
+        return '0' + digits[3:]
+    return None
+
+
 async def authenticate_user(
     db: AsyncSession,
     identifier: str,
@@ -237,9 +246,10 @@ async def authenticate_user(
     if '@' in identifier:
         query = select(User).where(User.email == identifier)
     else:
-        # Build both local and E.164 forms, query for either
+        # Build all phone variants (as-is, E.164, local) and match any
         normalized = _normalize_phone(identifier)
-        candidates = list({identifier, normalized} - {None})
+        local = _to_local_phone(identifier)
+        candidates = list({identifier, normalized, local} - {None})
         query = select(User).where(User.phone.in_(candidates))
 
     result = await db.execute(query)
