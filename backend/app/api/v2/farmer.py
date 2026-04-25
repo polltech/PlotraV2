@@ -1069,10 +1069,10 @@ async def get_farmer_stats(
 
 @router.get("/notifications")
 async def get_farmer_notifications(
-    current_user: User = Depends(require_farmer),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """Get notifications for the current farmer."""
+    """Get notifications for the current user."""
     from app.models.notification import Notification
     result = await db.execute(
         select(Notification)
@@ -1095,7 +1095,7 @@ async def get_farmer_notifications(
 @router.patch("/notifications/{notif_id}/read")
 async def mark_notification_read(
     notif_id: str,
-    current_user: User = Depends(require_farmer),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
     from app.models.notification import Notification

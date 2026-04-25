@@ -1160,7 +1160,12 @@ async def create_cooperative_impl(
     db.add(cooperative)
     await db.commit()
     await db.refresh(cooperative)
-    
+
+    # Link the admin user to this cooperative
+    if admin_user:
+        admin_user.cooperative_id = str(cooperative.id)
+        await db.commit()
+
     print(f"[DEBUG] Cooperative created successfully: ID={cooperative.id}, required_documents={cooperative.required_documents}, type={type(cooperative.required_documents)}")
 
     # Send welcome emails (fire-and-forget, don't block on failure)

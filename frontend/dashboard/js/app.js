@@ -2903,7 +2903,17 @@ class PlotraDashboard {
     }
 
     async loadCoopTeam(content) {
-        const coopId = this.currentUser?.cooperative_id;
+        let coopId = this.currentUser?.cooperative_id;
+        if (!coopId) {
+            try {
+                const info = await api.request('/coop/me');
+                coopId = info.cooperative_id;
+                if (coopId && this.currentUser) {
+                    this.currentUser.cooperative_id = coopId;
+                    localStorage.setItem('plotra_user', JSON.stringify(this.currentUser));
+                }
+            } catch(e) {}
+        }
         if (!coopId) {
             content.innerHTML = `<div class="alert alert-warning">No cooperative linked to your account.</div>`;
             return;
@@ -8588,6 +8598,12 @@ class PlotraDashboard {
                 break;
             case 'farmer-approvals':
                 await this.loadFarmerApprovals(pageContent);
+                break;
+            case 'farm-approvals':
+                await this.loadFarms(pageContent);
+                break;
+            case 'coop-team':
+                await this.loadCoopTeam(pageContent);
                 break;
             case 'wallet':
                 await this.loadWallet(pageContent);

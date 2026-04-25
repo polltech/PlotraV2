@@ -1132,6 +1132,24 @@ async def get_batch_traceability(
     return traceability
 
 
+@router.get("/me")
+async def get_my_cooperative(
+    current_user: User = Depends(require_coop_admin),
+    db: AsyncSession = Depends(get_db)
+):
+    """Return the cooperative linked to the current officer."""
+    coop_id = getattr(current_user, 'cooperative_id', None)
+    if not coop_id:
+        coop_result = await db.execute(
+            select(Cooperative).where(Cooperative.primary_officer_id == current_user.id)
+        )
+        coop = coop_result.scalar_one_or_none()
+        coop_id = str(coop.id) if coop else None
+    if not coop_id:
+        raise HTTPException(status_code=404, detail="No cooperative linked to your account")
+    return {"cooperative_id": coop_id}
+
+
 @router.get("/stats")
 async def get_coop_stats(
     current_user: User = Depends(require_coop_admin),
