@@ -2134,13 +2134,9 @@ async def get_system_settings(
             "simulation_mode": db_or("cfg_satellite_simulation_mode", settings.satellite.simulation_mode),
         },
         "email": {
-            "smtp_server": db_or("cfg_email_smtp_server", settings.email.smtp_server),
-            "smtp_port": db_or("cfg_email_smtp_port", settings.email.smtp_port),
-            "smtp_username": db_or("cfg_email_smtp_username", settings.email.smtp_username),
-            "smtp_password": db_or("cfg_email_smtp_password", mask(settings.email.smtp_password)),
+            "resend_api_key": db_or("cfg_email_resend_api_key", mask(settings.email.resend_api_key)),
             "from_email": db_or("cfg_email_from_email", settings.email.from_email),
             "from_name": db_or("cfg_email_from_name", settings.email.from_name),
-            "use_tls": db_or("cfg_email_use_tls", settings.email.use_tls),
         },
         "storage": {
             "s3_bucket": db_or("cfg_s3_bucket", settings.storage.s3_bucket),
