@@ -561,7 +561,7 @@ async def get_coop_members(
     """
     # Get cooperative membership for current user
     coop_result = await db.execute(
-        select(Cooperative).where(Cooperative.primary_admin_id == current_user.id)
+        select(Cooperative).where(Cooperative.primary_officer_id == current_user.id)
     )
     cooperative = coop_result.scalar_one_or_none()
     
@@ -615,7 +615,7 @@ async def add_coop_member(
     """
     # Get cooperative
     coop_result = await db.execute(
-        select(Cooperative).where(Cooperative.primary_admin_id == current_user.id)
+        select(Cooperative).where(Cooperative.primary_officer_id == current_user.id)
     )
     cooperative = coop_result.scalar_one_or_none()
     
@@ -883,7 +883,7 @@ async def get_pending_farms(
 ):
     """Get farms pending coop verification for this cooperative."""
     coop_result = await db.execute(
-        select(Cooperative).where(Cooperative.primary_admin_id == current_user.id)
+        select(Cooperative).where(Cooperative.primary_officer_id == current_user.id)
     )
     coop = coop_result.scalar_one_or_none()
     coop_id = coop.id if coop else None
@@ -996,7 +996,7 @@ async def create_batch(
     """
     # Get cooperative
     coop_result = await db.execute(
-        select(Cooperative).where(Cooperative.primary_admin_id == current_user.id)
+        select(Cooperative).where(Cooperative.primary_officer_id == current_user.id)
     )
     cooperative = coop_result.scalar_one_or_none()
     
@@ -1054,7 +1054,7 @@ async def get_batches(
     """
     # Get cooperative
     coop_result = await db.execute(
-        select(Cooperative).where(Cooperative.primary_admin_id == current_user.id)
+        select(Cooperative).where(Cooperative.primary_officer_id == current_user.id)
     )
     cooperative = coop_result.scalar_one_or_none()
     
@@ -1147,7 +1147,7 @@ async def get_coop_stats(
     
     # Get member count
     coop_result = await db.execute(
-        select(Cooperative).where(Cooperative.primary_admin_id == current_user.id)
+        select(Cooperative).where(Cooperative.primary_officer_id == current_user.id)
     )
     cooperative = coop_result.scalar_one_or_none()
     
