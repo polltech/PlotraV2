@@ -1,0 +1,35 @@
+# SSL Reverse Proxy for Plotra
+services:
+  nginx-proxy:
+    image: nginx:alpine
+    container_name: plotra-nginx-proxy
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - /root/ssl-certs:/etc/nginx/ssl:ro
+    depends_on:
+      - dashboard
+      - backend
+    restart: always
+    networks:
+      - plotrav2_plotra_network
+
+  dashboard:
+    expose:
+      - "80"
+    ports: []
+    networks:
+      - plotrav2_plotra_network
+
+  backend:
+    expose:
+      - "8000"
+    ports: []
+    networks:
+      - plotrav2_plotra_network
+
+networks:
+  plotrav2_plotra_network:
+    external: true
