@@ -10,9 +10,11 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/entrypoint-wrapper.sh:/entrypoint-wrapper.sh:ro
+    entrypoint: ["/bin/bash", "/entrypoint-wrapper.sh"]
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -q"]
       interval: 10s
       timeout: 5s
       retries: 5
