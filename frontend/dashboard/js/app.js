@@ -5543,6 +5543,10 @@ class PlotraDashboard {
     }
 
     async showAddFarmModal() {
+        if (this.currentUser?.verification_status !== 'verified') {
+            this.showToast('Your account must be fully verified before you can register a farm.', 'error');
+            return;
+        }
         const modalEl = document.getElementById('addFarmModal');
         if (!modalEl) return;
 
@@ -8306,9 +8310,9 @@ class PlotraDashboard {
                     <div class="card border-0 shadow-sm">
                         <div class="card-header bg-white d-flex justify-content-between align-items-center">
                             <h5 class="mb-0"><i class="bi bi-geo-alt me-2"></i>My Farms</h5>
-                    <button class="btn btn-primary" onclick="app.showAddFarmModal()">
-                        <i class="bi bi-plus-circle me-1"></i>Add Farm
-                    </button>
+                            ${this.currentUser?.verification_status === 'verified'
+                                ? `<button class="btn btn-primary" onclick="app.showAddFarmModal()"><i class="bi bi-plus-circle me-1"></i>Add Farm</button>`
+                                : `<span class="badge bg-warning text-dark px-3 py-2" style="font-size:0.75rem;"><i class="bi bi-hourglass-split me-1"></i>Pending Verification</span>`}
                         </div>
                         <div class="card-body">
                             <div id="farmCalculations">
