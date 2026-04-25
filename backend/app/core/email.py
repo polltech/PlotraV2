@@ -9,13 +9,31 @@ from app.core.config import settings
 RESEND_API_URL = "https://api.resend.com/emails"
 
 
+async def _get_resend_key() -> str:
+    """Read Resend API key from DB config first, fall back to env var."""
+    try:
+        from app.core.database import async_session_factory
+        from app.models.system import SystemConfig
+        from sqlalchemy import select
+        async with async_session_factory() as session:
+            result = await session.execute(
+                select(SystemConfig).where(SystemConfig.config_key == "cfg_email_resend_api_key")
+            )
+            cfg = result.scalar_one_or_none()
+            if cfg and cfg.config_value and cfg.config_value not in ("", "***"):
+                return cfg.config_value
+    except Exception:
+        pass
+    return settings.email.resend_api_key
+
+
 async def send_email(
     to_email: str,
     subject: str,
     html_content: str,
     text_content: Optional[str] = None
 ) -> bool:
-    api_key = settings.email.resend_api_key
+    api_key = await _get_resend_key()
     if not api_key:
         print(f"[Email] RESEND_API_KEY not set — skipping email to {to_email}")
         return False
