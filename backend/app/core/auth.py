@@ -237,11 +237,10 @@ async def authenticate_user(
     if '@' in identifier:
         query = select(User).where(User.email == identifier)
     else:
-        # Try as-is first, then normalized E.164
-        phone_to_try = identifier
-        if not identifier.startswith('+'):
-            phone_to_try = _normalize_phone(identifier) or identifier
-        query = select(User).where(User.phone == phone_to_try)
+        # Build both local and E.164 forms, query for either
+        normalized = _normalize_phone(identifier)
+        candidates = list({identifier, normalized} - {None})
+        query = select(User).where(User.phone.in_(candidates))
 
     result = await db.execute(query)
     user = result.scalar_one_or_none()
