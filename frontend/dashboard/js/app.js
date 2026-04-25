@@ -395,6 +395,8 @@ class PlotraDashboard {
                 headerBrandTitle.textContent = 'Platform Management';
             } else if (r === 'farmer') {
                 headerBrandTitle.textContent = 'Farmers Workplace';
+            } else if (r === 'cooperative_officer') {
+                headerBrandTitle.textContent = 'Cooperative Workplace';
             } else {
                 headerBrandTitle.textContent = 'Plotra Platform';
             }
@@ -2794,7 +2796,6 @@ class PlotraDashboard {
             content.innerHTML = `
                 <div class="d-flex align-items-center justify-content-between mb-4">
                     <div>
-                        <h3 class="mb-1 fw-bold" style="color:#6f4e37;">Cooperative Workplace</h3>
                         <p class="text-muted mb-0">Welcome back, ${userName}</p>
                     </div>
                     <div class="d-flex gap-2">

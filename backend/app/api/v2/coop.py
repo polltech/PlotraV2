@@ -700,15 +700,14 @@ async def get_coop_pending_farmers(
     db: AsyncSession = Depends(get_db)
 ):
     """Get farmers pending coop review (coop_status is null/empty)."""
-    # Find the cooperative managed by this coop admin
-    coop_member_result = await db.execute(
-        select(CooperativeMember).where(
-            CooperativeMember.user_id == current_user.id,
-            CooperativeMember.role == 'admin'
+    # Find cooperative via primary_officer_id or cooperative_id field
+    coop_id = getattr(current_user, 'cooperative_id', None)
+    if not coop_id:
+        coop_result = await db.execute(
+            select(Cooperative).where(Cooperative.primary_officer_id == current_user.id)
         )
-    )
-    coop_member = coop_member_result.scalar_one_or_none()
-    coop_id = coop_member.cooperative_id if coop_member else None
+        coop = coop_result.scalar_one_or_none()
+        coop_id = str(coop.id) if coop else None
 
     query = select(User).where(
         User.role == UserRole.FARMER,
@@ -719,7 +718,7 @@ async def get_coop_pending_farmers(
         farmer_ids_result = await db.execute(
             select(CooperativeMember.user_id).where(
                 CooperativeMember.cooperative_id == coop_id,
-                CooperativeMember.role == 'member'
+                CooperativeMember.cooperative_role == 'member'
             )
         )
         farmer_ids = [r for r in farmer_ids_result.scalars().all()]
