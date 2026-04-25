@@ -166,6 +166,12 @@ class PlotraDashboard {
         loginEl.removeAttribute('aria-hidden');
         const modal = new bootstrap.Modal(loginEl);
         modal.show();
+
+        const banner = document.getElementById('loginRegBanner');
+        if (banner) {
+            banner.style.display = this._justRegistered ? 'flex' : 'none';
+            this._justRegistered = false;
+        }
     }
     
     showForgotStep() {
@@ -1389,25 +1395,16 @@ class PlotraDashboard {
             });
             
             console.log('Registration request sent successfully');
-            this.showToast('Registration successful! Logging you in...', 'success');
-            
-            // Close register modal
+
+            // Close register modal and clear form
             const registerEl = document.getElementById('registerModal');
             const registerModal = bootstrap.Modal.getInstance(registerEl);
             if (registerModal) registerModal.hide();
-            
-            // Clear form
             document.getElementById('registerForm').reset();
-            
-            // Auto-login after registration using the same identifier
-            await api.login(identifier, password);
-            this.showApp();
-            this.showToast('Welcome! Please complete your profile information.', 'success');
-            
-            // Redirect to profile page after registration to complete profile
-            setTimeout(() => {
-                this.loadPage('profile');
-            }, 1000);
+
+            // Flag so login modal shows the registration success banner
+            this._justRegistered = true;
+            this.showLoginModal();
         } catch (error) {
             console.error('Registration/Login Error:', error);
             this.showToast(error.message || 'Registration failed', 'error');
