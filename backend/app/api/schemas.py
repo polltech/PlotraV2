@@ -241,7 +241,7 @@ class UserResponse(BaseModel):
     phone_number: Optional[str] = Field(None, alias="phone")
     role: UserRoleEnum
     verification_status: Optional[VerificationStatusEnum] = None
-    country: str
+    country: Optional[str] = None
     county: Optional[str] = None
     subcounty: Optional[str] = None
     gender: Optional[str] = None

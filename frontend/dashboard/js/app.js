@@ -2885,8 +2885,8 @@ class PlotraDashboard {
 
     async loadFarmerApprovals(content) {
         const role = (this.currentUser?.role || '').toUpperCase();
-        const isCoop = role === 'COOP_ADMIN' || role === 'COOPERATIVE';
-        const isAdmin = role === 'ADMIN' || role === 'KIPAWA' || role === 'SUPER_ADMIN';
+        const isCoop = role === 'COOP_ADMIN' || role === 'COOPERATIVE' || role === 'COOPERATIVE_OFFICER';
+        const isAdmin = role === 'ADMIN' || role === 'KIPAWA' || role === 'SUPER_ADMIN' || role === 'PLOTRA_ADMIN' || role === 'PLATFORM_ADMIN';
 
         const farmerStatusBadge = (f) => {
             const cs = f.coop_status;
