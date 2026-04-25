@@ -5718,17 +5718,18 @@ class PlotraDashboard {
                             <!-- Email -->
                             <div class="tab-pane fade" id="tabEmail">
                                 <div class="d-flex justify-content-between align-items-center mb-3">
-                                    <h5 class="mb-0">Email / SMTP Configuration</h5>
+                                    <h5 class="mb-0">Email Configuration <span class="badge bg-success ms-2" style="font-size:0.7rem;">Resend API</span></h5>
                                     <button class="btn btn-primary btn-sm" onclick="app.saveSystemSection('email')"><i class="bi bi-save me-1"></i>Save</button>
                                 </div>
+                                <div class="alert alert-info py-2 mb-3" style="font-size:0.85rem;">
+                                    <i class="bi bi-info-circle me-1"></i>
+                                    Emails are sent via <strong>Resend</strong> (HTTPS API — no SMTP port required).
+                                    Get your API key at <strong>resend.com</strong>.
+                                </div>
                                 <div class="row">
-                                    ${fieldRow('SMTP Server', 'email_smtp_server', email.smtp_server)}
-                                    ${fieldRow('SMTP Port', 'email_smtp_port', email.smtp_port, 'number')}
-                                    ${fieldRow('Username', 'email_smtp_username', email.smtp_username)}
-                                    ${fieldRow('Password', 'email_smtp_password', email.smtp_password, 'password', 'Leave *** to keep existing')}
+                                    ${fieldRow('Resend API Key', 'email_resend_api_key', email.resend_api_key, 'password', 'Leave *** to keep existing')}
                                     ${fieldRow('From Email', 'email_from_email', email.from_email)}
                                     ${fieldRow('From Name', 'email_from_name', email.from_name)}
-                                    ${checkRow('Use TLS', 'email_use_tls', email.use_tls)}
                                 </div>
                             </div>
                             <!-- Storage -->
@@ -5797,12 +5798,12 @@ class PlotraDashboard {
     async saveSystemSection(section) {
         const fieldMap = {
             satellite: { sat_provider: 'provider', sat_api_key: 'api_key', sat_base_url: 'base_url', sat_simulation_mode: 'simulation_mode' },
-            email: { email_smtp_server: 'smtp_server', email_smtp_port: 'smtp_port', email_smtp_username: 'smtp_username', email_smtp_password: 'smtp_password', email_from_email: 'from_email', email_from_name: 'from_name', email_use_tls: 'use_tls' },
+            email: { email_resend_api_key: 'resend_api_key', email_from_email: 'from_email', email_from_name: 'from_name' },
             storage: { s3_bucket: 'bucket', s3_endpoint: 'endpoint', s3_access_key: 'access_key', s3_secret_key: 'secret_key', s3_region: 'region' },
             payments: { pay_enabled: 'enabled', pay_mpesa_consumer_key: 'mpesa_consumer_key', pay_mpesa_consumer_secret: 'mpesa_consumer_secret', pay_mpesa_shortcode: 'mpesa_shortcode' },
             app: { app_name: 'name', app_frontend_base_url: 'frontend_base_url', app_access_token_expire_minutes: 'access_token_expire_minutes', app_debug: 'debug' },
         };
-        const checkboxIds = new Set(['sat_simulation_mode', 'email_use_tls', 'pay_enabled', 'app_debug']);
+        const checkboxIds = new Set(['sat_simulation_mode', 'pay_enabled', 'app_debug']);
         const fields = fieldMap[section] || {};
         const values = {};
         for (const [elId, key] of Object.entries(fields)) {
