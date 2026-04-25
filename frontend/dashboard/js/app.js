@@ -186,7 +186,7 @@ class PlotraDashboard {
         try {
             const formData = new FormData();
             formData.append('phone', phone);
-            const res = await api.request('/auth/forgot-password-otp', { method: 'POST', body: formData, isForm: true });
+            const res = await api.request('/auth/forgot-password-otp', { method: 'POST', body: formData, headers: { 'Content-Type': null } });
 
             // Store phone for OTP verification step
             this._forgotPhone = phone;
@@ -232,7 +232,8 @@ class PlotraDashboard {
             const formData = new FormData();
             formData.append('phone', this._forgotPhone);
             formData.append('code', code);
-            await api.request('/auth/verify-otp', { method: 'POST', body: formData, isForm: true });
+            const res = await api.request('/auth/verify-otp', { method: 'POST', body: formData, headers: { 'Content-Type': null } });
+            if (res.reset_token) this.resetToken = res.reset_token;
 
             document.querySelectorAll('#loginModal .step-content').forEach(s => s.classList.remove('active'));
             document.getElementById('loginStepReset').classList.add('active');
@@ -877,7 +878,7 @@ class PlotraDashboard {
             
             // Validate cooperative code with backend
             try {
-                const response = await fetch(`http://localhost:8000/api/v2/coop/cooperatives/validate-code?code=` + encodeURIComponent(cooperativeCode), {
+                const response = await fetch(`/api/v2/coop/cooperatives/validate-code?code=` + encodeURIComponent(cooperativeCode), {
                     method: 'GET',
                     headers: {
                         'Content-Type': 'application/json'
@@ -924,7 +925,7 @@ class PlotraDashboard {
                 // Debounce search
                 searchTimeout = setTimeout(async () => {
                     try {
-                        const response = await fetch(`http://localhost:8000/api/v2/coop/cooperatives/search?code=` + encodeURIComponent(searchTerm), {
+                        const response = await fetch(`/api/v2/coop/cooperatives/search?code=` + encodeURIComponent(searchTerm), {
                             method: 'GET',
                             headers: {
                                 'Content-Type': 'application/json'

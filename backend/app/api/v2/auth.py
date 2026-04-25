@@ -100,7 +100,13 @@ async def verify_otp(
 
     otp.is_used = True
     await db.commit()
-    return {"verified": True}
+    reset_token = None
+    user_result = await db.execute(select(User).where(User.phone == phone))
+    user = user_result.scalar_one_or_none()
+    if user and user.password_reset_token:
+        reset_token = user.password_reset_token
+
+    return {"verified": True, "reset_token": reset_token}
 
 
 @router.post("/forgot-password-otp")
@@ -128,6 +134,10 @@ async def forgot_password_otp(
         .where(OTPVerification.phone == normalized, OTPVerification.is_used == False)
         .values(is_used=True)
     )
+
+    import uuid as _uuid
+    reset_token = str(_uuid.uuid4())
+    user.password_reset_token = reset_token
 
     otp = OTPVerification.generate(normalized)
     db.add(otp)
