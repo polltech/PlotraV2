@@ -282,7 +282,7 @@ async def get_farm(
         "owner": {
             "id": owner.id if owner else None,
             "name": f"{owner.first_name} {owner.last_name}" if owner else "Unknown",
-            "phone": owner.phone_number if owner else None,
+            "phone": owner.phone if owner else None,
             "email": owner.email if owner else None,
             "national_id": owner.national_id if owner else None,
             "gender": owner.gender if owner else None,
@@ -300,9 +300,9 @@ async def get_farm(
                 "parcel_number": p.parcel_number,
                 "parcel_name": p.parcel_name,
                 "area_hectares": p.area_hectares,
-                "land_use_type": p.land_use_type,
+                "land_use_type": p.land_use_type.value if p.land_use_type else None,
                 "boundary_geojson": p.boundary_geojson,
-                "verification_status": p.verification_status,
+                "verification_status": getattr(p, 'verification_status', None),
             }
             for p in parcels
         ],
