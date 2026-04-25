@@ -166,12 +166,6 @@ class PlotraDashboard {
         loginEl.removeAttribute('aria-hidden');
         const modal = new bootstrap.Modal(loginEl);
         modal.show();
-
-        const banner = document.getElementById('loginRegBanner');
-        if (banner) {
-            banner.style.display = this._justRegistered ? 'flex' : 'none';
-            this._justRegistered = false;
-        }
     }
     
     showForgotStep() {
@@ -1402,9 +1396,9 @@ class PlotraDashboard {
             if (registerModal) registerModal.hide();
             document.getElementById('registerForm').reset();
 
-            // Flag so login modal shows the registration success banner
-            this._justRegistered = true;
-            this.showLoginModal();
+            // Flash toast then open login modal
+            this.showToast('Account created! Please log in to continue.', 'success');
+            setTimeout(() => this.showLoginModal(), 1200);
         } catch (error) {
             console.error('Registration/Login Error:', error);
             this.showToast(error.message || 'Registration failed', 'error');
