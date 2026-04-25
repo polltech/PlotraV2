@@ -14,6 +14,8 @@ class PlotraDashboard {
         this._sessionTimer = null;
         this._sessionCheckInterval = null;
         this._sessionWarningShown = false;
+        this.gpsInitialized = false; // For GPS button one-time setup
+        this.currentViewedDDSId = null; // For DDS detail modal
 
         this.init();
     }
@@ -186,7 +188,7 @@ class PlotraDashboard {
         try {
             const formData = new FormData();
             formData.append('phone', phone);
-            const res = await api.request('/auth/forgot-password-otp', { method: 'POST', body: formData, isForm: true });
+            const res = await api.request('/auth/forgot-password-otp', { method: 'POST', body: formData, headers: { 'Content-Type': null } });
 
             // Store phone for OTP verification step
             this._forgotPhone = phone;
@@ -232,7 +234,10 @@ class PlotraDashboard {
             const formData = new FormData();
             formData.append('phone', this._forgotPhone);
             formData.append('code', code);
-            await api.request('/auth/verify-otp', { method: 'POST', body: formData, isForm: true });
+            const res = await api.request('/auth/verify-otp', { method: 'POST', body: formData, headers: { 'Content-Type': null } });
+
+            // Store reset token returned by verify-otp
+            if (res.reset_token) this.resetToken = res.reset_token;
 
             document.querySelectorAll('#loginModal .step-content').forEach(s => s.classList.remove('active'));
             document.getElementById('loginStepReset').classList.add('active');
@@ -347,6 +352,16 @@ class PlotraDashboard {
         if (appContainer) appContainer.classList.remove('d-none');
         if (landingPage) landingPage.classList.add('d-none');
 
+        // Immediately restore cached user so sidebar renders instantly on refresh
+        const cachedUser = localStorage.getItem('plotra_user');
+        if (cachedUser) {
+            try {
+                this.currentUser = JSON.parse(cachedUser);
+                this.updateSidebarNavigation();
+                this._applyUserUI();
+            } catch (e) { /* ignore corrupt cache */ }
+        }
+
         this.loadCurrentUser().then(() => {
             this.updateSidebarNavigation();
             this.loadPage('dashboard');
@@ -362,6 +377,54 @@ class PlotraDashboard {
         });
     }
     
+    _applyUserUI() {
+        if (!this.currentUser) return;
+        const roleBadge = document.getElementById('userRole');
+        const userRoleDisplay = document.getElementById('userRoleDisplay');
+        const userProfile = document.getElementById('userProfile');
+        const userName = document.getElementById('userName');
+        const userAvatar = document.getElementById('userAvatar');
+
+        if (roleBadge) roleBadge.textContent = this.formatRole(this.currentUser.role);
+        if (userRoleDisplay) userRoleDisplay.textContent = this.formatRole(this.currentUser.role);
+
+        const headerBrandTitle = document.getElementById('headerBrandTitle');
+        if (headerBrandTitle) {
+            const r = (this.currentUser.role || '').toLowerCase();
+            if (r === 'plotra_admin' || r === 'kipawa_admin') {
+                headerBrandTitle.textContent = 'Platform Management';
+            } else if (r === 'farmer') {
+                headerBrandTitle.textContent = 'Farmers Workplace';
+            } else {
+                headerBrandTitle.textContent = 'Plotra Platform';
+            }
+        }
+
+        if (userProfile) {
+            userProfile.style.display = 'flex';
+            const firstName = this.currentUser.first_name || '';
+            const lastName = this.currentUser.last_name || '';
+            const initials = (firstName.charAt(0) + lastName.charAt(0)).toUpperCase() || (this.currentUser.email || 'U').charAt(0).toUpperCase();
+            if (userName) userName.textContent = firstName || this.currentUser.email || 'User';
+            if (userAvatar) {
+                userAvatar.textContent = initials;
+                userAvatar.style.background = 'linear-gradient(135deg, #6f4e37, #4a2c1a)';
+                userAvatar.style.color = 'white';
+                userAvatar.style.fontWeight = 'bold';
+                userAvatar.style.fontSize = initials.length > 1 ? '0.85rem' : '1rem';
+                userAvatar.style.letterSpacing = '1px';
+            }
+        }
+
+        const roleStr = (this.currentUser.role || '').toUpperCase();
+        const isFarmerUser = roleStr === 'FARMER';
+        const adminOnlyItems = ['nav-farmer-approvals'];
+        adminOnlyItems.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.style.display = isFarmerUser ? 'none' : '';
+        });
+    }
+
     async loadCurrentUser() {
         try {
             this.currentUser = await api.getCurrentUser();
@@ -369,58 +432,11 @@ class PlotraDashboard {
             console.log('Current user loaded:', this.currentUser);
             console.log('User role:', this.currentUser?.role);
 
-            // Validate user data exists
             if (!this.currentUser || !this.currentUser.id) {
                 throw new Error('Invalid user data');
             }
-            
-            const roleBadge = document.getElementById('userRole');
-            const userRoleDisplay = document.getElementById('userRoleDisplay');
-            const userProfile = document.getElementById('userProfile');
-            const userName = document.getElementById('userName');
-            const userAvatar = document.getElementById('userAvatar');
-            
-            if (roleBadge) roleBadge.textContent = this.formatRole(this.currentUser.role);
-            if (userRoleDisplay) userRoleDisplay.textContent = this.formatRole(this.currentUser.role);
 
-            // Update header brand title based on role
-            const headerBrandTitle = document.getElementById('headerBrandTitle');
-            if (headerBrandTitle) {
-                const r = (this.currentUser.role || '').toLowerCase();
-                if (r === 'plotra_admin' || r === 'kipawa_admin') {
-                    headerBrandTitle.textContent = 'Platform Management';
-                } else if (r === 'farmer') {
-                    headerBrandTitle.textContent = 'Farmers Workplace';
-                } else {
-                    headerBrandTitle.textContent = 'Plotra Platform';
-                }
-            }
-
-            // Show user profile in sidebar
-            if (userProfile) {
-                userProfile.style.display = 'flex';
-                const firstName = this.currentUser.first_name || '';
-                const lastName = this.currentUser.last_name || '';
-                const initials = (firstName.charAt(0) + lastName.charAt(0)).toUpperCase() || (this.currentUser.email || 'U').charAt(0).toUpperCase();
-                if (userName) userName.textContent = firstName || this.currentUser.email || 'User';
-                if (userAvatar) {
-                    userAvatar.textContent = initials;
-                    userAvatar.style.background = 'linear-gradient(135deg, #6f4e37, #4a2c1a)';
-                    userAvatar.style.color = 'white';
-                    userAvatar.style.fontWeight = 'bold';
-                    userAvatar.style.fontSize = initials.length > 1 ? '0.85rem' : '1rem';
-                    userAvatar.style.letterSpacing = '1px';
-                }
-            }
-
-            // Hide admin/coop-only nav items from farmers
-            const roleStr = (this.currentUser.role || '').toUpperCase();
-            const isFarmerUser = roleStr === 'FARMER';
-            const adminOnlyItems = ['nav-farmer-approvals'];
-            adminOnlyItems.forEach(id => {
-                const el = document.getElementById(id);
-                if (el) el.style.display = isFarmerUser ? 'none' : '';
-            });
+            this._applyUserUI();
         } catch (error) {
             console.error('Failed to load user:', error);
             // Clear invalid token and show landing page
@@ -877,7 +893,7 @@ class PlotraDashboard {
             
             // Validate cooperative code with backend
             try {
-                const response = await fetch(`http://localhost:8000/api/v2/coop/cooperatives/validate-code?code=` + encodeURIComponent(cooperativeCode), {
+                const response = await fetch((window.api ? window.api.baseUrl : '/api/v2') + `/coop/cooperatives/validate-code?code=` + encodeURIComponent(cooperativeCode), {
                     method: 'GET',
                     headers: {
                         'Content-Type': 'application/json'
@@ -924,7 +940,7 @@ class PlotraDashboard {
                 // Debounce search
                 searchTimeout = setTimeout(async () => {
                     try {
-                        const response = await fetch(`http://localhost:8000/api/v2/coop/cooperatives/search?code=` + encodeURIComponent(searchTerm), {
+                        const response = await fetch((window.api ? window.api.baseUrl : '/api/v2') + `/coop/cooperatives/search?code=` + encodeURIComponent(searchTerm), {
                             method: 'GET',
                             headers: {
                                 'Content-Type': 'application/json'
@@ -3104,10 +3120,7 @@ class PlotraDashboard {
                         <td>
                             <div class="d-flex gap-1 flex-wrap">
                                 <button class="btn btn-sm btn-outline-primary" onclick="app.adminViewFarm('${f.id}')"><i class="bi bi-eye me-1"></i>View</button>
-                                ${f.verification_status === 'pending' || f.coop_status === 'coop_approved' ? `
-                                <button class="btn btn-sm btn-success" onclick="app.showVerificationApproveModal('${f.id}', true)"><i class="bi bi-check-lg"></i></button>
-                                <button class="btn btn-sm btn-danger" onclick="app.showVerificationRejectModal('${f.id}', true)"><i class="bi bi-x-lg"></i></button>
-                                ` : ''}
+                                <button class="btn btn-sm btn-outline-info" onclick="app.requestSatelliteAnalysis('${f.id}')" ${!f.centroid_lat ? 'disabled title="No polygon captured for this farm"' : ''}><i class="bi bi-satellite-fill me-1"></i>Analyse</button>
                             </div>
                         </td>
                     </tr>`;
@@ -3936,30 +3949,6 @@ class PlotraDashboard {
             if (this.currentPage === 'batches') this.loadPage('batches');
         } catch (error) {
             this.showToast(error.message, 'error');
-        }
-    }
-
-    async showGenerateDDSModal() {
-        // Populate farm dropdown
-        const farmSelect = document.getElementById('ddsFarmIds');
-        try {
-            const farms = await api.getFarms();
-            farmSelect.innerHTML = '';
-            farms.forEach(farm => {
-                const option = document.createElement('option');
-                option.value = farm.id;
-                option.textContent = farm.farm_name || `Farm ${farm.id}`;
-                farmSelect.appendChild(option);
-            });
-        } catch (error) {
-            console.error('Error loading farms:', error);
-            farmSelect.innerHTML = '<option value="">Failed to load farms</option>';
-        }
-        
-        const modalEl = document.getElementById('generateDDSModal');
-        if (modalEl) {
-            const modal = new bootstrap.Modal(modalEl);
-            modal.show();
         }
     }
 
@@ -4832,13 +4821,14 @@ class PlotraDashboard {
 
         try {
             // Fetch all DDS
-            const ddsList = await api.getDDSList();
+            const response = await api.getDDSList();
+            const ddsList = response.dds || [];
             const list = document.getElementById('dds-list');
             
             if (ddsList.length > 0) {
                 list.innerHTML = ddsList.map(dds => `
                     <tr>
-                        <td><a href="#" onclick="app.viewDDS('${dds.dds_number}')">${dds.dds_number}</a></td>
+                        <td><a href="#" onclick="app.viewDDS('${dds.id}')">${dds.dds_number}</a></td>
                         <td>${dds.operator_name}</td>
                         <td>${dds.commodity_type}</td>
                         <td>${dds.quantity} ${dds.unit}</td>
@@ -4904,6 +4894,79 @@ class PlotraDashboard {
         if (modalEl) {
             const modal = new bootstrap.Modal(modalEl);
             modal.show();
+        }
+    }
+
+    async viewDDS(ddsId) {
+        try {
+            const dds = await api.getDDS(ddsId);
+            const content = document.getElementById('viewDDSContent');
+            
+            // Build detailed view
+            const farmCoords = dds.farm_coordinates || [];
+            const evidence = dds.evidence_references || [];
+            const mitigation = dds.mitigation_measures || [];
+            
+            content.innerHTML = `
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6 class="text-primary"><i class="bi bi-info-circle"></i> DDS Information</h6>
+                        <table class="table table-borderless table-sm">
+                            <tr><td><strong>DDS Number:</strong></td><td>${dds.dds_number}</td></tr>
+                            <tr><td><strong>Version:</strong></td><td>${dds.version}</td></tr>
+                            <tr><td><strong>Operator:</strong></td><td>${dds.operator_name} ${dds.operator_id ? '('+dds.operator_id+')' : ''}</td></tr>
+                            <tr><td><strong>Contact:</strong></td><td>${dds.contact_name || '-'}<br>${dds.contact_email || '-'}<br>${dds.contact_address || ''}</td></tr>
+                            <tr><td><strong>Commodity:</strong></td><td>${dds.commodity_type} (HS: ${dds.hs_code || '-'})</td></tr>
+                            <tr><td><strong>Quantity:</strong></td><td>${dds.quantity} ${dds.unit}</td></tr>
+                            <tr><td><strong>Origin:</strong></td><td>${dds.country_of_origin}</td></tr>
+                            <tr><td><strong>Supplier:</strong></td><td>${dds.supplier_name || '-'}<br>${dds.supplier_country || ''}</td></tr>
+                            <tr><td><strong>First Placement:</strong></td><td>${dds.first_placement_country || '-'}<br>${dds.first_placement_date ? new Date(dds.first_placement_date).toLocaleDateString() : '-'}</td></tr>
+                            <tr><td><strong>Risk Level:</strong></td><td><span class="badge bg-${this.getRiskBadgeClass(dds.risk_level)}">${dds.risk_level.toUpperCase()}</span></td></tr>
+                            <tr><td><strong>Status:</strong></td><td><span class="badge bg-${this.getStatusBadgeClass(dds.submission_status)}">${dds.submission_status}</span></td></tr>
+                            <tr><td><strong>Created:</strong></td><td>${new Date(dds.created_at).toLocaleString()}</td></tr>
+                        </table>
+                    </div>
+                    <div class="col-md-6">
+                        <h6 class="text-primary"><i class="bi bi-geo-alt"></i> Farm Coordinates (${farmCoords.length})</h6>
+                        ${farmCoords.length > 0 ? `
+                            <ul class="list-group list-group-flush mb-3">
+                                ${farmCoords.map(fc => `
+                                    <li class="list-group-item">
+                                        <strong>${fc.name}</strong><br>
+                                        Lat: ${fc.lat.toFixed(6)}, Lon: ${fc.lon.toFixed(6)}
+                                    </li>
+                                `).join('')}
+                            </ul>
+                        ` : '<p class="text-muted">No farm coordinates linked.</p>'}
+                        
+                        <h6 class="text-primary mt-3"><i class="bi bi-shield-check"></i> Mitigation Measures</h6>
+                        <ul class="list-group list-group-flush">
+                            ${mitigation.length > 0 ? mitigation.map(m => `<li class="list-group-item">${m}</li>`).join('') : '<li class="list-group-item">None specified</li>'}
+                        </ul>
+                        
+                        <h6 class="text-primary mt-3"><i class="bi bi-journal-text"></i> Evidence References</h6>
+                        <ul class="list-group list-group-flush">
+                            ${evidence.length > 0 ? evidence.map(e => `<li class="list-group-item">${e}</li>`).join('') : '<li class="list-group-item">None recorded</li>'}
+                        </ul>
+                    </div>
+                </div>
+            `;
+            
+            // Store current DDS ID for export
+            this.currentViewedDDSId = ddsId;
+            
+            // Wire export button
+            const exportBtn = document.getElementById('btnExportDDSFromView');
+            if (exportBtn) {
+                exportBtn.onclick = () => this.exportDDS(ddsId);
+            }
+            
+            // Show modal
+            const modalEl = document.getElementById('viewDDSModal');
+            const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+            modal.show();
+        } catch (error) {
+            this.showToast(error.message || 'Failed to load DDS', 'error');
         }
     }
 
@@ -5540,9 +5603,22 @@ class PlotraDashboard {
             console.warn('Could not fetch membership number:', e.message);
         }
 
-        // Initialize farm map and GPS capture
-        this.initFarmMap();
-        this.initGPSCapture();
+        // Map is on step 4 — initialise it only when step 4 becomes visible (see updateTab1Steps in index.html)
+        // Nothing to do here; the step-navigation hook calls app.initFarmMap() / invalidateSize().
+
+        // Clean up GPS watch when modal closes
+        const onHide = () => {
+            if (this._farmMapWatchId) {
+                navigator.geolocation.clearWatch(this._farmMapWatchId);
+                this._farmMapWatchId = null;
+            }
+            if (this.farmMap) {
+                try { this.farmMap.remove(); } catch(e) {}
+                this.farmMap = null;
+            }
+            modalEl.removeEventListener('hidden.bs.modal', onHide);
+        };
+        modalEl.addEventListener('hidden.bs.modal', onHide);
     }
 
     async loadSystemConfig(content) {
@@ -5746,12 +5822,12 @@ class PlotraDashboard {
 
     async showAddRequiredDocModal() {
         const html = `
-            <div class="modal fade" id="addRequiredDocModal" tabindex="-1">
+            <div class="modal fade" id="addRequiredDocModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
                 <div class="modal-dialog">
                     <div class="modal-content">
                         <div class="modal-header">
                             <h5 class="modal-title">Add Required Document</h5>
-                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            <button type="button" class="btn-modal-close" data-bs-dismiss="modal"><i class="bi bi-x-lg"></i>Close</button>
                         </div>
                         <div class="modal-body">
                             <div class="mb-3">
@@ -5937,103 +6013,281 @@ class PlotraDashboard {
         const mapDiv = document.getElementById('farmMap');
         if (!mapDiv) return;
 
-        // Check if map already exists
+        // Stop any previous GPS watch (new system)
+        if (this._farmMapWatchId) {
+            navigator.geolocation.clearWatch(this._farmMapWatchId);
+            this._farmMapWatchId = null;
+        }
+        // Stop old legacy GPS watch to avoid parallel watches
+        if (this.watchId) {
+            navigator.geolocation.clearWatch(this.watchId);
+            this.watchId = null;
+        }
         if (this.farmMap) {
-            return; // Map already initialized
+            try { this.farmMap.remove(); } catch (e) {}
+            this.farmMap = null;
         }
 
+        // Reset state (new system)
+        this.gpsPoints = [];
+        this._farmIsCapturing = false;
+        this._farmAutoAddPoint1 = false;
+        this._farmMapCurrentPos = null;
+        // Reset legacy state so old handlers don't interfere
+        this.isCapturing = false;
+        this._gpsPoint1Set = false;
+        this.lastKnownPosition = null;
+
+        // Clone-replace all 4 capture buttons to strip any old addEventListener handlers
+        ['startCaptureBtn', 'addPointBtn', 'finishCaptureBtn', 'clearPointsBtn'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el && el.parentNode) el.parentNode.replaceChild(el.cloneNode(true), el);
+        });
+
+        // Read current mode from radio (Walk default)
+        this._farmCaptureMode = document.getElementById('farmModeClick')?.checked ? 'click' : 'walk';
+        const walkRadio  = document.getElementById('farmModeWalk');
+        const clickRadio = document.getElementById('farmModeClick');
+        if (walkRadio)  walkRadio.onchange  = () => { if (walkRadio.checked)  this._farmCaptureMode = 'walk'; };
+        if (clickRadio) clickRadio.onchange = () => { if (clickRadio.checked) this._farmCaptureMode = 'click'; };
+
         try {
-            // Initialize Leaflet map
-            this.farmMap = L.map('farmMap').setView([-0.0236, 37.9062], 13);
-            
+            this.farmMap = L.map('farmMap', { zoomControl: true });
+            this.farmMap.setView([-0.0236, 37.9062], 13);
+
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 attribution: '&copy; OpenStreetMap contributors'
             }).addTo(this.farmMap);
 
-            // Initialize polygon layer
+            // Polygon + polyline layers
             this.farmPolygon = L.polygon([], {
-                color: '#2563eb',
-                fillColor: '#dbeafe',
-                fillOpacity: 0.5
+                color: '#40916c', fillColor: '#52b788', fillOpacity: 0.3, weight: 2
             }).addTo(this.farmMap);
+            this._farmPolyline = L.polyline([], { color: '#6f4e37', weight: 3, dashArray: '6,4' }).addTo(this.farmMap);
+            this._farmMarkers  = L.layerGroup().addTo(this.farmMap);
 
-            // Initialize GPS accuracy circle
-            this.accuracyCircle = L.circle([0, 0], {
-                radius: 0,
-                color: '#10b981',
-                fillColor: '#d1fae5',
-                fillOpacity: 0.3
-            }).addTo(this.farmMap);
-
-            // Initialize marker for current location
-            this.currentLocationMarker = L.marker([0, 0], {
+            // Live GPS marker (not added to map until first fix)
+            this._farmLiveMarker = L.marker([0, 0], {
                 icon: L.divIcon({
-                    className: 'current-location-marker',
-                    html: '<div style="background-color: #2563eb; color: white; padding: 8px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 10px rgba(0,0,0,0.3);">📍</div>',
-                    iconSize: [40, 40]
+                    className: '',
+                    html: '<div style="background:#2563eb;color:#fff;border-radius:50%;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.4);width:34px;height:34px;display:flex;align-items:center;justify-content:center;font-size:16px;line-height:1;">📍</div>',
+                    iconSize: [34, 34], iconAnchor: [17, 17]
                 })
-            }).addTo(this.farmMap);
+            });
+            this._farmAccuracyCircle = L.circle([0, 0], {
+                radius: 0, color: '#10b981', fillColor: '#d1fae5', fillOpacity: 0.3
+            });
+
+            this.farmMap.invalidateSize();
+
+            // Two-stage GPS centering: fast coarse first, then precise
+            if (navigator.geolocation) {
+                const setView = (lat, lng) => { if (this.farmMap) this.farmMap.setView([lat, lng], 16); };
+                navigator.geolocation.getCurrentPosition(
+                    pos => setView(pos.coords.latitude, pos.coords.longitude),
+                    () => {},
+                    { enableHighAccuracy: false, timeout: 5000, maximumAge: 300000 }
+                );
+                navigator.geolocation.getCurrentPosition(
+                    pos => setView(pos.coords.latitude, pos.coords.longitude),
+                    () => {},
+                    { enableHighAccuracy: true, timeout: 30000, maximumAge: 0 }
+                );
+            }
+
+            // Continuous GPS watch for live marker + walk-mode auto-points
+            if (navigator.geolocation) {
+                this._farmMapWatchId = navigator.geolocation.watchPosition(pos => {
+                    const { latitude: lat, longitude: lng, accuracy } = pos.coords;
+                    this._farmMapCurrentPos = pos.coords;
+
+                    // Update accuracy display
+                    const accEl = document.getElementById('gpsAccuracy');
+                    if (accEl) accEl.textContent = accuracy ? accuracy.toFixed(1) : '--';
+
+                    // Move live marker
+                    this._farmLiveMarker.setLatLng([lat, lng]);
+                    if (this.farmMap && !this.farmMap.hasLayer(this._farmLiveMarker)) {
+                        this._farmLiveMarker.addTo(this.farmMap);
+                    }
+                    if (this._farmAccuracyCircle) {
+                        this._farmAccuracyCircle.setLatLng([lat, lng]).setRadius(accuracy || 0);
+                        if (this.farmMap && !this.farmMap.hasLayer(this._farmAccuracyCircle)) {
+                            this._farmAccuracyCircle.addTo(this.farmMap);
+                        }
+                    }
+
+                    // Auto Point 1 when Start was pressed before GPS arrived
+                    if (this._farmAutoAddPoint1 && this._farmIsCapturing) {
+                        this._farmAutoAddPoint1 = false;
+                        this._addFarmPoint(lat, lng, accuracy);
+                    } else if (this._farmIsCapturing && this._farmCaptureMode === 'walk' && this.gpsPoints.length > 0) {
+                        // Walk mode: auto-add every 5 m
+                        const last = this.gpsPoints[this.gpsPoints.length - 1];
+                        if (this._haversineDistance(last.lat, last.lon, lat, lng) >= 5) {
+                            this._addFarmPoint(lat, lng, accuracy);
+                        }
+                    }
+
+                    // Follow user while walking and capturing
+                    if (this._farmIsCapturing && this._farmCaptureMode === 'walk' && this.farmMap) {
+                        this.farmMap.panTo([lat, lng], { animate: true, duration: 0.3 });
+                    }
+                }, err => {
+                    console.warn('Farm GPS error:', err.message);
+                }, { enableHighAccuracy: true, maximumAge: 5000, timeout: 30000 });
+            }
+
+            // Click-to-add-point (click mode only)
+            this.farmMap.on('click', (e) => {
+                if (!this._farmIsCapturing) return;
+                if (this._farmCaptureMode !== 'click') return;
+                this._addFarmPoint(e.latlng.lat, e.latlng.lng, 0);
+            });
+
+            // Wire up buttons
+            const startBtn  = document.getElementById('startCaptureBtn');
+            const addBtn    = document.getElementById('addPointBtn');
+            const finishBtn = document.getElementById('finishCaptureBtn');
+            const clearBtn  = document.getElementById('clearPointsBtn');
+            if (startBtn) startBtn.onclick = () => this._startFarmCapture();
+            if (addBtn)   addBtn.onclick   = () => {
+                if (!this._farmMapCurrentPos) { this.showToast('Waiting for GPS fix…', 'warning'); return; }
+                if (!this._farmIsCapturing)   { this.showToast('Press Start Capture first', 'warning'); return; }
+                this._addFarmPoint(this._farmMapCurrentPos.latitude, this._farmMapCurrentPos.longitude, this._farmMapCurrentPos.accuracy);
+            };
+            if (finishBtn) finishBtn.onclick = () => {
+                if (this.gpsPoints.length < 3) { this.showToast('Need at least 3 points', 'warning'); return; }
+                this._farmIsCapturing = false;
+                if (addBtn)   addBtn.disabled   = true;
+                const inst = document.getElementById('captureInstructions');
+                if (inst) inst.textContent = 'Capture complete. Continue to the next step.';
+            };
+            if (clearBtn) clearBtn.onclick = () => {
+                this.gpsPoints = [];
+                this._farmIsCapturing = false;
+                if (this.farmPolygon)    this.farmPolygon.setLatLngs([]);
+                if (this._farmPolyline)  this._farmPolyline.setLatLngs([]);
+                if (this._farmMarkers)   this._farmMarkers.clearLayers();
+                const pc = document.getElementById('pointCount');
+                const ca = document.getElementById('calculatedArea');
+                if (pc) pc.textContent = '0';
+                if (ca) ca.textContent = '--';
+                if (startBtn)  startBtn.disabled  = false;
+                if (addBtn)    addBtn.disabled    = true;
+                if (finishBtn) finishBtn.disabled  = true;
+                if (clearBtn)  clearBtn.disabled  = true;
+                const inst = document.getElementById('captureInstructions');
+                if (inst) inst.textContent = 'Cleared. Press Start Capture to begin again.';
+            };
+
+            const inst = document.getElementById('captureInstructions');
+            if (inst) inst.textContent = 'Choose Walk or Click mode, then press Start Capture.';
+
         } catch (error) {
             console.error('Map initialization error:', error);
-            // If map initialization fails, try to clean up and re-initialize
-            if (this.farmMap) {
-                try {
-                    this.farmMap.remove();
-                } catch (removeError) {
-                    console.error('Map removal error:', removeError);
-                }
-                this.farmMap = null;
-            }
-            // Clear map container
-            mapDiv.innerHTML = '';
-            // Try again
-            this.initFarmMap();
+            this.farmMap = null;
         }
+    }
+
+    _startFarmCapture() {
+        this._farmIsCapturing = true;
+        const mode = this._farmCaptureMode || 'walk';
+        const startBtn  = document.getElementById('startCaptureBtn');
+        const addBtn    = document.getElementById('addPointBtn');
+        const finishBtn = document.getElementById('finishCaptureBtn');
+        const clearBtn  = document.getElementById('clearPointsBtn');
+        const inst      = document.getElementById('captureInstructions');
+        if (startBtn)  startBtn.disabled  = true;
+        if (addBtn)    addBtn.disabled    = false;
+        if (finishBtn) finishBtn.disabled  = this.gpsPoints.length < 3;
+        if (clearBtn)  clearBtn.disabled  = false;
+
+        // Always auto-place Point 1 at current GPS location (both walk and click mode)
+        if (this._farmMapCurrentPos) {
+            this._addFarmPoint(this._farmMapCurrentPos.latitude, this._farmMapCurrentPos.longitude, this._farmMapCurrentPos.accuracy);
+            if (inst) inst.textContent = mode === 'walk'
+                ? 'Point 1 placed. Walking… points auto-add every 5 m. Press Add Point at key corners.'
+                : 'Point 1 placed at your location. Tap the map to add boundary corners.';
+        } else {
+            this._farmAutoAddPoint1 = true;
+            if (inst) inst.textContent = 'Waiting for GPS fix… Point 1 will be placed when location is found.';
+        }
+    }
+
+    _addFarmPoint(lat, lng, accuracy) {
+        this.gpsPoints.push({ lat, lon: lng, accuracy: accuracy || 0, timestamp: Date.now() });
+        const count = this.gpsPoints.length;
+
+        const icon = L.divIcon({
+            className: '',
+            html: `<div style="background:#40916c;color:#fff;border-radius:50%;width:26px;height:26px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,0.5);">${count}</div>`,
+            iconSize: [26, 26], iconAnchor: [13, 13]
+        });
+        if (this._farmMarkers) L.marker([lat, lng], { icon }).addTo(this._farmMarkers);
+
+        const coords = this.gpsPoints.map(p => [p.lat, p.lon]);
+        if (this._farmPolyline) this._farmPolyline.setLatLngs(coords);
+
+        if (count >= 3) {
+            if (this.farmPolygon) this.farmPolygon.setLatLngs(coords);
+            const area = this._calcArea(coords);
+            const ca = document.getElementById('calculatedArea');
+            if (ca) ca.textContent = area.toFixed(2);
+        }
+
+        const pc  = document.getElementById('pointCount');
+        const fb  = document.getElementById('finishCaptureBtn');
+        const inst = document.getElementById('captureInstructions');
+        if (pc)   pc.textContent  = count;
+        if (fb)   fb.disabled     = count < 3;
+        if (inst) inst.textContent = `${count} point(s). ${count >= 3 ? 'Press Finish or keep adding.' : 'Add more (min 3).'}`;
     }
 
     initGPSCapture() {
-        this.gpsPoints = [];
-        this.isCapturing = false;
-        this.watchId = null;
+        // Set up event listeners only once
+        if (!this.gpsInitialized) {
+            this.gpsInitialized = true;
+            const startBtn = document.getElementById('startCaptureBtn');
+            const addPointBtn = document.getElementById('addPointBtn');
+            const finishBtn = document.getElementById('finishCaptureBtn');
+            const clearBtn = document.getElementById('clearPointsBtn');
 
-        // Add event listeners
-        const startBtn = document.getElementById('startCaptureBtn');
-        const addPointBtn = document.getElementById('addPointBtn');
-        const finishBtn = document.getElementById('finishCaptureBtn');
-        const clearBtn = document.getElementById('clearPointsBtn');
+            if (startBtn) startBtn.addEventListener('click', () => this.startGPSCapture());
+            if (addPointBtn) addPointBtn.addEventListener('click', () => this.addGPSPoint());
+            if (finishBtn) finishBtn.addEventListener('click', () => this.finishGPSCapture());
+            if (clearBtn) clearBtn.addEventListener('click', () => this.clearGPSPoints());
+        }
+        
+        // Reset state and UI each time modal opens
+        this.clearGPSPoints();
 
-        if (startBtn) startBtn.addEventListener('click', () => this.startGPSCapture());
-        if (addPointBtn) addPointBtn.addEventListener('click', () => this.addGPSPoint());
-        if (finishBtn) finishBtn.addEventListener('click', () => this.finishGPSCapture());
-        if (clearBtn) clearBtn.addEventListener('click', () => this.clearGPSPoints());
+        // Auto-start GPS watch so Point 1 is placed automatically
+        this._startGPSWatch();
     }
 
-    startGPSCapture() {
-        if (!navigator.geolocation) {
-            this.showToast('GPS not available on this device', 'error');
-            return;
-        }
-
-        this.isCapturing = true;
-        this.gpsPoints = [];
-        
-        // Update UI
-        document.getElementById('startCaptureBtn').disabled = true;
-        document.getElementById('addPointBtn').disabled = false;
-        document.getElementById('finishCaptureBtn').disabled = true;
-        document.getElementById('clearPointsBtn').disabled = true;
-        document.getElementById('captureInstructions').textContent = 'Walking around the farm boundary... Click "Add Point" at each corner.';
-
-        // Start watching GPS position
+    _startGPSWatch() {
+        if (!navigator.geolocation) return;
+        if (this.watchId) return; // already watching
         this.watchId = navigator.geolocation.watchPosition(
             (position) => this.handleGPSUpdate(position),
             (error) => this.handleGPSError(error),
-            {
-                enableHighAccuracy: true,
-                maximumAge: 1000,
-                timeout: 10000
-            }
+            { enableHighAccuracy: true, maximumAge: 1000, timeout: 15000 }
         );
+    }
+
+    startGPSCapture() {
+        // If GPS auto already placed Point 1, just enable Add Point (don't wipe gpsPoints)
+        this.isCapturing = true;
+        this._startGPSWatch(); // no-op if already running
+
+        const getEl = id => document.getElementById(id);
+        if (getEl('startCaptureBtn'))    getEl('startCaptureBtn').disabled    = true;
+        if (getEl('addPointBtn'))        getEl('addPointBtn').disabled         = false;
+        if (getEl('finishCaptureBtn'))   getEl('finishCaptureBtn').disabled    = true;
+        if (getEl('clearPointsBtn'))     getEl('clearPointsBtn').disabled      = this.gpsPoints.length === 0;
+        if (getEl('captureInstructions')) getEl('captureInstructions').textContent =
+            'Walking around the farm boundary… click "Add Point" at each corner.';
     }
 
     handleGPSUpdate(position) {
@@ -6041,20 +6295,40 @@ class PlotraDashboard {
         const lon = position.coords.longitude;
         const accuracy = position.coords.accuracy;
 
-        // Update accuracy display
-        document.getElementById('gpsAccuracy').textContent = accuracy.toFixed(1);
+        // Store last known position first so addGPSPoint can use it even if map isn't ready
+        this.lastKnownPosition = { lat, lon, accuracy };
 
-        // Update current location marker
+        const gpsAccuracyEl = document.getElementById('gpsAccuracy');
+        if (gpsAccuracyEl) gpsAccuracyEl.textContent = accuracy.toFixed(1);
+
+        if (!this.currentLocationMarker || !this.accuracyCircle) return;
+
         this.currentLocationMarker.setLatLng([lat, lon]);
         this.accuracyCircle.setLatLng([lat, lon]).setRadius(accuracy);
 
-        // Center map on current location
-        if (this.farmMap) {
+        // Centre map only on the FIRST GPS fix — never jump again while user is clicking
+        if (this.farmMap && !this._gpsPoint1Set) {
             this.farmMap.setView([lat, lon], 16);
-        }
 
-        // Store last known position
-        this.lastKnownPosition = { lat, lon, accuracy };
+            // Auto-place Point 1 at the GPS location
+            this._gpsPoint1Set = true;
+            this.gpsPoints = [{ lat, lon, accuracy, timestamp: Date.now() }];
+
+            const icon = L.divIcon({
+                className: 'click-point-icon',
+                html: `<div style="background:#6f4e37;color:#fff;border-radius:50%;width:26px;height:26px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,0.5);line-height:1;">1</div>`,
+                iconSize: [26, 26], iconAnchor: [13, 13]
+            });
+            const m = L.marker([lat, lon], { icon }).addTo(this.farmMap);
+            this._clickMarkers = [m];
+
+            const pc = document.getElementById('pointCount');
+            if (pc) pc.textContent = '1';
+            const cb = document.getElementById('clearPointsBtn');
+            if (cb) cb.disabled = false;
+            const inst = document.getElementById('captureInstructions');
+            if (inst) inst.textContent = 'GPS Point 1 placed at your location. Click on the map (or walk and Add Point) to mark boundary corners.';
+        }
     }
 
     handleGPSError(error) {
@@ -6102,59 +6376,115 @@ class PlotraDashboard {
         // Calculate and display area
         if (this.gpsPoints.length > 2) {
             const area = this.calculatePolygonArea(coordinates);
-            const hectares = (area / 10000).toFixed(2);
-            const farmAreaEl = document.getElementById('farmArea');
-            if (farmAreaEl) farmAreaEl.value = hectares;
+            const hectares = parseFloat((area / 10000).toFixed(4)).toFixed(2); // 4dp precision, display 2dp
             const farmAreaEstimateEl = document.getElementById('farmAreaEstimate');
             if (farmAreaEstimateEl) farmAreaEstimateEl.value = hectares;
-            
+
             // Dispatch event for step navigation to track GPS validation
-            window.dispatchEvent(new CustomEvent('gpsPointsUpdated', { 
-                detail: { count: this.gpsPoints.length, area: hectares } 
+            window.dispatchEvent(new CustomEvent('gpsPointsUpdated', {
+                detail: { count: this.gpsPoints.length, area: hectares }
             }));
-            
+
             // Update calculated area display
             const calculatedAreaEl = document.getElementById('calculatedArea');
             if (calculatedAreaEl) calculatedAreaEl.innerText = hectares;
+            console.log('[Area Live] areaSqM:', area, 'ha:', hectares, 'pts:', coordinates.length);
+
+            // Build GeoJSON Feature for form submission
+            const geoJSONCoords = this.gpsPoints.map(p => [p.lon, p.lat]);
+            // Ensure closed polygon
+            if (geoJSONCoords[0][0] !== geoJSONCoords[geoJSONCoords.length-1][0] || 
+                geoJSONCoords[0][1] !== geoJSONCoords[geoJSONCoords.length-1][1]) {
+                geoJSONCoords.push(geoJSONCoords[0]);
+            }
+            this.currentPolygon = {
+                type: 'Feature',
+                geometry: {
+                    type: 'Polygon',
+                    coordinates: [geoJSONCoords]
+                }
+            };
         }
     }
 
     calculatePolygonArea(coordinates) {
-        // Shoelace formula for polygon area calculation
-        let area = 0;
-        const n = coordinates.length;
+        if (coordinates.length < 3) return 0;
+        const toRad = d => d * Math.PI / 180;
+        const R = 6378137; // WGS84 Earth radius in metres
 
+        // Compute centroid to use as local origin (avoids floating-point cancellation)
+        const latMean = coordinates.reduce((s, c) => s + c[0], 0) / coordinates.length;
+        const lonMean = coordinates.reduce((s, c) => s + c[1], 0) / coordinates.length;
+        const cosLat  = Math.cos(toRad(latMean));
+
+        // Equirectangular projection to local metres, centred at polygon centroid
+        const pts = coordinates.map(c => [
+            R * toRad(c[1] - lonMean) * cosLat,  // x = easting
+            R * toRad(c[0] - latMean)              // y = northing
+        ]);
+
+        // Shoelace formula on projected (flat) coordinates
+        let area = 0;
+        const n = pts.length;
         for (let i = 0; i < n; i++) {
             const j = (i + 1) % n;
-            const xi = coordinates[i][0];
-            const yi = coordinates[i][1];
-            const xj = coordinates[j][0];
-            const yj = coordinates[j][1];
-            area += (xi * yj) - (xj * yi);
+            area += pts[i][0] * pts[j][1] - pts[j][0] * pts[i][1];
         }
-
-        return Math.abs(area) * 111319.9 * 111319.9; // Convert to square meters (approximate)
+        return Math.abs(area) / 2; // result in m²
     }
 
     finishGPSCapture() {
         this.stopGPSCapture();
+        const getEl = id => document.getElementById(id);
 
-        // Close polygon by adding first point at end
-        if (this.gpsPoints.length > 2) {
-            const firstPoint = this.gpsPoints[0];
-            this.gpsPoints.push({
-                ...firstPoint,
-                timestamp: Date.now()
-            });
-            this.updateFarmPolygon();
+        if (this.gpsPoints.length < 3) {
+            if (getEl('captureInstructions')) getEl('captureInstructions').textContent = 'Need at least 3 points to finish. Keep clicking on the map.';
+            return;
         }
 
-        // Update UI
-        document.getElementById('startCaptureBtn').disabled = false;
-        document.getElementById('addPointBtn').disabled = true;
-        document.getElementById('finishCaptureBtn').disabled = true;
-        document.getElementById('clearPointsBtn').disabled = false;
-        document.getElementById('captureInstructions').textContent = 'Capture complete! You can clear and re-capture if needed.';
+        // Ensure polygon is closed (first point repeated at end)
+        const first = this.gpsPoints[0];
+        const last  = this.gpsPoints[this.gpsPoints.length - 1];
+        if (first.lat !== last.lat || first.lon !== last.lon) {
+            this.gpsPoints.push({ ...first, timestamp: Date.now() });
+        }
+
+        // Calculate area
+        const coordinates = this.gpsPoints.map(p => [p.lat, p.lon]);
+        const areaSqM = this.calculatePolygonArea(coordinates);
+        console.log('[Area Debug] points:', coordinates.length, 'coords:', JSON.stringify(coordinates), 'areaSqM:', areaSqM);
+        const hectares = (areaSqM / 10000).toFixed(4);
+        const hectaresDisplay = parseFloat(hectares).toFixed(2);
+
+        // Update polygon on map
+        if (this.farmPolygon) this.farmPolygon.setLatLngs(coordinates);
+
+        // Build / store GeoJSON
+        const geoCoords = this.gpsPoints.map(p => [p.lon, p.lat]);
+        this.currentPolygon = {
+            type: 'Feature',
+            geometry: { type: 'Polygon', coordinates: [geoCoords] }
+        };
+
+        // Update all area display elements
+        if (getEl('calculatedArea'))    getEl('calculatedArea').innerText = hectaresDisplay;
+        if (getEl('farmAreaEstimate'))  getEl('farmAreaEstimate').value   = hectaresDisplay;
+        if (getEl('farmArea'))          getEl('farmArea').value           = hectaresDisplay;
+
+        // Dispatch event for step validation
+        window.dispatchEvent(new CustomEvent('gpsPointsUpdated', {
+            detail: { count: this.gpsPoints.length, area: hectaresDisplay }
+        }));
+
+        // Update UI state
+        if (getEl('startCaptureBtn'))    getEl('startCaptureBtn').disabled    = false;
+        if (getEl('addPointBtn'))        getEl('addPointBtn').disabled         = true;
+        if (getEl('finishCaptureBtn'))   getEl('finishCaptureBtn').disabled    = true;
+        if (getEl('clearPointsBtn'))     getEl('clearPointsBtn').disabled      = false;
+        if (getEl('captureInstructions')) {
+            getEl('captureInstructions').innerHTML =
+                `Capture complete! <strong>Area: ${hectaresDisplay} ha</strong>. You can clear and re-capture if needed.`;
+        }
     }
 
     stopGPSCapture() {
@@ -6168,22 +6498,36 @@ class PlotraDashboard {
     clearGPSPoints() {
         this.stopGPSCapture();
         this.gpsPoints = [];
+        this.currentPolygon = null;
+
+        // Clear click-mode test markers
+        if (this._clickMarkers && this.farmMap) {
+            this._clickMarkers.forEach(m => { try { this.farmMap.removeLayer(m); } catch(e){} });
+        }
+        this._clickMarkers = [];
+        if (this._clickPolyline) {
+            try { this._clickPolyline.setLatLngs([]); } catch(e) {}
+        }
+
+        // Clear drawn items (manual polygon)
+        if (this.drawnItems) {
+            this.drawnItems.clearLayers();
+        }
         
         // Reset UI
-        document.getElementById('pointCount').textContent = '0';
-        document.getElementById('gpsAccuracy').textContent = '--';
-        document.getElementById('farmArea').value = '';
-        const farmAreaEstimate = document.getElementById('farmAreaEstimate');
-        if (farmAreaEstimate) farmAreaEstimate.value = '';
-        const calculatedAreaEl = document.getElementById('calculatedArea');
-        if (calculatedAreaEl) calculatedAreaEl.innerText = '--';
-        document.getElementById('startCaptureBtn').disabled = false;
-        document.getElementById('addPointBtn').disabled = true;
-        document.getElementById('finishCaptureBtn').disabled = true;
-        document.getElementById('clearPointsBtn').disabled = true;
-        document.getElementById('captureInstructions').textContent = 'Click "Start Capture" to begin mapping your farm boundary. Walk around the perimeter and click "Add Point" at each corner (minimum 4 points required).';
+        const getEl = id => document.getElementById(id);
+        if (getEl('pointCount')) getEl('pointCount').textContent = '0';
+        if (getEl('gpsAccuracy')) getEl('gpsAccuracy').textContent = '--';
+        if (getEl('farmArea')) getEl('farmArea').value = '';
+        if (getEl('farmAreaEstimate')) getEl('farmAreaEstimate').value = '';
+        if (getEl('calculatedArea')) getEl('calculatedArea').innerText = '--';
+        if (getEl('startCaptureBtn')) getEl('startCaptureBtn').disabled = false;
+        if (getEl('addPointBtn')) getEl('addPointBtn').disabled = true;
+        if (getEl('finishCaptureBtn')) getEl('finishCaptureBtn').disabled = true;
+        if (getEl('clearPointsBtn')) getEl('clearPointsBtn').disabled = true;
+        if (getEl('captureInstructions')) getEl('captureInstructions').textContent = 'Click "Start Capture" to begin mapping your farm boundary. Walk around the perimeter and click "Add Point" at each corner (minimum 4 points required).';
 
-        // Clear map
+        // Clear map polygon
         if (this.farmPolygon) {
             this.farmPolygon.setLatLngs([]);
         }
@@ -6219,7 +6563,7 @@ class PlotraDashboard {
 
                 // Coffee Production (Section 1.4)
                 primary_crop: 'Coffee',
-                coffee_variety: document.getElementById('coffeeVariety')?.value,
+                coffee_variety: Array.from(document.querySelectorAll('input[name="coffeeVariety"]:checked')).map(cb => cb.value),
                 estimated_annual_yield_kg: parseFloat(document.getElementById('estimatedYield')?.value) || null,
                 farming_method: document.getElementById('farmingMethod')?.value,
 
@@ -6254,13 +6598,23 @@ class PlotraDashboard {
             const requiredFields = [
                 'farmerFullName', 'farmerPhone', 'farmerNationalId', 'farmerGender',
                 'cooperativeMemberNo', 'farmName', 'farmLocation', 'farmAreaEstimate',
-                'landOwnershipType', 'coffeeVariety', 'estimatedYield', 'farmingMethod'
+                'landOwnershipType', 'estimatedYield', 'farmingMethod'
             ];
 
             const missingFields = requiredFields.filter(id => {
                 const el = document.getElementById(id);
                 return !el?.value?.trim();
             });
+
+            const selectedVarieties = Array.from(document.querySelectorAll('input[name="coffeeVariety"]:checked'));
+            if (selectedVarieties.length === 0) {
+                const errEl = document.getElementById('coffeeVarietyError');
+                if (errEl) errEl.style.display = 'block';
+                missingFields.push('coffeeVariety');
+            } else {
+                const errEl = document.getElementById('coffeeVarietyError');
+                if (errEl) errEl.style.display = 'none';
+            }
 
             if (missingFields.length > 0) {
                 this.showToast(`Please complete all required fields (${missingFields.length} missing)`, 'error');
@@ -6274,32 +6628,55 @@ class PlotraDashboard {
             }
 
             // Calculate area from GPS polygon if available (optional)
-            if (this.gpsPoints && this.gpsPoints.length >= 4) {
-                const polygonCoords = this.gpsPoints.map(point => [point.lon, point.lat]);
-                farmData.calculated_area_ha = this.calculatePolygonArea(polygonCoords);
+            if (this.gpsPoints && this.gpsPoints.length >= 3) {
+                const polygonCoords = this.gpsPoints.map(point => [point.lat, point.lon]);
+                farmData.calculated_area_ha = parseFloat((this.calculatePolygonArea(polygonCoords) / 10000).toFixed(4));
+            }
+
+            // Map farming_method to valid LandUseTypeEnum values
+            const landUseMap = {
+                'agroforestry': 'agroforestry', 'monocrop': 'monocrop', 'mono crop': 'monocrop',
+                'mono-crop': 'monocrop', 'mixed': 'mixed_cropping', 'mixed cropping': 'mixed_cropping',
+                'mixed_cropping': 'mixed_cropping', 'forest': 'forest_reserve', 'forest_reserve': 'forest_reserve',
+                'buffer': 'buffer_zone', 'buffer_zone': 'buffer_zone'
+            };
+            const landUseType = landUseMap[(farmData.farming_method || '').toLowerCase()] || 'agroforestry';
+
+            // coffee_variety is already an array from the checkboxes
+            const coffeeVarieties = Array.isArray(farmData.coffee_variety)
+                ? farmData.coffee_variety
+                : [farmData.coffee_variety].filter(Boolean);
+
+            // Build parcel list — require ≥ 3 GPS points (GPS auto-point + 2 boundary clicks)
+            const hasPolygon = this.gpsPoints && this.gpsPoints.length >= 3;
+            // Close polygon: ensure first point repeated at end
+            let polygonPts = hasPolygon ? [...this.gpsPoints] : [];
+            if (hasPolygon) {
+                const f = polygonPts[0], l = polygonPts[polygonPts.length - 1];
+                if (f.lat !== l.lat || f.lon !== l.lon) polygonPts.push({ ...f });
             }
 
             // Prepare API payload
             const apiPayload = {
                 farm_name: farmData.farm_name,
                 total_area_hectares: farmData.calculated_area_ha || farmData.approximate_size_ha,
-                coffee_varieties: [farmData.coffee_variety],
+                coffee_varieties: coffeeVarieties,
                 years_farming: farmData.farm_established_year ? new Date().getFullYear() - farmData.farm_established_year : null,
                 average_annual_production_kg: farmData.estimated_annual_yield_kg,
-                centroid_lat: (this.gpsPoints && this.gpsPoints.length > 0) ? this.gpsPoints.reduce((sum, p) => sum + p.lat, 0) / this.gpsPoints.length : null,
-                centroid_lon: (this.gpsPoints && this.gpsPoints.length > 0) ? this.gpsPoints.reduce((sum, p) => sum + p.lon, 0) / this.gpsPoints.length : null,
-                parcels: this.gpsPoints && this.gpsPoints.length >= 4 ? [
+                centroid_lat: hasPolygon ? this.gpsPoints.reduce((s, p) => s + p.lat, 0) / this.gpsPoints.length : null,
+                centroid_lon: hasPolygon ? this.gpsPoints.reduce((s, p) => s + p.lon, 0) / this.gpsPoints.length : null,
+                parcels: hasPolygon ? [
                     {
-                        parcel_number: 1,
+                        parcel_number: '1',
                         parcel_name: farmData.farm_name || 'Main Parcel',
                         boundary_geojson: {
                             type: 'Polygon',
-                            coordinates: [this.gpsPoints.map(point => [point.lon, point.lat])]
+                            coordinates: [polygonPts.map(p => [p.lon, p.lat])]
                         },
                         area_hectares: farmData.calculated_area_ha || farmData.approximate_size_ha,
-                        gps_accuracy_meters: this.gpsPoints ? Math.max(...this.gpsPoints.map(point => point.accuracy || 10)) : null,
+                        gps_accuracy_meters: Math.max(...this.gpsPoints.map(p => p.accuracy || 10)),
                         mapping_device: 'GPS',
-                        land_use_type: farmData.farming_method?.toLowerCase() || 'agroforestry'
+                        land_use_type: landUseType
                     }
                 ] : [],
                 // Extended fields for EUDR compliance
@@ -6356,27 +6733,7 @@ class PlotraDashboard {
         }
     }
 
-    // Helper function to calculate polygon area (in hectares)
-    calculatePolygonArea(coordinates) {
-        // Using Shoelace formula for area calculation
-        // Returns area in hectares (approximate for small areas)
-        let area = 0;
-        const n = coordinates.length;
-        
-        for (let i = 0; i < n; i++) {
-            const j = (i + 1) % n;
-            const [lon1, lat1] = coordinates[i];
-            const [lon2, lat2] = coordinates[j];
-            area += (lon2 - lon1) * (lat1 + lat2) / 2;
-        }
-        
-        // Convert to hectares (approximate for Kenya's latitude)
-        // 1 degree ≈ 111km at equator, adjust for latitude
-        const avgLat = coordinates.reduce((sum, c) => sum + c[1], 0) / coordinates.length;
-        const metersPerDegree = 111320 * Math.cos(avgLat * Math.PI / 180);
-        const areaSqMeters = Math.abs(area) * metersPerDegree * metersPerDegree;
-        return Math.round(areaSqMeters / 10000 * 100) / 100; // Convert to hectares with 2 decimal places
-    }
+    // (duplicate calculatePolygonArea removed — single definition above)
 
     // Helper function to hash strings (simple hash for demo)
     hashString(str) {
@@ -6394,6 +6751,9 @@ class PlotraDashboard {
         if (modalEl) {
             const form = document.getElementById('addCooperativeForm');
             if (form) form.reset();
+            // Dispose any stale instance before creating a fresh one so getInstance works later
+            const existing = bootstrap.Modal.getInstance(modalEl);
+            if (existing) existing.dispose();
             const modal = new bootstrap.Modal(modalEl);
             modal.show();
         }
@@ -6416,7 +6776,7 @@ class PlotraDashboard {
                         <div class="modal-content">
                             <div class="modal-header sticky-top bg-light">
                                 <h5 class="modal-title" id="coopDetailsModalTitle">Cooperative Details</h5>
-                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                <button type="button" class="btn-modal-close" data-bs-dismiss="modal"><i class="bi bi-x-lg"></i>Close</button>
                             </div>
                             <div class="modal-body" id="coopDetailsContent" style="max-height: 70vh; overflow-y: auto;">
                                 <!-- Identification Section -->
@@ -6705,6 +7065,13 @@ class PlotraDashboard {
     }
 
     async handleCreateCooperative() {
+        const submitBtn = document.querySelector('#addCooperativeForm [type="submit"], #addCooperativeModal .btn-primary');
+        if (submitBtn) {
+            if (submitBtn.disabled) return;
+            submitBtn.disabled = true;
+            submitBtn.dataset.originalText = submitBtn.innerHTML;
+            submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Creating...';
+        }
         try {
             const docFiles = {};
             document.querySelectorAll('#coopRequiredDocsList input[type="file"]').forEach(input => {
@@ -6765,17 +7132,20 @@ class PlotraDashboard {
             if (response) {
                 this.showToast('Cooperative created successfully', 'success');
                 const modalEl = document.getElementById('addCooperativeModal');
-                const modal = bootstrap.Modal.getInstance(modalEl);
-                if (modal) modal.hide();
-                
-                // Refresh the cooperatives list if we are on that page
-                if (this.currentPage === 'cooperatives') {
-                    this.loadPage('cooperatives');
-                }
+                const modal = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
+                modal.hide();
+
+                // Always navigate to cooperatives page so the new entry is visible
+                this.navigateTo('cooperatives');
             }
         } catch (error) {
             console.error('Failed to create cooperative:', error);
             this.showToast(error.message || 'Failed to create cooperative', 'error');
+        } finally {
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = submitBtn.dataset.originalText || 'Create Cooperative';
+            }
         }
     }
 
@@ -6839,8 +7209,13 @@ class PlotraDashboard {
         this.drawnItems = null;
         this.captureMode = false;
         this.capturedPoints = [];
+        this.gpsPoints = [];
         this.currentPolygon = null;
         this.gpsWatchId = null;
+        this.isCapturing = false;
+        this.lastKnownPosition = null;
+        this._clickMarkers = [];
+        this._clickPolyline = null;
         this.treeCaptureMode = false;
         this.capturedTrees = [];
         this.treeMarkers = [];
@@ -6972,7 +7347,7 @@ class PlotraDashboard {
         }
     }
 
-    startGPSCapture() {
+    _legacyStartGPSCapture() {
         this.captureMode = true;
         this.capturedPoints = [];
 
@@ -6985,7 +7360,7 @@ class PlotraDashboard {
         this.showToast('GPS capture started. Walk to your farm boundary and add points.', 'info');
     }
 
-    addGPSPoint() {
+    _legacyAddGPSPoint() {
         if (!this.captureMode) return;
 
         if (navigator.geolocation) {
@@ -7153,7 +7528,7 @@ class PlotraDashboard {
             const formData = new FormData(document.getElementById('addFarmForm'));
             const farmData = {
                 farm_name: formData.get('farmName'),
-                total_area_hectares: parseFloat(formData.get('farmArea')),
+                total_area_hectares: parseFloat(formData.get('farmAreaEstimate')) || null,
                 coffee_varieties: formData.get('farmVarieties') ?
                     formData.get('farmVarieties').split(',').map(v => v.trim()) : [],
                 years_farming: formData.get('farmYears') ? parseInt(formData.get('farmYears')) : null,
@@ -7167,7 +7542,7 @@ class PlotraDashboard {
                     parcel_number: 1,
                     parcel_name: 'Main Parcel',
                     boundary_geojson: this.currentPolygon.geometry,
-                    area_hectares: parseFloat(formData.get('farmArea')),
+                    area_hectares: farmData.total_area_hectares,
                     gps_accuracy_meters: document.getElementById('gpsAccuracy').textContent !== '--' ?
                         parseFloat(document.getElementById('gpsAccuracy').textContent) : null,
                     mapping_device: navigator.userAgent,
@@ -7199,7 +7574,7 @@ class PlotraDashboard {
                 document.body.style.overflow = '';
                 document.body.style.paddingRight = '';
             }, 300);
-            this.loadFarms(); // Refresh farm list
+            this.loadFarmerFarms(); // Refresh farm list
 
         } catch (error) {
             this.showToast(`Error creating farm: ${error.message}`, 'error');
@@ -7301,12 +7676,12 @@ class PlotraDashboard {
     showTreeDetailsModal(lat, lng) {
         // Create modal for tree details
         const modalHtml = `
-            <div class="modal fade" id="treeDetailsModal" tabindex="-1">
+            <div class="modal fade" id="treeDetailsModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
                 <div class="modal-dialog">
                     <div class="modal-content">
                         <div class="modal-header">
                             <h5 class="modal-title"><i class="bi bi-tree me-2"></i>Add Tree</h5>
-                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            <button type="button" class="btn-modal-close" data-bs-dismiss="modal"><i class="bi bi-x-lg"></i>Close</button>
                         </div>
                         <form id="treeDetailsForm">
                             <div class="modal-body">
@@ -7566,6 +7941,10 @@ class PlotraDashboard {
     }
 
     async requestSatelliteAnalysis(farmId, parcelIds = null) {
+        // Disable the button to prevent double-clicks
+        const btn = document.querySelector(`[onclick*="requestSatelliteAnalysis('${farmId}')"]`);
+        if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Analysing…'; }
+
         try {
             // Verify farm has a captured polygon before requesting analysis
             const farm = await api.getFarmById(farmId);
@@ -7574,7 +7953,7 @@ class PlotraDashboard {
                 this.showToast('Please capture the farm polygon first before running satellite analysis.', 'warning');
                 return;
             }
-            this.showToast('Requesting satellite analysis...', 'info');
+            this.showToast('Running satellite analysis…', 'info');
 
             // Build query string — backend takes parcel_ids as query params, not body
             let url = `/farmer/farm/${farmId}/satellite-analysis`;
@@ -7587,18 +7966,25 @@ class PlotraDashboard {
 
             const result = await api.request(url, { method: 'POST' });
 
-            this.showToast('Satellite analysis completed!', 'success');
-
-            // Store historical analysis data
+            // Store historical analysis so it appears in Historical Analysis section
             if (result.results && result.results.length > 0) {
                 await this.storeHistoricalAnalysis(farmId, result.results);
             }
 
-            // Refresh data
-            this.loadSatelliteAnalysis(farmId);
+            this.showToast(`Analysis complete — ${result.results?.length || 0} parcel(s) processed.`, 'success');
+
+            // Reload farm cards + auto-switch analysis sections to this farm
+            await this.loadFarmerFarms();
+            const selector = document.getElementById('analysisFarmSelector');
+            if (selector) {
+                selector.value = farmId;
+                this.switchAnalysisFarm(farmId);
+            }
 
         } catch (error) {
             this.showToast(`Satellite analysis failed: ${error.message}`, 'error');
+        } finally {
+            if (btn) { btn.disabled = false; btn.innerHTML = '<i class="bi bi-satellite-fill me-1"></i>Analyse'; }
         }
     }
 
@@ -7926,9 +8312,9 @@ class PlotraDashboard {
                     <div class="card border-0 shadow-sm">
                         <div class="card-header bg-white d-flex justify-content-between align-items-center">
                             <h5 class="mb-0"><i class="bi bi-geo-alt me-2"></i>My Farms</h5>
-                            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addFarmModal">
-                                <i class="bi bi-plus-circle me-1"></i>Add Farm
-                            </button>
+                    <button class="btn btn-primary" onclick="app.showAddFarmModal()">
+                        <i class="bi bi-plus-circle me-1"></i>Add Farm
+                    </button>
                         </div>
                         <div class="card-body">
                             <div id="farmCalculations">
@@ -8009,12 +8395,12 @@ class PlotraDashboard {
             </div>
 
             <!-- Farm Details Modal -->
-            <div class="modal fade" id="farmDetailsModal" tabindex="-1">
+            <div class="modal fade" id="farmDetailsModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
                 <div class="modal-dialog modal-xl">
                     <div class="modal-content">
                         <div class="modal-header">
                             <h5 class="modal-title"><i class="bi bi-geo-alt me-2"></i>Farm Details</h5>
-                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            <button type="button" class="btn-modal-close" data-bs-dismiss="modal"><i class="bi bi-x-lg"></i>Close</button>
                         </div>
                         <div class="modal-body">
                             <div id="farmDetailsContent">
@@ -8026,10 +8412,10 @@ class PlotraDashboard {
             </div>
         `;
 
-        await this.loadFarms();
+        await this.loadFarmerFarms();
     }
 
-    async loadFarms() {
+    async loadFarmerFarms() {
         try {
             const farmsResponse = await api.getFarms();
             let farms = [];
@@ -8060,7 +8446,7 @@ class PlotraDashboard {
                     </div>`;
             } else {
                 farmsList.innerHTML = `<div class="row g-3">` + farms.map(farm => {
-                    const hasPolygon = farm.parcels && farm.parcels.length > 0 && farm.parcels[0].boundary_geojson;
+                    const hasPolygon = !!(farm.parcels && farm.parcels.length > 0 && farm.parcels[0].boundary_geojson);
                     const statusColor = { draft:'secondary', pending:'warning', verified:'success', rejected:'danger' }[farm.verification_status] || 'secondary';
                     const compColor = farm.compliance_status === 'Compliant' ? 'success' : farm.compliance_status === 'Under Review' ? 'warning' : 'secondary';
                     return `
@@ -8083,7 +8469,7 @@ class PlotraDashboard {
                                     <i class="bi bi-eye-fill me-1"></i>View
                                 </button>
                                 <button class="btn btn-${hasPolygon ? 'outline-warning' : 'outline-success'} btn-sm flex-fill" style="min-width:70px"
-                                    onclick="app.openFarmCapture('${farm.id}', ${hasPolygon})">
+                                    data-capture-farm-id="${farm.id}" data-is-recapture="${hasPolygon}">
                                     <i class="bi bi-${hasPolygon ? 'arrow-repeat' : 'geo-alt-fill'} me-1"></i>${hasPolygon ? 'Recapture' : 'Capture'}
                                 </button>
                                 <button class="btn btn-outline-info btn-sm flex-fill" style="min-width:70px"
@@ -8096,6 +8482,15 @@ class PlotraDashboard {
                     </div>
                 </div>`;
                 }).join('') + `</div>`;
+
+            // Attach event listeners for capture buttons (in case inline onclick fails)
+            farmsList.querySelectorAll('[data-capture-farm-id]').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const farmId = btn.getAttribute('data-capture-farm-id');
+                    const isRecapture = btn.getAttribute('data-is-recapture') === 'true';
+                    this.openFarmCapture(farmId, isRecapture);
+                });
+            });
             }
             // Populate analysis farm selector with mapped farms only
             const mappedFarms = farms?.filter(f => f.parcels?.length > 0 && f.parcels[0].boundary_geojson) || [];
@@ -8199,23 +8594,23 @@ class PlotraDashboard {
               <div class="row g-3 mb-4">
                 <div class="col-md-6 col-lg-4">
                   <label class="form-label small fw-semibold">Full Name</label>
-                  <input class="form-control form-control-sm" name="full_name" value="${fv(farm._farmer_name || '')}" placeholder="—" readonly style="background:#f8f3ee;">
+                  <input class="form-control form-control-sm" value="${fv(farm.farmer_name)}" placeholder="—" readonly style="background:#f8f3ee;">
                 </div>
                 <div class="col-md-6 col-lg-4">
                   <label class="form-label small fw-semibold">Phone</label>
-                  <input class="form-control form-control-sm" name="phone" value="${fv(farm._farmer_phone || '')}" placeholder="—" readonly style="background:#f8f3ee;">
+                  <input class="form-control form-control-sm" value="${fv(farm.farmer_phone)}" placeholder="—" readonly style="background:#f8f3ee;">
                 </div>
                 <div class="col-md-6 col-lg-4">
                   <label class="form-label small fw-semibold">National ID</label>
-                  <input class="form-control form-control-sm" name="national_id" value="${fv(farm._farmer_id || '')}" placeholder="—" readonly style="background:#f8f3ee;">
+                  <input class="form-control form-control-sm" value="${fv(farm.farmer_national_id)}" placeholder="—" readonly style="background:#f8f3ee;">
                 </div>
                 <div class="col-md-6 col-lg-4">
                   <label class="form-label small fw-semibold">Gender</label>
-                  <input class="form-control form-control-sm" name="gender" value="${fv(farm._farmer_gender || '')}" placeholder="—" readonly style="background:#f8f3ee;">
+                  <input class="form-control form-control-sm" value="${fv(farm.farmer_gender)}" placeholder="—" readonly style="background:#f8f3ee;">
                 </div>
                 <div class="col-md-6 col-lg-4">
                   <label class="form-label small fw-semibold">Coop Member No.</label>
-                  <input class="form-control form-control-sm" name="coop_member_no" value="${fv(farm._coop_member_no || '')}" placeholder="—" readonly style="background:#f8f3ee;">
+                  <input class="form-control form-control-sm" value="${fv(farm.coop_member_no)}" placeholder="—" readonly style="background:#f8f3ee;">
                 </div>
                 <div class="col-md-6 col-lg-4">
                   <label class="form-label small fw-semibold">Registered</label>
@@ -8232,7 +8627,7 @@ class PlotraDashboard {
                 </div>
                 <div class="col-md-6 col-lg-4">
                   <label class="form-label small fw-semibold">Location / Subcounty</label>
-                  <input class="form-control form-control-sm" name="location" value="${fv(farm.location || farm.land_use_type || '')}" placeholder="e.g. Kirinyaga">
+                  <input class="form-control form-control-sm" value="${fv(farm.farmer_location)}" placeholder="—" readonly style="background:#f8f3ee;">
                 </div>
                 <div class="col-md-6 col-lg-4">
                   <label class="form-label small fw-semibold">Total Area (ha)</label>
@@ -8244,11 +8639,7 @@ class PlotraDashboard {
                 </div>
                 <div class="col-md-6 col-lg-4">
                   <label class="form-label small fw-semibold">Land Ownership</label>
-                  <select class="form-select form-select-sm" name="land_ownership_type">
-                    ${['FREEHOLD','LEASEHOLD','CUSTOMARY','COMMUNAL','GOVERNMENT_LEASE'].map(o =>
-                      `<option value="${o}" ${(farm.land_ownership_type||'').toUpperCase()===o?'selected':''}>${o.replace(/_/g,' ')}</option>`
-                    ).join('')}
-                  </select>
+                  <input class="form-control form-control-sm" value="${fv((parcel.ownership_type||'').replace(/_/g,' '))}" placeholder="—" readonly style="background:#f8f3ee;">
                 </div>
                 <div class="col-md-6 col-lg-4">
                   <label class="form-label small fw-semibold">Land Use Type</label>
@@ -8335,28 +8726,20 @@ class PlotraDashboard {
               <h6 class="fw-bold border-bottom pb-1 mb-3" style="color:#6f4e37;"><i class="bi bi-sliders me-2"></i>Advanced Information</h6>
               <div class="row g-3 mb-4">
                 <div class="col-md-6 col-lg-4">
-                  <label class="form-label small fw-semibold">Farm Est. Year</label>
-                  <input type="number" class="form-control form-control-sm" name="farm_established_year" value="${fv(farm.farm_established_year)}" min="1900" max="2100" placeholder="YYYY">
+                  <label class="form-label small fw-semibold">Agroforestry Start Year</label>
+                  <input class="form-control form-control-sm" value="${fv(parcel.agroforestry_start_year)}" placeholder="—" readonly style="background:#f8f3ee;">
                 </div>
                 <div class="col-md-6 col-lg-4">
                   <label class="form-label small fw-semibold">Previous Land Use</label>
-                  <input class="form-control form-control-sm" name="previous_land_use" value="${fv(farm.previous_land_use)}" placeholder="e.g. Forest, Pasture">
-                </div>
-                <div class="col-md-6 col-lg-4">
-                  <label class="form-label small fw-semibold">Agroforestry Start Year</label>
-                  <input type="number" class="form-control form-control-sm" name="agroforestry_start_year" value="${fv(farm.agroforestry_start_year)}" min="1900" max="2100" placeholder="YYYY">
+                  <input class="form-control form-control-sm" value="${fv(parcel.previous_land_use)}" placeholder="—" readonly style="background:#f8f3ee;">
                 </div>
                 <div class="col-md-6 col-lg-4">
                   <label class="form-label small fw-semibold">Estimated Coffee Trees</label>
-                  <input type="number" class="form-control form-control-sm" name="estimated_coffee_trees" value="${fv(farm.estimated_coffee_trees)}" min="0" placeholder="0">
+                  <input class="form-control form-control-sm" value="${fv(parcel.estimated_coffee_plants)}" placeholder="—" readonly style="background:#f8f3ee;">
                 </div>
                 <div class="col-md-6 col-lg-4">
                   <label class="form-label small fw-semibold">NGO / Programme Support</label>
-                  <input class="form-control form-control-sm" name="ngo_support" value="${fv(farm.ngo_support || (farm.programme_support && farm.programme_support.name) || '')}" placeholder="—">
-                </div>
-                <div class="col-md-6 col-lg-4">
-                  <label class="form-label small fw-semibold">Notes</label>
-                  <input class="form-control form-control-sm" name="notes" value="${fv(farm.notes)}" placeholder="—">
+                  <input class="form-control form-control-sm" value="${fv(parcel.programme_support ? (parcel.programme_support.name || JSON.stringify(parcel.programme_support)) : '')}" placeholder="—" readonly style="background:#f8f3ee;">
                 </div>
                 <div class="col-md-6 col-lg-4">
                   <label class="form-label small fw-semibold">Compliance Status</label>
@@ -8375,24 +8758,7 @@ class PlotraDashboard {
 
             </form>`;
 
-            // Populate farmer identity from current user
-            const u = this.currentUser;
-            if (u) {
-                const f = document.getElementById('editFarmForm');
-                const set = (n, v) => { const el = f && f.querySelector(`[name="${n}"]`); if (el && v != null && v !== '') el.value = v; };
-                set('full_name', u.full_name || [u.first_name, u.last_name].filter(Boolean).join(' '));
-                set('phone', u.phone || u.phone_number);
-                set('national_id', u.national_id);
-                set('gender', u.gender);
-            }
-            // Coop membership
-            try {
-                const membership = await api.getMyMembership();
-                if (membership?.membership_number) {
-                    const el = document.getElementById('editFarmForm')?.querySelector('[name="coop_member_no"]');
-                    if (el) el.value = membership.membership_number;
-                }
-            } catch(e) {}
+            // Farmer identity is now served directly from the API response (farmer_* fields)
 
             // Add Save button to modal footer
             const footer = modalEl.querySelector('.modal-footer');
@@ -8450,7 +8816,7 @@ class PlotraDashboard {
 
             await api.updateFarm(farmId, data);
             this.showToast('Farm saved successfully', 'success');
-            this.loadFarms(); // refresh cards
+            this.loadFarmerFarms(); // refresh cards
         } catch(e) {
             this.showToast(e.message || 'Save failed', 'error');
         } finally {
@@ -8458,81 +8824,302 @@ class PlotraDashboard {
         }
     }
 
-    openFarmCapture(farmId, isRecapture = false) {
+    async openFarmCapture(farmId, isRecapture = false) {
         const modalEl = document.getElementById('farmCaptureModal');
         if (!modalEl) return;
         document.getElementById('captureFarmId').value = farmId;
         const titleEl = document.getElementById('farmCaptureModalLabel');
         if (titleEl) titleEl.innerHTML = `<i class="bi bi-geo-alt-fill me-2"></i>${isRecapture ? 'Recapture Farm Boundary' : 'Capture Farm Boundary'}`;
+
+        // Reset state
         this._capturePoints = [];
-        this._captureWatchId = null;
         this._captureCapturing = false;
 
         const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+
+        const onShown = () => {
+            this._initCaptureMap(farmId, isRecapture);
+            modalEl.removeEventListener('shown.bs.modal', onShown);
+        };
+        const cleanupOnHide = () => {
+            this._cleanupCaptureMap();
+            modalEl.removeEventListener('hidden.bs.modal', cleanupOnHide);
+        };
+        modalEl.addEventListener('shown.bs.modal', onShown);
+        modalEl.addEventListener('hidden.bs.modal', cleanupOnHide);
+
         modal.show();
 
-        setTimeout(() => this._initCaptureMap(), 300);
+        document.getElementById('captureStartBtn').onclick      = () => this._startCapture();
+        document.getElementById('captureAddPointBtn').onclick   = () => this._addCapturePoint();
+        document.getElementById('captureFinishBtn').onclick     = () => this._finishCapture();
+        document.getElementById('captureClearBtn').onclick      = () => this._clearCapture();
+        document.getElementById('captureNewPolygonBtn').onclick = () => this._newPolygon();
+        document.getElementById('saveCaptureBtn').onclick       = () => this._saveCapturedPolygon(farmId);
 
-        document.getElementById('captureStartBtn').onclick = () => this._startCapture();
-        document.getElementById('captureAddPointBtn').onclick = () => this._addCapturePoint();
-        document.getElementById('captureFinishBtn').onclick = () => this._finishCapture();
-        document.getElementById('captureClearBtn').onclick = () => this._clearCapture();
-        document.getElementById('saveCaptureBtn').onclick = () => this._saveCapturedPolygon(farmId);
+        // Show "New Polygon" button only in recapture mode
+        const newPolyBtn = document.getElementById('captureNewPolygonBtn');
+        if (newPolyBtn) newPolyBtn.style.display = isRecapture ? '' : 'none';
     }
 
-    _initCaptureMap() {
+    async _initCaptureMap(farmId, isRecapture = false) {
         const mapEl = document.getElementById('captureMap');
         if (!mapEl) return;
-        if (this._captureMap) {
-            try { this._captureMap.remove(); } catch(e) {}
-        }
+
+        // Full cleanup of any previous session
+        this._cleanupCaptureMap();
+
         this._captureMap = L.map('captureMap', { zoomControl: true });
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(this._captureMap);
+
+        // Tile layer (OSM)
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors', maxZoom: 19
+        }).addTo(this._captureMap);
+
+        // --- Mode toggle (Walk / Click) ---
+        const walkRadio  = document.getElementById('modeWalkBtn');
+        const clickRadio = document.getElementById('modeClickBtn');
+        // Read current radio state (persists across opens)
+        this._captureInputMode = (clickRadio && clickRadio.checked) ? 'click' : 'walk';
+        if (walkRadio)  walkRadio.onchange  = () => { if (walkRadio.checked)  this._captureInputMode = 'walk'; };
+        if (clickRadio) clickRadio.onchange = () => { if (clickRadio.checked) this._captureInputMode = 'click'; };
+
+        // Dashed polyline connecting points (same as add-farm)
+        this._capturePolyline = L.polyline([], { color: '#6f4e37', weight: 3, dashArray: '6,4' }).addTo(this._captureMap);
+
+        // Filled polygon (drawn once ≥3 points)
         this._capturePolygon = L.polygon([], { color: '#40916c', fillColor: '#52b788', fillOpacity: 0.3, weight: 2 }).addTo(this._captureMap);
+
+        // Numbered point markers
         this._captureMarkers = L.layerGroup().addTo(this._captureMap);
-        if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(pos => {
-                this._captureMap.setView([pos.coords.latitude, pos.coords.longitude], 16);
-            }, () => this._captureMap.setView([0, 37], 5));
-        } else {
-            this._captureMap.setView([0, 37], 5);
+
+        // Live GPS location marker
+        this._captureLiveMarker = L.marker([0, 0], {
+            icon: L.divIcon({
+                className: '',
+                html: '<div style="background:#2563eb;color:#fff;padding:0;border-radius:50%;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.4);width:34px;height:34px;display:flex;align-items:center;justify-content:center;font-size:16px;line-height:1;">📍</div>',
+                iconSize: [34, 34], iconAnchor: [17, 17]
+            })
+        });
+
+        // GPS accuracy circle
+        this._captureAccuracyCircle = L.circle([0, 0], { radius: 0, color: '#10b981', fillColor: '#d1fae5', fillOpacity: 0.3 });
+
+        this._existingPolygonLayer = null;
+
+        // Load existing boundary for recapture
+        if (isRecapture && farmId) {
+            try {
+                const farm = await api.getFarmById(farmId);
+                if (farm?.parcels?.length > 0) {
+                    const parcel = farm.parcels[0];
+                    if (parcel.boundary_geojson?.coordinates) {
+                        const coords = parcel.boundary_geojson.coordinates[0];
+                        const latlngs = coords.map(c => [c[1], c[0]]);
+                        this._existingPolygonLayer = L.polygon(latlngs, {
+                            color: '#dc3545', fillColor: '#dc3545', fillOpacity: 0.1,
+                            weight: 2, dashArray: '6, 6', interactive: false
+                        }).addTo(this._captureMap);
+                        this._captureMap.fitBounds(this._existingPolygonLayer.getBounds().pad(0.1));
+                    }
+                }
+            } catch (e) {
+                console.error('Failed to load existing polygon:', e);
+            }
         }
+
+        // Click-to-add-point — only active in Click mode
+        this._captureMap.on('click', (e) => {
+            if (!this._captureCapturing) return;
+            if (this._captureInputMode !== 'click') return;
+            this._addPointToCapture(e.latlng.lat, e.latlng.lng);
+        });
+
+        // For new farm or recapture without existing polygon, center map on GPS.
+        // For recapture with existing polygon, fitBounds already positioned the map.
+        const centerOnGPS = !this._existingPolygonLayer;
+
+        // Set a sensible fallback view (Kenya) while waiting for GPS fix
+        if (!this._existingPolygonLayer) {
+            this._captureMap.setView([-0.0236, 37.9062], 13);
+        }
+
+        // Two-stage centering: fast coarse fix first (WiFi/cell, <1 s), then precise GPS
+        if (centerOnGPS && navigator.geolocation) {
+            const centerMap = (lat, lng) => {
+                if (this._captureMap) this._captureMap.setView([lat, lng], 16);
+            };
+            // Stage 1: coarse but instant (allow cached/network position)
+            navigator.geolocation.getCurrentPosition(
+                pos => centerMap(pos.coords.latitude, pos.coords.longitude),
+                () => {},
+                { enableHighAccuracy: false, timeout: 5000, maximumAge: 300000 }
+            );
+            // Stage 2: precise GPS — refines position when hardware lock arrives
+            navigator.geolocation.getCurrentPosition(
+                pos => centerMap(pos.coords.latitude, pos.coords.longitude),
+                () => {},
+                { enableHighAccuracy: true, timeout: 30000, maximumAge: 0 }
+            );
+        }
+
+        // Start continuous GPS watch — centers on first fix for new farm
+        this._startCaptureGPSWatch(centerOnGPS);
+
+        this._captureMap.invalidateSize();
+
+        const statusEl = document.getElementById('captureStatusMsg');
+        if (statusEl) statusEl.textContent = 'Press Start Capture, then tap the map or use Add Point at your GPS location.';
+    }
+
+    _startCaptureGPSWatch(centerOnFix = false) {
+        if (!navigator.geolocation) return;
+        if (this._captureWatchId) return; // already watching
+
+        this._captureWatchId = navigator.geolocation.watchPosition(pos => {
+            const { latitude: lat, longitude: lng, accuracy } = pos.coords;
+            this._currentCapturePos = pos.coords;
+
+            // Update accuracy readout
+            const accEl = document.getElementById('captureAccuracy');
+            if (accEl) accEl.textContent = accuracy ? accuracy.toFixed(1) : '--';
+
+            // Move live marker
+            this._captureLiveMarker.setLatLng([lat, lng]);
+            if (this._captureMap && !this._captureMap.hasLayer(this._captureLiveMarker)) {
+                this._captureLiveMarker.addTo(this._captureMap);
+            }
+
+            // Update accuracy circle
+            if (this._captureAccuracyCircle) {
+                this._captureAccuracyCircle.setLatLng([lat, lng]);
+                this._captureAccuracyCircle.setRadius(accuracy || 0);
+                if (this._captureMap && !this._captureMap.hasLayer(this._captureAccuracyCircle)) {
+                    this._captureAccuracyCircle.addTo(this._captureMap);
+                }
+            }
+
+            // Centre map on first GPS fix (only when no existing polygon loaded)
+            if (centerOnFix && this._capturePoints.length === 0 && this._captureMap) {
+                const z = this._captureMap.getZoom();
+                this._captureMap.setView([lat, lng], z < 14 ? 16 : z);
+                centerOnFix = false; // only centre once
+            }
+
+            // Auto-place Point 1 when Start Capture was pressed before GPS arrived
+            if (this._autoAddPoint1 && this._captureCapturing) {
+                this._autoAddPoint1 = false;
+                this._addPointToCapture(lat, lng);
+            } else if (this._captureCapturing && this._captureInputMode === 'walk' && this._capturePoints.length > 0) {
+                // Walk mode: auto-add a point every 5 m of movement
+                const last = this._capturePoints[this._capturePoints.length - 1];
+                if (this._haversineDistance(last.lat, last.lon, lat, lng) >= 5) {
+                    this._addPointToCapture(lat, lng);
+                }
+            }
+
+            // Walk mode: keep map centred on user's position while capturing
+            if (this._captureCapturing && this._captureInputMode === 'walk' && this._captureMap) {
+                this._captureMap.panTo([lat, lng], { animate: true, duration: 0.3 });
+            }
+        }, err => {
+            console.warn('Capture GPS error:', err.message);
+        }, { enableHighAccuracy: true, maximumAge: 5000, timeout: 30000 });
+    }
+
+    _addPointToCapture(lat, lng) {
+        this._capturePoints.push({ lat, lon: lng });
+        const count = this._capturePoints.length;
+
+        // Numbered circle marker (same style as add-farm)
+        const icon = L.divIcon({
+            className: '',
+            html: `<div style="background:#40916c;color:#fff;border-radius:50%;width:26px;height:26px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,0.5);">${count}</div>`,
+            iconSize: [26, 26], iconAnchor: [13, 13]
+        });
+        L.marker([lat, lng], { icon }).addTo(this._captureMarkers);
+
+        // Redraw dashed polyline
+        const coords = this._capturePoints.map(p => [p.lat, p.lon]);
+        if (this._capturePolyline) this._capturePolyline.setLatLngs(coords);
+
+        // Fill polygon once ≥3 points
+        if (count >= 3) {
+            if (this._capturePolygon) this._capturePolygon.setLatLngs(coords);
+            const area = this._calcArea(coords);
+            const dispEl = document.getElementById('captureAreaDisplay');
+            const inpEl  = document.getElementById('captureAreaInput');
+            if (dispEl) dispEl.textContent = area.toFixed(2);
+            if (inpEl && !inpEl.value) inpEl.value = area.toFixed(2);
+        }
+
+        const countEl  = document.getElementById('capturePointCount');
+        const statusEl = document.getElementById('captureStatusMsg');
+        const finishBtn = document.getElementById('captureFinishBtn');
+        if (countEl)  countEl.textContent  = count;
+        if (statusEl) statusEl.textContent = `${count} point(s) added. ${count >= 3 ? 'Tap Finish or keep adding.' : 'Add more points (min 3).'}`;
+        if (finishBtn) finishBtn.disabled  = count < 3;
+    }
+
+    _newPolygon() {
+        // Remove the existing boundary overlay
+        if (this._existingPolygonLayer && this._captureMap) {
+            try { this._captureMap.removeLayer(this._existingPolygonLayer); } catch(e) {}
+            this._existingPolygonLayer = null;
+        }
+        // Reset all drawn points
+        this._clearCapture();
+
+        // Pan to current GPS location
+        const goToPos = (lat, lng) => {
+            if (this._captureMap) this._captureMap.setView([lat, lng], 17);
+        };
+
+        if (this._currentCapturePos) {
+            goToPos(this._currentCapturePos.latitude, this._currentCapturePos.longitude);
+        } else if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                pos => goToPos(pos.coords.latitude, pos.coords.longitude),
+                ()  => {}
+            );
+        }
+
+        const statusEl = document.getElementById('captureStatusMsg');
+        if (statusEl) statusEl.textContent = 'Existing boundary removed. Press Start Capture to draw your new boundary.';
     }
 
     _startCapture() {
-        if (!navigator.geolocation) { this.showToast('Geolocation not available', 'error'); return; }
         this._captureCapturing = true;
         document.getElementById('captureStartBtn').disabled = true;
         document.getElementById('captureAddPointBtn').disabled = false;
-        document.getElementById('captureFinishBtn').disabled = false;
-        document.getElementById('captureStatusMsg').textContent = 'GPS active. Walk to a corner and tap Add Point.';
-        this._captureWatchId = navigator.geolocation.watchPosition(pos => {
-            document.getElementById('captureAccuracy').value = pos.coords.accuracy ? pos.coords.accuracy.toFixed(1) : '--';
-            this._currentCapturePos = pos.coords;
-            if (this._captureMap) this._captureMap.setView([pos.coords.latitude, pos.coords.longitude]);
-        }, null, { enableHighAccuracy: true });
+        document.getElementById('captureFinishBtn').disabled = this._capturePoints.length < 3;
+
+        const mode = this._captureInputMode || 'walk';
+        const statusEl = document.getElementById('captureStatusMsg');
+
+        // GPS watch already running; start if not yet (e.g. permission denied earlier)
+        this._startCaptureGPSWatch(true);
+
+        // Always auto-place Point 1 at current GPS location (both walk and click mode)
+        if (this._currentCapturePos) {
+            this._addPointToCapture(this._currentCapturePos.latitude, this._currentCapturePos.longitude);
+            if (statusEl) statusEl.textContent = mode === 'walk'
+                ? 'Point 1 placed. Walking… points auto-add every 5 m. Press Add Point at key corners.'
+                : 'Point 1 placed at your location. Tap the map to add boundary corners.';
+        } else {
+            this._autoAddPoint1 = true;
+            if (statusEl) statusEl.textContent = 'Waiting for GPS fix… Point 1 will be placed when location is found.';
+        }
     }
 
     _addCapturePoint() {
-        if (!this._currentCapturePos) { this.showToast('Waiting for GPS fix...', 'warning'); return; }
-        this._capturePoints.push({ lat: this._currentCapturePos.latitude, lon: this._currentCapturePos.longitude });
-        const count = this._capturePoints.length;
-        document.getElementById('capturePointCount').textContent = count;
-        L.circleMarker([this._currentCapturePos.latitude, this._currentCapturePos.longitude], { radius: 6, color: '#40916c', fillColor: '#fff', fillOpacity: 1, weight: 2 })
-            .bindTooltip(String(count)).addTo(this._captureMarkers);
-        if (count >= 3) {
-            const latlngs = this._capturePoints.map(p => [p.lat, p.lon]);
-            this._capturePolygon.setLatLngs(latlngs);
-            const area = this._calcArea(latlngs);
-            document.getElementById('captureAreaDisplay').textContent = area.toFixed(2);
-            document.getElementById('captureAreaInput').value = area.toFixed(2);
-        }
-        document.getElementById('captureStatusMsg').textContent = `${count} point(s) added. Add more or tap Finish.`;
+        if (!this._currentCapturePos) { this.showToast('Waiting for GPS fix…', 'warning'); return; }
+        if (!this._captureCapturing) { this.showToast('Press Start Capture first', 'warning'); return; }
+        this._addPointToCapture(this._currentCapturePos.latitude, this._currentCapturePos.longitude);
     }
 
     _finishCapture() {
         if (this._capturePoints.length < 3) { this.showToast('Need at least 3 points', 'warning'); return; }
-        if (this._captureWatchId) navigator.geolocation.clearWatch(this._captureWatchId);
         this._captureCapturing = false;
         document.getElementById('captureAddPointBtn').disabled = true;
         document.getElementById('captureStatusMsg').textContent = 'Capture complete. Adjust area if needed, then Save.';
@@ -8540,17 +9127,47 @@ class PlotraDashboard {
 
     _clearCapture() {
         this._capturePoints = [];
-        if (this._captureWatchId) { navigator.geolocation.clearWatch(this._captureWatchId); this._captureWatchId = null; }
         this._captureCapturing = false;
-        if (this._capturePolygon) this._capturePolygon.setLatLngs([]);
-        if (this._captureMarkers) this._captureMarkers.clearLayers();
-        document.getElementById('capturePointCount').textContent = '0';
-        document.getElementById('captureAreaDisplay').textContent = '--';
-        document.getElementById('captureAreaInput').value = '';
-        document.getElementById('captureStartBtn').disabled = false;
-        document.getElementById('captureAddPointBtn').disabled = true;
-        document.getElementById('captureFinishBtn').disabled = true;
-        document.getElementById('captureStatusMsg').textContent = 'Ready to capture.';
+        this._autoAddPoint1 = false;
+        this._captureInputMode = this._captureInputMode || 'walk';
+        if (this._capturePolygon)  this._capturePolygon.setLatLngs([]);
+        if (this._capturePolyline) this._capturePolyline.setLatLngs([]);
+        if (this._captureMarkers)  this._captureMarkers.clearLayers();
+        const countEl   = document.getElementById('capturePointCount');
+        const dispEl    = document.getElementById('captureAreaDisplay');
+        const inpEl     = document.getElementById('captureAreaInput');
+        const startBtn  = document.getElementById('captureStartBtn');
+        const addBtn    = document.getElementById('captureAddPointBtn');
+        const finishBtn = document.getElementById('captureFinishBtn');
+        const statusEl  = document.getElementById('captureStatusMsg');
+        if (countEl)   countEl.textContent   = '0';
+        if (dispEl)    dispEl.textContent    = '--';
+        if (inpEl)     inpEl.value           = '';
+        if (startBtn)  startBtn.disabled     = false;
+        if (addBtn)    addBtn.disabled       = true;
+        if (finishBtn) finishBtn.disabled    = true;
+        if (statusEl)  statusEl.textContent  = 'Cleared. Press Start Capture to begin again.';
+    }
+
+    _cleanupCaptureMap() {
+        if (this._captureWatchId) {
+            navigator.geolocation.clearWatch(this._captureWatchId);
+            this._captureWatchId = null;
+        }
+        if (this._captureMap) {
+            try { this._captureMap.remove(); } catch(e) {}
+            this._captureMap = null;
+        }
+        this._capturePolygon        = null;
+        this._capturePolyline       = null;
+        this._captureMarkers        = null;
+        this._captureLiveMarker     = null;
+        this._captureAccuracyCircle = null;
+        this._existingPolygonLayer  = null;
+        this._currentCapturePos     = null;
+        this._capturePoints         = [];
+        this._captureCapturing      = false;
+        this._autoAddPoint1         = false;
     }
 
     async _saveCapturedPolygon(farmId) {
@@ -8560,6 +9177,7 @@ class PlotraDashboard {
             document.getElementById('saveCaptureBtn').disabled = true;
             await api.updateFarmPolygon(farmId, { gps_points: this._capturePoints, area_hectares: area });
             this.showToast('Farm boundary saved successfully', 'success');
+            this._cleanupCaptureMap();
             const modal = bootstrap.Modal.getInstance(document.getElementById('farmCaptureModal'));
             if (modal) modal.hide();
             setTimeout(() => {
@@ -8567,13 +9185,22 @@ class PlotraDashboard {
                 document.body.classList.remove('modal-open');
                 document.body.style.overflow = '';
                 document.body.style.paddingRight = '';
-                this.loadFarms();
+                this.loadFarmerFarms();
             }, 300);
         } catch (e) {
             this.showToast(e.message || 'Failed to save boundary', 'error');
         } finally {
             document.getElementById('saveCaptureBtn').disabled = false;
         }
+    }
+
+    _haversineDistance(lat1, lng1, lat2, lng2) {
+        const R = 6371000;
+        const φ1 = lat1 * Math.PI / 180, φ2 = lat2 * Math.PI / 180;
+        const Δφ = (lat2 - lat1) * Math.PI / 180;
+        const Δλ = (lng2 - lng1) * Math.PI / 180;
+        const a = Math.sin(Δφ/2)**2 + Math.cos(φ1)*Math.cos(φ2)*Math.sin(Δλ/2)**2;
+        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     }
 
     _calcArea(latlngs) {
@@ -8767,7 +9394,7 @@ class PlotraDashboard {
 
     async loadHistoricalAnalysis(farmId) {
         try {
-            const historicalData = await api.request(`/farmer/farm/${farmId}/historical-analysis`);
+            const historicalData = await api.request(`/farmer/farm/${farmId}/historical-analysis`, { optional: true }) || {};
 
             const container = document.getElementById('historicalAnalysis');
             if (!container) return;
@@ -8892,13 +9519,13 @@ class PlotraDashboard {
             let totalCropAreas = 0;
             let agroforestryScore = 0;
 
-            html = '<div class="row g-3">';
+            let html = '<div class="row g-3">';
 
             for (const parcel of parcels) {
                 try {
                     // Load trees
-                    const trees = await api.request(`/farmer/farm/${farmId}/parcel/${parcel.id}/trees`);
-                    totalTrees += trees.length;
+                    const trees = await api.request(`/farmer/farm/${farmId}/parcel/${parcel.id}/trees`, { optional: true, default: [] });
+                    totalTrees += (trees || []).length;
 
                     // Load crops
                     const crops = await api.getParcelCrops(farmId, parcel.id);
@@ -9189,14 +9816,14 @@ class PlotraDashboard {
 
         // Create modal for crop details
         const modalHtml = `
-            <div class="modal fade" id="cropDetailsModal" tabindex="-1">
+            <div class="modal fade" id="cropDetailsModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
                 <div class="modal-dialog modal-lg">
                     <div class="modal-content">
                         <div class="modal-header" style="background-color: ${cropType.display_color}; color: white;">
                             <h5 class="modal-title">
                                 <i class="bi bi-seedling me-2"></i>Add ${cropType.name}
                             </h5>
-                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                            <button type="button" class="btn-modal-close" data-bs-dismiss="modal"><i class="bi bi-x-lg"></i>Close</button>
                         </div>
                         <form id="cropDetailsForm">
                             <div class="modal-body">
@@ -9490,12 +10117,12 @@ class PlotraDashboard {
         }).join('');
 
         const modalHtml = `
-            <div class="modal fade" id="cropAnalysisModal" tabindex="-1">
+            <div class="modal fade" id="cropAnalysisModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
                 <div class="modal-dialog modal-xl">
                     <div class="modal-content">
                         <div class="modal-header">
                             <h5 class="modal-title"><i class="bi bi-graph-up me-2"></i>Crop Health Analysis Results</h5>
-                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            <button type="button" class="btn-modal-close" data-bs-dismiss="modal"><i class="bi bi-x-lg"></i>Close</button>
                         </div>
                         <div class="modal-body">
                             ${resultsHtml}
@@ -9529,12 +10156,12 @@ class PlotraDashboard {
 
         // For now, show a modal with instructions
         const modalHtml = `
-            <div class="modal fade" id="treeMappingModal" tabindex="-1">
+            <div class="modal fade" id="treeMappingModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
                 <div class="modal-dialog modal-lg">
                     <div class="modal-content">
                         <div class="modal-header">
                             <h5 class="modal-title"><i class="bi bi-tree me-2"></i>Tree Mapping</h5>
-                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            <button type="button" class="btn-modal-close" data-bs-dismiss="modal"><i class="bi bi-x-lg"></i>Close</button>
                         </div>
                         <div class="modal-body">
                             <div class="alert alert-info">

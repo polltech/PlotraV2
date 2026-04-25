@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, Form,
 from typing import Union
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
+from sqlalchemy.orm import selectinload
 
 from app.core.database import get_db
 from app.core.auth import get_current_user, require_platform_admin, require_admin
@@ -41,7 +42,7 @@ async def get_all_farms(
 ):
     """Get all farms with pagination and optional status filter."""
     from app.models.user import User as UserModel
-    query = select(Farm, UserModel).join(UserModel, Farm.owner_id == UserModel.id, isouter=True)
+    query = select(Farm, UserModel).join(UserModel, Farm.owner_id == UserModel.id, isouter=True).options(selectinload(Farm.parcels))
     if status_filter:
         query = query.where(Farm.verification_status == status_filter)
 
@@ -57,6 +58,17 @@ async def get_all_farms(
 
     farms_out = []
     for farm, owner in rows:
+        # Compute centroid from parcels if not set
+        centroid_lat = farm.centroid_lat
+        centroid_lon = farm.centroid_lon
+        if (centroid_lat is None or centroid_lon is None) and farm.parcels:
+            first_parcel = farm.parcels[0]
+            if first_parcel.boundary_geojson:
+                coords = first_parcel.boundary_geojson.get('coordinates', [[]])[0]
+                if coords and len(coords) > 0:
+                    centroid_lat = sum(c[1] for c in coords) / len(coords)
+                    centroid_lon = sum(c[0] for c in coords) / len(coords)
+        
         farms_out.append({
             "id": farm.id,
             "farm_name": farm.farm_name,
@@ -68,6 +80,8 @@ async def get_all_farms(
             "created_at": farm.created_at,
             "owner_name": f"{owner.first_name} {owner.last_name}" if owner else "Unknown",
             "owner_phone": owner.phone if owner else None,
+            "centroid_lat": centroid_lat,
+            "centroid_lon": centroid_lon,
         })
 
     return {
@@ -481,7 +495,43 @@ async def generate_dds(
 ):
     """
     Generate Due Diligence Statement for EUDR compliance.
+    Fetches linked farms to include geospatial and compliance data.
     """
+    from app.models.compliance import DueDiligenceStatement
+    
+    # Fetch linked farms to include in DDS
+    farms_data = []
+    if dds_data.farm_ids:
+        result = await db.execute(
+            select(Farm).options(selectinload(Farm.parcels)).where(Farm.id.in_(dds_data.farm_ids))
+        )
+        farms = result.scalars().all()
+        
+        for farm in farms:
+            centroid_lat = farm.centroid_lat
+            centroid_lon = farm.centroid_lon
+            if (centroid_lat is None or centroid_lon is None) and farm.parcels:
+                first_parcel = farm.parcels[0]
+                if first_parcel.boundary_geojson:
+                    coords = first_parcel.boundary_geojson.get('coordinates', [[]])[0]
+                    if coords and len(coords) > 0:
+                        centroid_lat = sum(c[1] for c in coords) / len(coords)
+                        centroid_lon = sum(c[0] for c in coords) / len(coords)
+            
+            farms_data.append({
+                "id": farm.id,
+                "farm_name": farm.farm_name or "Unnamed Farm",
+                "country": "Kenya",
+                "region": farm.cooperative_id or "Unknown Region",
+                "centroid_lat": centroid_lat,
+                "centroid_lon": centroid_lon,
+                "area_hectares": farm.total_area_hectares,
+                "coffee_area_hectares": farm.coffee_area_hectares,
+                "verification_status": farm.verification_status,
+                "compliance_status": farm.compliance_status,
+                "deforestation_risk_score": farm.deforestation_risk_score
+            })
+    
     # Create DDS data structure
     dds_service_data = DDSData(
         operator_name=dds_data.operator_name,
@@ -501,8 +551,38 @@ async def generate_dds(
         farm_ids=dds_data.farm_ids
     )
     
-    # Generate DDS
-    dds = eudr_service.generate_due_diligence_statement(dds_service_data)
+    # Generate DDS dict
+    dds_dict = eudr_service.generate_due_diligence_statement(dds_service_data, farms=farms_data)
+    
+    # Create ORM record
+    dds = DueDiligenceStatement(
+        dds_number=dds_dict['dds_number'],
+        version=dds_dict['version'],
+        operator_name=dds_dict['operator_name'],
+        operator_id=dds_dict.get('operator_id'),
+        contact_name=dds_dict.get('contact_name'),
+        contact_email=dds_dict.get('contact_email'),
+        contact_address=dds_dict.get('contact_address'),
+        commodity_type=dds_dict['commodity_type'],
+        hs_code=dds_dict.get('hs_code'),
+        country_of_origin=dds_dict['country_of_origin'],
+        quantity=dds_dict['quantity'],
+        unit=dds_dict['unit'],
+        supplier_name=dds_dict.get('supplier_name'),
+        supplier_country=dds_dict.get('supplier_country'),
+        first_placement_country=dds_dict.get('first_placement_country'),
+        first_placement_date=dds_dict.get('first_placement_date'),
+        risk_level=dds_dict['risk_level'],
+        submission_status='draft',
+        dds_hash=dds_dict.get('dds_hash'),
+        signature=dds_dict.get('signature'),
+        risk_assessment=dds_dict.get('risk_assessment'),
+        mitigation_measures=dds_dict.get('mitigation_measures'),
+        evidence_references=dds_dict.get('evidence_references'),
+        farm_coordinates=dds_dict.get('farm_coordinates'),
+        polygon_references=None,  # Could be populated later
+        satellite_analysis_ids=None
+    )
     
     db.add(dds)
     await db.commit()

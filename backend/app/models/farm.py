@@ -597,18 +597,6 @@ class HealthStatus(str, enum.Enum):
     NUTRIENT_DEFICIENT = "nutrient_deficient"
 
 
-class CropCategory(str, enum.Enum):
-    """Crop categories for organization"""
-    COFFEE = "coffee"
-    SHADE_TREE = "shade_tree"
-    FRUIT_TREE = "fruit_tree"
-    TIMBER = "timber"
-    VEGETABLE = "vegetable"
-    LEGUME = "legume"
-    CEREAL = "cereal"
-    OTHER = "other"
-
-
 class CropType(BaseModel):
     """
     Comprehensive crop type definitions with spectral signatures and growth characteristics.

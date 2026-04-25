@@ -2,6 +2,7 @@
 Plotra Platform - Farmer API Endpoints (Tier 1)
 GPS mapping, KYC, and farm management
 """
+import json
 from datetime import datetime, timedelta
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
@@ -53,79 +54,184 @@ async def update_farmer_profile(
     return current_user
 
 
-@router.post("/farm", response_model=FarmResponse, status_code=status.HTTP_201_CREATED)
+def _farm_to_dict(farm: Farm) -> dict:
+    """Serialize a Farm ORM object to a dict including owner/farmer details."""
+    owner = farm.owner
+    farmer_name = None
+    farmer_phone = None
+    farmer_national_id = None
+    farmer_gender = None
+    farmer_location = None
+    coop_member_no = None
+    if owner:
+        farmer_name = f"{owner.first_name or ''} {owner.last_name or ''}".strip() or None
+        farmer_phone = owner.phone or getattr(owner, 'phone_number', None)
+        farmer_national_id = getattr(owner, 'national_id', None)
+        farmer_gender = getattr(owner, 'gender', None)
+        farmer_location = getattr(owner, 'subcounty', None) or getattr(owner, 'county', None) or getattr(owner, 'district', None)
+        coop_member_no = getattr(owner, 'cooperative_member_no', None) or getattr(owner, 'membership_number', None)
+
+    parcels = []
+    for p in (farm.parcels or []):
+        parcels.append({
+            "id": p.id,
+            "parcel_number": str(p.parcel_number) if p.parcel_number else None,
+            "parcel_name": p.parcel_name,
+            "area_hectares": p.area_hectares,
+            "coffee_area_hectares": p.coffee_area_hectares,
+            "boundary_geojson": p.boundary_geojson,
+            "land_use_type": p.land_use_type.value if p.land_use_type else None,
+            "ownership_type": p.ownership_type.value if p.ownership_type else None,
+            "soil_type": p.soil_type.value if p.soil_type else None,
+            "altitude_meters": p.altitude_meters,
+            "slope_degrees": p.slope_degrees,
+            "gps_accuracy_meters": p.gps_accuracy_meters,
+            "mapping_date": p.mapping_date.isoformat() if p.mapping_date else None,
+            "estimated_coffee_plants": p.estimated_coffee_plants,
+            "canopy_cover": p.canopy_cover.value if p.canopy_cover else None,
+            "irrigation_type": p.irrigation_type.value if p.irrigation_type else None,
+            "planting_method": p.planting_method.value if p.planting_method else None,
+            "practice_mixed_farming": p.practice_mixed_farming,
+            "other_crops": p.other_crops,
+            "ndvi_baseline": p.ndvi_baseline,
+            "agroforestry_start_year": p.agroforestry_start_year,
+            "previous_land_use": p.previous_land_use,
+            "programme_support": p.programme_support,
+            "verification_status": p.verification_status,
+            "created_at": p.created_at.isoformat() if p.created_at else None,
+        })
+
+    return {
+        "id": farm.id,
+        "owner_id": farm.owner_id,
+        "farm_name": farm.farm_name,
+        "farm_code": farm.farm_code,
+        "total_area_hectares": farm.total_area_hectares,
+        "coffee_area_hectares": farm.coffee_area_hectares,
+        "coffee_varieties": farm.coffee_varieties or [],
+        "land_use_type": farm.land_use_type.value if farm.land_use_type else None,
+        "years_farming": farm.years_farming,
+        "average_annual_production_kg": farm.average_annual_production_kg,
+        "deforestation_risk_score": farm.deforestation_risk_score,
+        "compliance_status": farm.compliance_status,
+        "verification_status": farm.verification_status,
+        "centroid_lat": farm.centroid_lat,
+        "centroid_lon": farm.centroid_lon,
+        "parcels": parcels,
+        "created_at": farm.created_at.isoformat() if farm.created_at else None,
+        "farmer_name": farmer_name,
+        "farmer_phone": farmer_phone,
+        "farmer_national_id": farmer_national_id,
+        "farmer_gender": farmer_gender,
+        "farmer_location": farmer_location,
+        "coop_member_no": coop_member_no,
+    }
+
+
+@router.post("/farm", status_code=status.HTTP_201_CREATED)
 async def create_farm(
     farm_data: FarmCreate,
     current_user: User = Depends(require_farmer),
     db: AsyncSession = Depends(get_db)
 ):
-    """
-    Create a new farm with parcel boundaries.
-    Farmers can create multiple parcels with GPS coordinates.
-    """
+    """Create a new farm with parcel boundaries."""
     has_polygon = bool(farm_data.parcels and any(p.boundary_geojson for p in farm_data.parcels))
     initial_status = "pending" if has_polygon else "draft"
 
-    # Create farm
+    # Resolve land_use_type
+    from app.models.farm import LandUseType
+    land_use_type = None
+    if farm_data.land_use_type:
+        try:
+            land_use_type = LandUseType(farm_data.land_use_type.lower())
+        except ValueError:
+            land_use_type = LandUseType.AGROFORESTRY
+
     farm = Farm(
         owner_id=current_user.id,
         farm_name=farm_data.farm_name,
         total_area_hectares=farm_data.total_area_hectares,
+        coffee_area_hectares=farm_data.coffee_area_hectares,
         coffee_varieties=farm_data.coffee_varieties,
         years_farming=farm_data.years_farming,
         average_annual_production_kg=farm_data.average_annual_production_kg,
+        land_use_type=land_use_type,
         compliance_status="Under Review",
-        verification_status=initial_status
+        verification_status=initial_status,
+        centroid_lat=farm_data.centroid_lat,
+        centroid_lon=farm_data.centroid_lon,
     )
-    
     db.add(farm)
     await db.flush()
-    
-    # Create parcels
+
+    # Apply extra fields from form sub-objects
+    sustainability = farm_data.sustainability or {}
+    land_parcel_extra = farm_data.land_parcel or {}
+
+    # Update user with any new farmer details
+    farmer_info = farm_data.farmer or {}
+    if farmer_info.get('cooperative_member_no') and hasattr(current_user, 'cooperative_member_no'):
+        current_user.cooperative_member_no = farmer_info['cooperative_member_no']
+
     for parcel_data in farm_data.parcels:
+        geojson_str = json.dumps(parcel_data.boundary_geojson)
+        boundary_geom = func.ST_SetSRID(func.ST_GeomFromGeoJSON(geojson_str), 4326)
+
+        # Resolve ownership type
+        ownership_raw = land_parcel_extra.get('ownership_type') or ''
+        ownership = None
+        if ownership_raw:
+            try:
+                ownership = OwnershipType(ownership_raw.lower())
+            except ValueError:
+                pass
+
         parcel = LandParcel(
             farm_id=farm.id,
-            parcel_number=parcel_data.parcel_number,
-            parcel_name=parcel_data.parcel_name,
+            parcel_number=str(parcel_data.parcel_number),
+            parcel_name=parcel_data.parcel_name or farm_data.farm_name,
             boundary_geojson=parcel_data.boundary_geojson,
+            boundary_geometry=boundary_geom,
             area_hectares=parcel_data.area_hectares,
             gps_accuracy_meters=parcel_data.gps_accuracy_meters,
             mapping_device=parcel_data.mapping_device,
             land_use_type=parcel_data.land_use_type,
-            coffee_area_hectares=parcel_data.coffee_area_hectares
+            coffee_area_hectares=parcel_data.coffee_area_hectares,
+            ownership_type=ownership,
+            agroforestry_start_year=sustainability.get('agroforestry_start_year'),
+            previous_land_use=sustainability.get('previous_land_use'),
+            programme_support=sustainability.get('programme_support'),
         )
         db.add(parcel)
-    
+
     await db.commit()
 
-    # Reload with parcels eagerly to avoid MissingGreenlet
     from sqlalchemy.orm import selectinload
     result2 = await db.execute(
-        select(Farm).options(selectinload(Farm.parcels)).where(Farm.id == farm.id)
+        select(Farm).options(selectinload(Farm.parcels), selectinload(Farm.owner)).where(Farm.id == farm.id)
     )
     farm = result2.scalar_one()
-    return farm
+    return _farm_to_dict(farm)
 
 
-@router.get("/farm", response_model=List[FarmResponse])
+@router.get("/farm")
 async def get_farms(
     current_user: User = Depends(require_farmer),
     db: AsyncSession = Depends(get_db)
 ):
     """Get all farms belonging to the current farmer."""
     from sqlalchemy.orm import selectinload
-    from app.models.farm import LandParcel
     result = await db.execute(
         select(Farm)
-        .options(selectinload(Farm.parcels))
+        .options(selectinload(Farm.parcels), selectinload(Farm.owner))
         .where(Farm.owner_id == current_user.id, Farm.deleted_at == None)
         .order_by(Farm.created_at.desc())
     )
     farms = result.scalars().all()
-    return farms
+    return [_farm_to_dict(f) for f in farms]
 
 
-@router.get("/farm/{farm_id}", response_model=FarmResponse)
+@router.get("/farm/{farm_id}")
 async def get_farm_by_id(
     farm_id: str,
     current_user: User = Depends(require_farmer),
@@ -133,13 +239,13 @@ async def get_farm_by_id(
 ):
     from sqlalchemy.orm import selectinload
     result = await db.execute(
-        select(Farm).options(selectinload(Farm.parcels))
+        select(Farm).options(selectinload(Farm.parcels), selectinload(Farm.owner))
         .where(Farm.id == farm_id, Farm.owner_id == current_user.id, Farm.deleted_at == None)
     )
     farm = result.scalar_one_or_none()
     if not farm:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Farm not found")
-    return farm
+    return _farm_to_dict(farm)
 
 
 @router.patch("/farm/{farm_id}", response_model=FarmResponse)
@@ -176,7 +282,10 @@ async def update_farm(
 
     if not boundary_geojson and gps_points and len(gps_points) >= 3:
         coords = [[p["lon"], p["lat"]] for p in gps_points]
-        if coords[0] != coords[-1]:
+        # Ensure at least 4 points for closed polygon (first != last)
+        if len(coords) < 4:
+            coords.append(coords[0])
+        elif coords[0][0] != coords[-1][0] or coords[0][1] != coords[-1][1]:
             coords.append(coords[0])
         boundary_geojson = {"type": "Polygon", "coordinates": [coords]}
 

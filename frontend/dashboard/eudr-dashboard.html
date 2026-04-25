@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EUDR Review Dashboard - Plotra</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        .risk-low { color: #28a745; }
+        .risk-medium { color: #ffc107; }
+        .risk-high { color: #dc3545; }
+        .badge.eudr-compliant { background: #28a745; }
+        .badge.eudr-pending { background: #ffc107; }
+        .badge.eudr-flagged { background: #dc3545; }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-dark bg-dark">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="#">
+                <i class="bi bi-shield-check"></i> EUDR Review Dashboard
+            </a>
+            <span class="navbar-text text-white">
+                <i class="bi bi-person-badge"></i> EUDR Reviewer
+            </span>
+        </div>
+    </nav>
+
+    <div class="container-fluid py-4">
+        <!-- EUDR Summary -->
+        <div class="row mb-4">
+            <div class="col-md-4">
+                <div class="card text-center border-success">
+                    <div class="card-body">
+                        <i class="bi bi-check-circle text-success fs-1"></i>
+                        <h2 id="compliantCount">0</h2>
+                        <p class="text-muted">EUDR Compliant</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card text-center border-warning">
+                    <div class="card-body">
+                        <i class="bi bi-hourglass-split text-warning fs-1"></i>
+                        <h2 id="pendingCount">0</h2>
+                        <p class="text-muted">Pending Review</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card text-center border-danger">
+                    <div class="card-body">
+                        <i class="bi bi-exclamation-triangle text-danger fs-1"></i>
+                        <h2 id="flaggedCount">0</h2>
+                        <p class="text-muted">Flagged for Review</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Verification Workflow -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">Four-Tier Verification Workflow</h5>
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col">
+                        <div class="badge bg-secondary fs-6">1. Draft</div>
+                        <p class="small text-muted">Farmer entry</p>
+                    </div>
+                    <div class="col-1"><i class="bi bi-arrow-right fs-3 text-muted"></i></div>
+                    <div class="col">
+                        <div class="badge bg-warning text-dark fs-6">2. Coop Approved</div>
+                        <p class="small text-muted">Cooperative review</p>
+                    </div>
+                    <div class="col-1"><i class="bi bi-arrow-right fs-3 text-muted"></i></div>
+                    <div class="col">
+                        <div class="badge bg-info fs-6">3. Kipawa Verified</div>
+                        <p class="small text-muted">Satellite screening</p>
+                    </div>
+                    <div class="col-1"><i class="bi bi-arrow-right fs-3 text-muted"></i></div>
+                    <div class="col">
+                        <div class="badge bg-success fs-6">4. EUDR Submitted</div>
+                        <p class="small text-muted">DDS generated</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tabs -->
+        <ul class="nav nav-tabs mb-3">
+            <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#pending">Pending Review</a></li>
+            <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#approved">Approved</a></li>
+            <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#flagged">Flagged</a></li>
+            <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#dds">DDS Generation</a></li>
+        </ul>
+
+        <div class="tab-content">
+            <div class="tab-pane fade show active" id="pending">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Farmer</th>
+                            <th>Cooperative</th>
+                            <th>Parcels</th>
+                            <th>EUDR Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="pendingTable">
+                        <tr><td colspan="5" class="text-center text-muted">Loading...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="tab-pane fade" id="approved">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Farmer</th>
+                            <th>Cooperative</th>
+                            <th>Approved Date</th>
+                            <th>DDS Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="approvedTable"></tbody>
+                </table>
+            </div>
+
+            <div class="tab-pane fade" id="flagged">
+                <div class="alert alert-danger">
+                    <i class="bi bi-exclamation-triangle"></i> These parcels require manual review due to satellite false positives or conflicts.
+                </div>
+                <table class="table table-danger">
+                    <thead>
+                        <tr>
+                            <th>Parcel ID</th>
+                            <th>Issue</th>
+                            <th>False Positive?</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="flaggedTable"></tbody>
+                </table>
+            </div>
+
+            <div class="tab-pane fade" id="dds">
+                <div class="card">
+                    <div class="card-body">
+                        <h5>Generate Due Diligence Statement</h5>
+                        <form id="ddsForm">
+                            <div class="mb-3">
+                                <label class="form-label">Batch ID</label>
+                                <select class="form-select" id="ddsBatchId">
+                                    <option value="">Select batch...</option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Operator Name</label>
+                                <input type="text" class="form-control" id="ddsOperator" required>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Contact Email</label>
+                                <input type="email" class="form-control" id="ddsEmail" required>
+                            </div>
+                            <button type="submit" class="btn btn-success">
+                                <i class="bi bi-file-earmark-text"></i> Generate DDS
+                            </button>
+                        </form>
+                    </div>
+                </div>
+                <div id="ddsResult" class="mt-3 d-none">
+                    <div class="card bg-light">
+                        <div class="card-body">
+                            <pre id="ddsOutput"></pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const API_BASE = '/api/v2';
+        let token = localStorage.getItem('plotra_token');
+
+        async function api(endpoint, options = {}) {
+            const response = await fetch(API_BASE + endpoint, {
+                ...options,
+                headers: {
+                    ...options.headers,
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            return response.json();
+        }
+
+        async function loadData() {
+            try {
+                const [pending, approved, flagged] = await Promise.all([
+                    api('/admin/verification/pending'),
+                    api('/admin/farmers/verified'),
+                    api('/admin/farmers/rejected')
+                ]);
+
+                document.getElementById('pendingCount').textContent = (pending.farmers || []).length;
+                document.getElementById('compliantCount').textContent = (approved.farmers || []).length;
+                document.getElementById('flaggedCount').textContent = (flagged.farmers || []).length;
+
+                renderTable('pendingTable', pending.farmers || []);
+                renderTable('approvedTable', approved.farmers || []);
+                renderTable('flaggedTable', flagged.farmers || [], true);
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        function renderTable(id, farmers, showIssues = false) {
+            if (!farmers.length) {
+                document.getElementById(id).innerHTML = '<tr><td colspan="5" class="text-center text-muted">No records</td></tr>';
+                return;
+            }
+            document.getElementById(id).innerHTML = farmers.map(f => `
+                <tr>
+                    <td>${f.first_name} ${f.last_name}</td>
+                    <td>${f.cooperative_name || '-'}</td>
+                    <td>${f.farm_count || 0}</td>
+                    <td><span class="badge ${getStatusBadge(f.eudr_status)}">${f.eudr_status || 'pending'}</span></td>
+                    <td>
+                        <button class="btn btn-sm btn-primary" onclick="reviewFarmer('${f.id}')">Review</button>
+                        <button class="btn btn-sm btn-success" onclick="approveFarmer('${f.id}')">Approve</button>
+                        <button class="btn btn-sm btn-danger" onclick="rejectFarmer('${f.id}')">Reject</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function getStatusBadge(status) {
+            return {
+                compliant: 'eudr-compliant',
+                pending: 'eudr-pending',
+                flagged: 'eudr-flagged'
+            }[status] || 'eudr-pending';
+        }
+
+        async function approveFarmer(id) {
+            if (!confirm('Approve this farmer for EUDR submission?')) return;
+            await api(`/admin/farmers/${id}/verify`, { method: 'POST' });
+            loadData();
+        }
+
+        async function rejectFarmer(id) {
+            const reason = prompt('Reason for rejection:');
+            if (!reason) return;
+            await api(`/admin/farmers/${id}/reject`, {
+                method: 'POST',
+                body: JSON.stringify({ reason })
+            });
+            loadData();
+        }
+
+        function reviewFarmer(id) {
+            window.location.href = `farmer-profile.html?id=${id}`;
+        }
+
+        document.getElementById('ddsForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const batchId = document.getElementById('ddsBatchId').value;
+            const operator = document.getElementById('ddsOperator').value;
+            const email = document.getElementById('ddsEmail').value;
+
+            try {
+                const result = await api(`/eudr/batch/${batchId}/dds`, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        operator_name: operator,
+                        contact_email: email,
+                        commodity_type: 'Coffee'
+                    })
+                });
+
+                document.getElementById('ddsResult').classList.remove('d-none');
+                document.getElementById('ddsOutput').textContent = JSON.stringify(result, null, 2);
+            } catch (e) {
+                alert('DDS generation failed: ' + e.message);
+            }
+        });
+
+        loadData();
+    </script>
+</body>
+</html>

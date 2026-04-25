@@ -158,10 +158,6 @@ class User(BaseModel):
     timezone = Column(String(50), default="Africa/Nairobi")
     notification_preferences = Column(JSON, nullable=True)
     
-    # Password reset
-    password_reset_token = Column(String(255), nullable=True)
-    password_reset_expires = Column(DateTime, nullable=True)
-    
     # Metadata
     kyc_data = Column(JSON, nullable=True)
     profile_photo_url = Column(String(500), nullable=True)

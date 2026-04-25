@@ -62,3 +62,43 @@ class RequiredDocument(BaseModel):
             "sort_order": self.sort_order,
             "created_at": self.created_at.isoformat() if self.created_at else None
         }
+
+
+class SyncLog(BaseModel):
+    """
+    Sync log for delta-sync analytics.
+    Tracks sync success rate for KPI measurement.
+    """
+    
+    __tablename__ = "sync_logs"
+    
+    device_id = Column(String(100), nullable=True, index=True)
+    user_id = Column(String(36), nullable=False, index=True)
+    records_sent = Column(Integer, default=0)
+    synced_count = Column(Integer, default=0)
+    conflict_count = Column(Integer, default=0)
+    failed_count = Column(Integer, default=0)
+    sync_timestamp = Column(String(50), nullable=True)
+    checksum = Column(String(64), nullable=True)
+    
+
+class ConflictRecord(BaseModel):
+    """
+    Conflict record for polygon overlap resolution.
+    Tracks 48h SLA compliance.
+    """
+    
+    __tablename__ = "conflict_records"
+    
+    conflict_type = Column(String(50), nullable=False)
+    entity_type = Column(String(50), nullable=False)
+    entity_id = Column(String(36), nullable=False)
+    cooperative_id = Column(String(36), nullable=True, index=True)
+    local_version = Column(JSON, nullable=True)
+    server_version = Column(JSON, nullable=True)
+    severity = Column(String(20), default="medium")
+    status = Column(String(50), default="pending_resolution", index=True)
+    resolved_by = Column(String(36), nullable=True)
+    resolved_at = Column(String(50), nullable=True)
+    resolution_data = Column(JSON, nullable=True)
+    sla_alert_sent = Column(Boolean, default=False)

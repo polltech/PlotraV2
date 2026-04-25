@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - Plotra</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+</head>
+<body>
+    <nav class="navbar navbar-dark bg-dark">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="#"><i class="bi bi-gear"></i> Plotra Admin</a>
+            <div class="navbar-nav flex-row">
+                <a class="nav-item nav-link" href="index.html">Dashboard</a>
+                <a class="nav-item nav-link" href="#">Logout</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid py-4">
+        <!-- Stats -->
+        <div class="row mb-4">
+            <div class="col-md-3"><div class="card text-center"><h2 id="totalFarmers">-</h2><p>Total Farmers</p></div></div>
+            <div class="col-md-3"><div class="card text-center"><h2 id="totalCoops">-</h2><p>Cooperatives</p></div></div>
+            <div class="col-md-3"><div class="card text-center"><h2 id="totalBatches">-</h2><p>Batches</p></div></div>
+            <div class="col-md-3"><div class="card text-center"><h2 id="syncRate">-</h2><p>Sync Rate</p></div></div>
+        </div>
+
+        <!-- Tabs -->
+        <ul class="nav nav-tabs mb-3">
+            <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#users">Users</a></li>
+            <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#cooperatives">Cooperatives</a></li>
+            <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#compliance">Compliance</a></li>
+            <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#satellite">Satellite</a></li>
+            <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#system">System</a></li>
+        </ul>
+
+        <div class="tab-content">
+            <div class="tab-pane fade show active" id="users">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between">
+                        <span>User Management</span>
+                        <button class="btn btn-sm btn-primary" onclick="showCreateUser()">Add User</button>
+                    </div>
+                    <table class="table mb-0">
+                        <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead>
+                        <tbody id="usersTable"><tr><td colspan="5">Loading...</td></tr></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="tab-pane fade" id="cooperatives">
+                <div class="card">
+                    <table class="table">
+                        <thead><tr><th>Name</th><th>Code</th><th>Region</th><th>Farmers</th><th>Actions</th></tr></thead>
+                        <tbody id="coopsTable"><tr><td colspan="5">Loading...</td></tr></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="tab-pane fade" id="compliance">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header">EUDR Compliance Overview</div>
+                            <div class="card-body" id="complianceOverview">Loading...</div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header">Risk Report</div>
+                            <div class="card-body" id="riskReport">Loading...</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="tab-pane fade" id="satellite">
+                <div class="card">
+                    <div class="card-header">Satellite Analysis Dashboard</div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-4"><div class="card bg-light"><div class="card-body text-center"><h3 id="avgNdvi">-</h3><p>Avg NDVI</p></div></div></div>
+                            <div class="col-md-4"><div class="card bg-light"><div class="card-body text-center"><h3 id="highCloud">-</h3><p>High Cloud %</p></div></div></div>
+                            <div class="col-md-4"><div class="card bg-light"><div class="card-body text-center"><h3 id="falsePositives">-</h3><p>False Positives</p></div></div></div>
+                        </div>
+                        <button class="btn btn-primary mt-3" onclick="runBatchAnalysis()">
+                            <i class="bi bi-satellite-dish"></i> Run Batch Analysis
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="tab-pane fade" id="system">
+                <div class="card mb-3">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <span><i class="bi bi-gear"></i> System Configuration</span>
+                        <button class="btn btn-sm btn-primary" onclick="loadSystemSettings()">
+                            <i class="bi bi-arrow-clockwise"></i> Refresh
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <ul class="nav nav-tabs" id="sysSubTabs">
+                            <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#sysSettings">Settings</a></li>
+                            <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#sysEnvCreds">Env Credentials</a></li>
+                            <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#sysSession">Session</a></li>
+                            <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#sysDocs">Required Docs</a></li>
+                        </ul>
+                        <div class="tab-content mt-3">
+                            <!-- Settings Tab -->
+                            <div class="tab-pane fade show active" id="sysSettings">
+                                <div class="table-responsive">
+                                    <table class="table table-sm">
+                                        <thead><tr><th>Key</th><th>Value</th><th>Actions</th></tr></thead>
+                                        <tbody id="systemSettingsTable"><tr><td colspan="3">Loading...</td></tr></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            <!-- Env Credentials Tab -->
+                            <div class="tab-pane fade" id="sysEnvCreds">
+                                <div class="card bg-light mb-3">
+                                    <div class="card-body">
+                                        <h6>Add/Update Credential</h6>
+                                        <div class="row g-2">
+                                            <div class="col-md-3">
+                                                <input type="text" class="form-control" id="credKey" placeholder="Key (e.g. AWS_SECRET)">
+                                            </div>
+                                            <div class="col-md-5">
+                                                <input type="password" class="form-control" id="credValue" placeholder="Value">
+                                            </div>
+                                            <div class="col-md-2">
+                                                <input type="text" class="form-control" id="credDesc" placeholder="Description">
+                                            </div>
+                                            <div class="col-md-2">
+                                                <button class="btn btn-success w-100" onclick="saveCredential()">
+                                                    <i class="bi bi-save"></i> Save
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <table class="table table-sm">
+                                    <thead><tr><th>Key</th><th>Description</th><th>Public</th><th>Actions</th></tr></thead>
+                                    <tbody id="credentialsTable"><tr><td colspan="4">Loading...</td></tr></tbody>
+                                </table>
+                            </div>
+                            <!-- Session Tab -->
+                            <div class="tab-pane fade" id="sysSession">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="card">
+                                            <div class="card-header">Session Timeout</div>
+                                            <div class="card-body">
+                                                <div class="input-group mb-2">
+                                                    <input type="number" class="form-control" id="sessionTimeout" value="60" min="5" max="480">
+                                                    <span class="input-group-text">minutes</span>
+                                                    <button class="btn btn-primary" onclick="saveSessionTimeout()">Save</button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- Required Docs Tab -->
+                            <div class="tab-pane fade" id="sysDocs">
+                                <button class="btn btn-primary mb-3" onclick="showAddDocModal()">
+                                    <i class="bi bi-plus"></i> Add Required Document
+                                </button>
+                                <div id="requiredDocsList"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-header">Sync Statistics</div>
+                    <div class="card-body" id="syncStats">Loading...</div>
+                </div>
+                <div class="card mt-3">
+                    <div class="card-header">Required Documents</div>
+                    <div class="card-body">
+                        <div id="requiredDocs"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const API = '/api/v2';
+        let token = localStorage.getItem('plotra_token');
+
+        async function api(endpoint, options = {}) {
+            const r = await fetch(API + endpoint, {
+                ...options,
+                headers: {
+                    ...options.headers,
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            return r.json();
+        }
+
+        async function init() {
+            const [users, coops, stats, compliance, sync] = await Promise.all([
+                api('/admin/users'),
+                api('/admin/cooperatives'),
+                api('/admin/dashboard/stats'),
+                api('/admin/compliance/overview'),
+                api('/sync/stats')
+            ]);
+
+            document.getElementById('totalFarmers').textContent = stats.total_farmers || 0;
+            document.getElementById('totalCoops').textContent = (coops.cooperatives || []).length;
+            document.getElementById('totalBatches').textContent = stats.total_batches || 0;
+            document.getElementById('syncRate').textContent = (sync.meets_kpi ? '✓' : '!') + (sync.success_rate || 100) + '%';
+
+            renderUsers(users.users || users || []);
+            renderCoops(coops.cooperatives || coops || []);
+            renderCompliance(compliance);
+            renderSync(sync);
+        }
+
+        function renderUsers(users) {
+            document.getElementById('usersTable').innerHTML = users.length ? users.map(u => `
+                <tr>
+                    <td>${u.first_name} ${u.last_name}</td>
+                    <td>${u.email}</td>
+                    <td><span class="badge bg-secondary">${u.role}</span></td>
+                    <td><span class="badge bg-${u.is_active ? 'success' : 'danger'}">${u.is_active ? 'Active' : 'Inactive'}</span></td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-primary" onclick="editUser('${u.id}')">Edit</button>
+                        ${u.is_active ? `<button class="btn btn-sm btn-outline-danger" onclick="suspendUser('${u.id}')">Suspend</button>` : `<button class="btn btn-sm btn-outline-success" onclick="unsuspendUser('${u.id}')">Activate</button>`}
+                    </td>
+                </tr>
+            `).join('') : '<tr><td colspan="5" class="text-muted">No users</td></tr>';
+        }
+
+        function renderCoops(coops) {
+            document.getElementById('coopsTable').innerHTML = coops.length ? coops.map(c => `
+                <tr>
+                    <td>${c.name}</td>
+                    <td><code>${c.cooperative_code}</code></td>
+                    <td>${c.region || '-'}</td>
+                    <td>${c.farmer_count || 0}</td>
+                    <td>
+                        <button class="btn btn-sm btn-primary" onclick="viewCoop('${c.id}')">View</button>
+                        <button class="btn btn-sm btn-success" onclick="verifyCoop('${c.id}')">Verify</button>
+                    </td>
+                </tr>
+            `).join('') : '<tr><td colspan="5" class="text-muted">No cooperatives</td></tr>';
+        }
+
+        function renderCompliance(data) {
+            const el = document.getElementById('complianceOverview');
+            el.innerHTML = `
+                <ul class="list-unstyled">
+                    <li>Compliant: <span class="text-success fw-bold">${data.compliant || 0}</span></li>
+                    <li>Pending: <span class="text-warning fw-bold">${data.pending || 0}</span></li>
+                    <li>Non-Compliant: <span class="text-danger fw-bold">${data.non_compliant || 0}</span></li>
+                </ul>
+            `;
+        }
+
+        function renderSync(data) {
+            document.getElementById('syncStats').innerHTML = `
+                <ul class="list-unstyled">
+                    <li>Total Syncs: ${data.total_syncs}</li>
+                    <li>Synced: ${data.total_synced}</li>
+                    <li>Conflicts: ${data.total_conflicts}</li>
+                    <li>Failed: ${data.total_failed}</li>
+                    <li>Success Rate: <span class="${data.meets_kpi ? 'text-success' : 'text-danger'}">${data.success_rate}%</span></li>
+                </ul>
+            `;
+        }
+
+        async function suspendUser(id) { await api(`/admin/users/${id}/suspend`, { method: 'POST' }); init(); }
+        async function unsuspendUser(id) { await api(`/admin/users/${id}/unsuspend`, { method: 'POST' }); init(); }
+        async function verifyCoop(id) { await api(`/admin/cooperatives/${id}/verify`, { method: 'POST' }); init(); }
+        function viewCoop(id) { window.location.href = `coop-dashboard.html?id=${id}`; }
+        async function runBatchAnalysis() { await api('/admin/satellite/analyze', { method: 'POST' }); alert('Batch analysis started'); }
+
+        // === System Configuration Functions ===
+        
+        async function loadSystemSettings() {
+            // Load settings
+            try {
+                const settings = await api('/admin/config/settings');
+                document.getElementById('systemSettingsTable').innerHTML = (settings.settings || []).map(s => `
+                    <tr>
+                        <td><code>${s.key}</code></td>
+                        <td>${typeof s.value === 'object' ? JSON.stringify(s.value) : s.value}</td>
+                        <td>
+                            <button class="btn btn-sm btn-outline-primary" onclick="editSetting('${s.key}')">Edit</button>
+                            <button class="btn btn-sm btn-outline-danger" onclick="deleteSetting('${s.key}')">Delete</button>
+                        </td>
+                    </tr>
+                `).join('') || '<tr><td colspan="3">No settings found</td></tr>';
+            } catch(e) { console.error(e); }
+            
+            // Load credentials
+            try {
+                const creds = await api('/admin/config/env-credentials');
+                document.getElementById('credentialsTable').innerHTML = Object.entries(creds.credentials || {}).map(([k, v]) => `
+                    <tr>
+                        <td><code>${k}</code></td>
+                        <td>${v.description || '-'}</td>
+                        <td>${v.is_public ? '<span class="badge bg-success">Yes</span>' : '<span class="badge bg-secondary">No</span>'}</td>
+                        <td>
+                            <button class="btn btn-sm btn-outline-danger" onclick="deleteCredential('${k}')">Delete</button>
+                        </td>
+                    </tr>
+                `).join('') || '<tr><td colspan="4">No credentials</td></tr>';
+            } catch(e) { console.error(e); }
+            
+            // Load session timeout
+            try {
+                const timeout = await api('/admin/config/session-timeout');
+                document.getElementById('sessionTimeout').value = timeout.session_timeout_minutes || 60;
+            } catch(e) { console.error(e); }
+            
+            // Load required docs
+            loadRequiredDocs();
+        }
+        
+        async function loadRequiredDocs() {
+            try {
+                const docs = await api('/admin/config/required-documents');
+                document.getElementById('requiredDocsList').innerHTML = (docs.documents || docs || []).map(d => `
+                    <div class="card mb-2">
+                        <div class="card-body py-2 d-flex justify-content-between">
+                            <div>
+                                <strong>${d.display_name}</strong>
+                                <span class="badge bg-${d.is_required ? 'danger' : 'secondary'}">${d.is_required ? 'Required' : 'Optional'}</span>
+                            </div>
+                            <button class="btn btn-sm btn-outline-danger" onclick="deleteRequiredDoc('${d.id}')">Delete</button>
+                        </div>
+                    </div>
+                `).join('') || '<p class="text-muted">No required documents</p>';
+            } catch(e) { console.error(e); }
+        }
+        
+        async function saveCredential() {
+            const key = document.getElementById('credKey').value.trim();
+            const value = document.getElementById('credValue').value;
+            const description = document.getElementById('credDesc').value.trim();
+            
+            if (!key || !value) { alert('Key and value are required'); return; }
+            
+            try {
+                await api('/admin/config/env-credentials', {
+                    method: 'PUT',
+                    body: JSON.stringify({ key, value, description, is_public: false })
+                });
+                alert('Credential saved!');
+                document.getElementById('credKey').value = '';
+                document.getElementById('credValue').value = '';
+                document.getElementById('credDesc').value = '';
+                loadSystemSettings();
+            } catch(e) { alert('Error saving credential: ' + e.message); }
+        }
+        
+        async function deleteCredential(key) {
+            if (!confirm(`Delete credential "${key}"?`)) return;
+            try {
+                await api(`/admin/config/env-credentials/${key}`, { method: 'DELETE' });
+                loadSystemSettings();
+            } catch(e) { alert('Error: ' + e.message); }
+        }
+        
+        async function saveSessionTimeout() {
+            const timeout = parseInt(document.getElementById('sessionTimeout').value);
+            try {
+                await api('/admin/config/session-timeout', {
+                    method: 'PUT',
+                    body: JSON.stringify({ timeout_minutes: timeout })
+                });
+                alert('Session timeout updated!');
+            } catch(e) { alert('Error: ' + e.message); }
+        }
+        
+        async function editSetting(key) {
+            const newValue = prompt(`Edit setting "${key}":`);
+            if (newValue === null) return;
+            try {
+                await api(`/admin/config/settings/${key}`, {
+                    method: 'PUT',
+                    body: JSON.stringify({ key, value: newValue })
+                });
+                loadSystemSettings();
+            } catch(e) { alert('Error: ' + e.message); }
+        }
+        
+        async function deleteSetting(key) {
+            if (!confirm(`Delete setting "${key}"?`)) return;
+            try {
+                await api(`/admin/config/settings/${key}`, { method: 'DELETE' });
+                loadSystemSettings();
+            } catch(e) { alert('Error: ' + e.message); }
+        }
+        
+        function showAddDocModal() {
+            const name = prompt('Document name (e.g. national_id):');
+            if (!name) return;
+            const displayName = prompt('Display name (e.g. National ID):');
+            if (!displayName) return;
+            const desc = prompt('Description (optional):') || '';
+            
+            api('/admin/config/required-documents', {
+                method: 'POST',
+                body: JSON.stringify({
+                    name, display_name: displayName, 
+                    description: desc, is_required: true
+                })
+            }).then(() => loadRequiredDocs()).catch(e => alert('Error: ' + e.message));
+        }
+        
+        async function deleteRequiredDoc(id) {
+            if (!confirm('Delete this document?')) return;
+            try {
+                await api(`/admin/config/required-documents/${id}`, { method: 'DELETE' });
+                loadRequiredDocs();
+            } catch(e) { alert('Error: ' + e.message); }
+        }
+
+        // Load system settings on tab click
+        document.querySelector('a[href="#system"]').addEventListener('shown.bs.tab', loadSystemSettings);
+
+        init();
+    </script>
+</body>
+</html>

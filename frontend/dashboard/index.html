@@ -260,6 +260,35 @@
         .lp-reveal { opacity: 0; transform: translateY(30px); transition: opacity .75s ease, transform .75s ease; }
         .lp-reveal.in { opacity: 1; transform: none; }
 
+        /* === MODAL CLOSE BUTTON === */
+        .btn-modal-close {
+            background: linear-gradient(135deg, #6f4e37 0%, #3d2515 100%);
+            color: #fff;
+            border: none;
+            padding: 5px 18px;
+            border-radius: 20px;
+            font-size: 0.82rem;
+            font-weight: 600;
+            letter-spacing: 0.04em;
+            cursor: pointer;
+            transition: background 0.22s ease, transform 0.18s ease, box-shadow 0.22s ease;
+            box-shadow: 0 2px 8px rgba(111,78,55,0.35);
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .btn-modal-close:hover {
+            background: linear-gradient(135deg, #5a3d2b 0%, #2c1a0e 100%);
+            color: #fff;
+            transform: translateY(-2px) scale(1.04);
+            box-shadow: 0 6px 18px rgba(111,78,55,0.5);
+        }
+        .btn-modal-close:active {
+            transform: translateY(0) scale(0.98);
+            box-shadow: 0 1px 4px rgba(111,78,55,0.25);
+        }
+        .btn-modal-close i { font-size: 0.9rem; }
+
         /* === AUTH MODAL CSS (preserved) === */
         .auth-modal .modal-close-btn{position:absolute !important;top:20px !important;right:20px !important;z-index:1050 !important;background:transparent !important;border:none !important;width:32px !important;height:32px !important;display:flex !important;align-items:center !important;justify-content:center !important;color:#6f4e37 !important;opacity:1 !important;transition:all .3s ease !important;cursor:pointer !important;font-size:1.2rem !important;}
         .auth-modal .modal-close-btn:hover{color:#3d2314 !important;transform:scale(1.15) !important;}
@@ -394,7 +423,7 @@
     </div>
 
     <!-- Login Modal -->
-    <div class="modal fade auth-modal" id="loginModal" data-bs-backdrop="static" tabindex="-1">
+    <div class="modal fade auth-modal" id="loginModal" data-bs-backdrop="static" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
         <div class="modal-dialog modal-dialog-centered" style="max-width: 480px;">
             <div class="modal-content border-0 shadow-lg">
                 <div class="modal-body px-5 py-5 position-relative">
@@ -546,7 +575,7 @@
     </div>
     
     <!-- Registration Modal -->
-    <div class="modal fade auth-modal" id="registerModal" data-bs-backdrop="static" tabindex="-1">
+    <div class="modal fade auth-modal" id="registerModal" data-bs-backdrop="static" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
         <div class="modal-dialog modal-dialog-centered" style="max-width: 400px;">
             <div class="modal-content border-0 shadow-lg">
                 <div class="modal-body px-4 py-4 position-relative">
@@ -752,12 +781,12 @@
     </div>
 
     <!-- Add Farm Modal -->
-    <div class="modal fade" id="addFarmModal" tabindex="-1">
+    <div class="modal fade" id="addFarmModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
         <div class="modal-dialog modal-lg modal-xl">
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title"><i class="bi bi-geo-alt"></i> Add New Farm</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    <button type="button" class="btn-modal-close" data-bs-dismiss="modal"><i class="bi bi-x-lg"></i>Close</button>
                 </div>
                 <form id="addFarmForm">
                     <div class="modal-body">
@@ -801,11 +830,6 @@
                                             <div class="step-circle">4</div>
                                             <div class="step-label">GPS Polygon</div>
                                         </div>
-                                        <div class="step-line"></div>
-                                        <div class="step-item" data-step="5">
-                                            <div class="step-circle">✓</div>
-                                            <div class="step-label">Review</div>
-                                        </div>
                                     </div>
                                 </div>
 
@@ -846,7 +870,7 @@
                                                 <div class="invalid-feedback">Cooperative membership number is required</div>
                                             </div>
                                             <div class="col-12">
-                                                <div class="form-check">
+                                                <div class="form-check ms-3">
                                                     <input class="form-check-input" type="checkbox" id="dataConsent" required>
                                                     <label class="form-check-label" for="dataConsent">
                                                         I consent to the collection and processing of my data * (Required)
@@ -901,15 +925,29 @@
                                             </div>
                                             <div class="col-md-6">
                                                 <label class="form-label">Coffee Variety *</label>
-                                                <select class="form-select" id="coffeeVariety" required>
-                                                    <option value="">Select variety</option>
-                                                    <option value="Ruiru 11">Ruiru 11</option>
-                                                    <option value="Batian">Batian</option>
-                                                    <option value="SL28">SL28</option>
-                                                    <option value="SL34">SL34</option>
-                                                    <option value="Other">Other</option>
-                                                </select>
-                                                <div class="invalid-feedback">Coffee variety is required</div>
+                                                <div id="coffeeVarietyGroup" class="d-flex flex-wrap gap-3 pt-1 ps-2">
+                                                    <div class="form-check">
+                                                        <input class="form-check-input" type="checkbox" name="coffeeVariety" id="cvRuiru11" value="Ruiru 11">
+                                                        <label class="form-check-label" for="cvRuiru11">Ruiru 11</label>
+                                                    </div>
+                                                    <div class="form-check">
+                                                        <input class="form-check-input" type="checkbox" name="coffeeVariety" id="cvBatian" value="Batian">
+                                                        <label class="form-check-label" for="cvBatian">Batian</label>
+                                                    </div>
+                                                    <div class="form-check">
+                                                        <input class="form-check-input" type="checkbox" name="coffeeVariety" id="cvSL28" value="SL28">
+                                                        <label class="form-check-label" for="cvSL28">SL28</label>
+                                                    </div>
+                                                    <div class="form-check">
+                                                        <input class="form-check-input" type="checkbox" name="coffeeVariety" id="cvSL34" value="SL34">
+                                                        <label class="form-check-label" for="cvSL34">SL34</label>
+                                                    </div>
+                                                    <div class="form-check">
+                                                        <input class="form-check-input" type="checkbox" name="coffeeVariety" id="cvOther" value="Other">
+                                                        <label class="form-check-label" for="cvOther">Other</label>
+                                                    </div>
+                                                </div>
+                                                <div id="coffeeVarietyError" class="text-danger small mt-1" style="display:none;">Please select at least one coffee variety</div>
                                             </div>
                                             <div class="col-md-6">
                                                 <label class="form-label">Estimated Annual Yield (kg) *</label>
@@ -937,29 +975,39 @@
                                                 <label class="form-label">Farm Boundary <span class="text-muted fw-normal">(Optional — walk the perimeter)</span></label>
                                                 <div class="card">
                                                     <div class="card-body p-0">
-                                                        <div id="farmMap" style="height: 300px; width: 100%;"></div>
-                                                        <div class="p-3 bg-light">
-                                                            <div class="d-flex justify-content-between align-items-center mb-2">
-                                                                <span class="text-sm text-muted">GPS Accuracy: <span id="gpsAccuracy">--</span>m</span>
-                                                                <span class="text-sm text-muted">Points: <span id="pointCount">0</span></span>
-                                                                <span class="text-sm text-muted">Area: <span id="calculatedArea">--</span> ha</span>
+                                                        <div id="farmMap" style="height: 340px; width: 100%;"></div>
+                                                        <div class="p-2 bg-light border-top">
+                                                            <!-- Mode toggle + stats -->
+                                                            <div class="d-flex gap-2 flex-wrap align-items-center mb-2">
+                                                                <div class="btn-group btn-group-sm" role="group">
+                                                                    <input type="radio" class="btn-check" name="farmModeRadio" id="farmModeWalk" autocomplete="off" checked>
+                                                                    <label class="btn btn-outline-success" for="farmModeWalk"><i class="bi bi-person-walking me-1"></i>Walk</label>
+                                                                    <input type="radio" class="btn-check" name="farmModeRadio" id="farmModeClick" autocomplete="off">
+                                                                    <label class="btn btn-outline-primary" for="farmModeClick"><i class="bi bi-cursor-fill me-1"></i>Click</label>
+                                                                </div>
+                                                                <span class="ms-auto text-muted small">
+                                                                    GPS: <strong id="gpsAccuracy">--</strong>m &nbsp;|&nbsp;
+                                                                    Pts: <strong id="pointCount">0</strong> &nbsp;|&nbsp;
+                                                                    Area: <strong id="calculatedArea">--</strong> ha
+                                                                </span>
                                                             </div>
-                                                            <div class="d-flex gap-2 flex-wrap">
-                                                                <button type="button" class="btn btn-sm btn-primary" id="startCaptureBtn">
-                                                                    <i class="bi bi-geo-alt"></i> Start Capture
+                                                            <!-- Action buttons -->
+                                                            <div class="d-flex gap-2 flex-wrap align-items-center">
+                                                                <button type="button" class="btn btn-sm btn-success" id="startCaptureBtn">
+                                                                    <i class="bi bi-play-fill me-1"></i>Start Capture
                                                                 </button>
-                                                                <button type="button" class="btn btn-sm btn-success" id="addPointBtn" disabled>
-                                                                    <i class="bi bi-plus-circle"></i> Add Point
+                                                                <button type="button" class="btn btn-sm btn-primary" id="addPointBtn" disabled>
+                                                                    <i class="bi bi-plus-circle me-1"></i>Add Point
                                                                 </button>
                                                                 <button type="button" class="btn btn-sm btn-warning" id="finishCaptureBtn" disabled>
-                                                                    <i class="bi bi-check-circle"></i> Finish
+                                                                    <i class="bi bi-check-circle-fill me-1"></i>Finish
                                                                 </button>
-                                                                <button type="button" class="btn btn-sm btn-danger" id="clearPointsBtn" disabled>
-                                                                    <i class="bi bi-trash"></i> Clear
+                                                                <button type="button" class="btn btn-sm btn-outline-danger" id="clearPointsBtn" disabled>
+                                                                    <i class="bi bi-trash me-1"></i>Clear
                                                                 </button>
                                                             </div>
-                                                            <div class="mt-2 text-xs text-muted" id="captureInstructions">
-                                                                Click "Start Capture" to begin mapping your farm boundary. Walk around the perimeter and click "Add Point" at each corner (minimum 4 points required).
+                                                            <div class="mt-2 text-muted small" id="captureInstructions">
+                                                                Choose Walk or Click mode, then press Start Capture.
                                                             </div>
                                                         </div>
                                                     </div>
@@ -969,16 +1017,6 @@
                                         </div>
                                     </div>
 
-                                    <!-- Step 5: Review Tab 1 -->
-                                    <div class="step-content" data-step="5">
-                                        <h6 class="mb-3 text-primary"><i class="bi bi-check-circle"></i> Review Basic Farm Information</h6>
-                                        <div class="alert alert-info mb-3">
-                                            <i class="bi bi-info-circle"></i> Please review your information before submitting. All fields marked with * are required.
-                                        </div>
-                                        <div class="row g-3" id="tab1ReviewContent">
-                                            <!-- Dynamically populated -->
-                                        </div>
-                                    </div>
                                 </div>
 
                                 <!-- Tab 1 Navigation Buttons -->
@@ -1049,17 +1087,22 @@
                                         <div class="row g-3">
                                             <div class="col-md-6">
                                                 <label class="form-label">Intercropped Species</label>
-                                                <select class="form-select" id="intercroppedSpecies" multiple>
-                                                    <option value="Avocado">Avocado</option>
-                                                    <option value="Macadamia">Macadamia</option>
-                                                    <option value="Banana">Banana</option>
-                                                    <option value="Other">Other</option>
-                                                </select>
-                                                <div class="form-text">Hold Ctrl/Cmd to select multiple (optional)</div>
+                                                <div style="position:relative;">
+                                                    <button type="button" class="btn btn-outline-secondary w-100 text-start d-flex justify-content-between align-items-center" id="intercroppedBtn" onclick="toggleCustomDropdown('intercroppedMenu',this)">
+                                                        <span id="intercroppedBtnText">Select species…</span><i class="bi bi-chevron-down ms-2"></i>
+                                                    </button>
+                                                    <div id="intercroppedMenu" style="display:none;position:absolute;z-index:9999;width:100%;top:100%;left:0;background:#fff;border:1px solid #dee2e6;border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,.15);padding:6px 0;">
+                                                        <label class="d-flex align-items-center gap-2 px-3 py-2" style="cursor:pointer;margin:0"><input type="checkbox" class="form-check-input intercrop-check" value="Avocado" onchange="updateCheckboxDropdown('intercrop-check','intercroppedBtnText','Select species…')"> Avocado</label>
+                                                        <label class="d-flex align-items-center gap-2 px-3 py-2" style="cursor:pointer;margin:0"><input type="checkbox" class="form-check-input intercrop-check" value="Macadamia" onchange="updateCheckboxDropdown('intercrop-check','intercroppedBtnText','Select species…')"> Macadamia</label>
+                                                        <label class="d-flex align-items-center gap-2 px-3 py-2" style="cursor:pointer;margin:0"><input type="checkbox" class="form-check-input intercrop-check" value="Banana" onchange="updateCheckboxDropdown('intercrop-check','intercroppedBtnText','Select species…')"> Banana</label>
+                                                        <label class="d-flex align-items-center gap-2 px-3 py-2" style="cursor:pointer;margin:0"><input type="checkbox" class="form-check-input intercrop-check" value="Other" onchange="updateCheckboxDropdown('intercrop-check','intercroppedBtnText','Select species…')"> Other</label>
+                                                    </div>
+                                                </div>
+                                                <div class="form-text">Select all that apply (optional)</div>
                                             </div>
                                             <div class="col-md-6">
                                                 <label class="form-label">Shade Trees Present</label>
-                                                <div class="d-flex align-items-center gap-3">
+                                                <div class="d-flex align-items-center gap-3 ms-2">
                                                     <div class="form-check form-check-inline">
                                                         <input class="form-check-input" type="radio" name="shadeTrees" id="shadeTreesYes" value="yes">
                                                         <label class="form-check-label" for="shadeTreesYes">Yes</label>
@@ -1135,14 +1178,19 @@
                                             </div>
                                             <div class="col-md-6">
                                                 <label class="form-label">Certification Status</label>
-                                                <select class="form-select" id="certificationStatus" multiple>
-                                                    <option value="Rainforest Alliance">Rainforest Alliance</option>
-                                                    <option value="Organic">Organic</option>
-                                                    <option value="UTZ">UTZ</option>
-                                                    <option value="Fairtrade">Fairtrade</option>
-                                                    <option value="None">None</option>
-                                                </select>
-                                                <div class="form-text">Hold Ctrl/Cmd to select multiple (optional)</div>
+                                                <div style="position:relative;">
+                                                    <button type="button" class="btn btn-outline-secondary w-100 text-start d-flex justify-content-between align-items-center" id="certificationBtn" onclick="toggleCustomDropdown('certificationMenu',this)">
+                                                        <span id="certificationBtnText">Select certifications…</span><i class="bi bi-chevron-down ms-2"></i>
+                                                    </button>
+                                                    <div id="certificationMenu" style="display:none;position:absolute;z-index:9999;width:100%;top:100%;left:0;background:#fff;border:1px solid #dee2e6;border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,.15);padding:6px 0;">
+                                                        <label class="d-flex align-items-center gap-2 px-3 py-2" style="cursor:pointer;margin:0"><input type="checkbox" class="form-check-input cert-check" value="Rainforest Alliance" onchange="updateCheckboxDropdown('cert-check','certificationBtnText','Select certifications…')"> Rainforest Alliance</label>
+                                                        <label class="d-flex align-items-center gap-2 px-3 py-2" style="cursor:pointer;margin:0"><input type="checkbox" class="form-check-input cert-check" value="Organic" onchange="updateCheckboxDropdown('cert-check','certificationBtnText','Select certifications…')"> Organic</label>
+                                                        <label class="d-flex align-items-center gap-2 px-3 py-2" style="cursor:pointer;margin:0"><input type="checkbox" class="form-check-input cert-check" value="UTZ" onchange="updateCheckboxDropdown('cert-check','certificationBtnText','Select certifications…')"> UTZ</label>
+                                                        <label class="d-flex align-items-center gap-2 px-3 py-2" style="cursor:pointer;margin:0"><input type="checkbox" class="form-check-input cert-check" value="Fairtrade" onchange="updateCheckboxDropdown('cert-check','certificationBtnText','Select certifications…')"> Fairtrade</label>
+                                                        <label class="d-flex align-items-center gap-2 px-3 py-2" style="cursor:pointer;margin:0"><input type="checkbox" class="form-check-input cert-check" value="None" onchange="updateCheckboxDropdown('cert-check','certificationBtnText','Select certifications…')"> None</label>
+                                                    </div>
+                                                </div>
+                                                <div class="form-text">Select all that apply (optional)</div>
                                             </div>
                                             <div class="col-md-6">
                                                 <label class="form-label">NGO or Programme Support Received</label>
@@ -1152,16 +1200,28 @@
                                         </div>
                                     </div>
 
-                                    <!-- Step 5: Review Tab 2 -->
+                                    <!-- Step 5: Combined Final Review -->
                                     <div class="step-content" data-step="5">
-                                        <h6 class="mb-3 text-success"><i class="bi bi-check-circle"></i> Review Advanced Farm Information</h6>
-                                        <div class="alert alert-success mb-3">
-                                            <i class="bi bi-info-circle"></i> Advanced information is optional but improves your compliance score and supports premium access.
+                                        <h6 class="mb-3 text-success"><i class="bi bi-check-circle-fill"></i> Final Review — All Farm Information</h6>
+
+                                        <!-- Tab 1 Review Section -->
+                                        <div class="alert alert-info mb-2 py-2">
+                                            <i class="bi bi-info-circle me-1"></i> <strong>Basic Farm Information</strong> — All fields marked * are required.
                                         </div>
-                                        <div class="progress mb-3" style="height: 20px;">
+                                        <div class="row g-2 mb-4" id="tab1ReviewContent">
+                                            <!-- Dynamically populated -->
+                                        </div>
+
+                                        <hr class="my-3">
+
+                                        <!-- Tab 2 Review Section -->
+                                        <div class="alert alert-success mb-2 py-2">
+                                            <i class="bi bi-tree me-1"></i> <strong>Advanced Farm Information</strong> — Optional fields that improve your compliance score.
+                                        </div>
+                                        <div class="progress mb-3" style="height: 18px;">
                                             <div class="progress-bar bg-success" id="tab2ProgressBar" role="progressbar" style="width: 0%;">0% Complete</div>
                                         </div>
-                                        <div class="row g-3" id="tab2ReviewContent">
+                                        <div class="row g-2" id="tab2ReviewContent">
                                             <!-- Dynamically populated -->
                                         </div>
                                     </div>
@@ -1241,12 +1301,12 @@
     </style>
 
     <!-- Add Cooperative Modal -->
-    <div class="modal fade" id="addCooperativeModal" tabindex="-1">
+    <div class="modal fade" id="addCooperativeModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
         <div class="modal-dialog modal-lg modal-dialog-centered">
             <div class="modal-content">
                 <div class="modal-header bg-gradient text-center justify-content-center position-relative" style="background: linear-gradient(135deg, #6f4e37 0%, #8b6914 100%);">
                     <h5 class="modal-title text-white w-100"><i class="bi bi-building"></i> Create New Cooperative</h5>
-                    <button type="button" class="btn-close btn-close-white position-absolute end-0 me-3" data-bs-dismiss="modal"></button>
+                    <button type="button" class="btn-modal-close position-absolute end-0 me-3" data-bs-dismiss="modal"><i class="bi bi-x-lg"></i>Close</button>
                 </div>
                 <form id="addCooperativeForm">
                     <div class="modal-body p-4">
@@ -1443,12 +1503,12 @@
     </div>
 
     <!-- Add Delivery Modal -->
-    <div class="modal fade" id="addDeliveryModal" tabindex="-1">
+    <div class="modal fade" id="addDeliveryModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
         <div class="modal-dialog modal-lg">
             <div class="modal-content">
                 <div class="modal-header" style="background:linear-gradient(135deg,#2c1a0e,#6f4e37);color:white;">
                     <h5 class="modal-title"><i class="bi bi-box-seam me-2"></i>Record Farmer Delivery</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    <button type="button" class="btn-modal-close" data-bs-dismiss="modal"><i class="bi bi-x-lg"></i>Close</button>
                 </div>
                 <form id="addDeliveryForm">
                     <div class="modal-body">
@@ -1521,12 +1581,12 @@
     </div>
 
     <!-- Create Batch Modal -->
-    <div class="modal fade" id="createBatchModal" tabindex="-1">
+    <div class="modal fade" id="createBatchModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
         <div class="modal-dialog modal-lg">
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title"><i class="bi bi-layers"></i> Create Batch</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    <button type="button" class="btn-modal-close" data-bs-dismiss="modal"><i class="bi bi-x-lg"></i>Close</button>
                 </div>
                 <form id="createBatchForm">
                     <div class="modal-body">
@@ -1562,12 +1622,12 @@
     </div>
 
     <!-- Notifications Modal -->
-    <div class="modal fade" id="notificationsModal" tabindex="-1">
+    <div class="modal fade" id="notificationsModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
         <div class="modal-dialog modal-dialog-scrollable" style="max-width:480px">
             <div class="modal-content">
                 <div class="modal-header" style="background:linear-gradient(135deg,#2c1a0e,#6f4e37);color:white;">
                     <h5 class="modal-title"><i class="bi bi-bell me-2"></i>Notifications</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    <button type="button" class="btn-modal-close" data-bs-dismiss="modal"><i class="bi bi-x-lg"></i>Close</button>
                 </div>
                 <div class="modal-body p-0" id="notificationsModalBody">
                     <div class="text-center py-5 text-muted">
@@ -1583,12 +1643,12 @@
     </div>
 
     <!-- Verification Approve/Reject Reason Modal -->
-    <div class="modal fade" id="verificationReasonModal" tabindex="-1">
+    <div class="modal fade" id="verificationReasonModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
         <div class="modal-dialog" style="max-width:420px">
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title" id="verificationModalTitle">Approve Farm</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    <button type="button" class="btn-modal-close" data-bs-dismiss="modal"><i class="bi bi-x-lg"></i>Close</button>
                 </div>
                 <div class="modal-body">
                     <label class="form-label" id="verificationReasonLabel">Notes (optional)</label>
@@ -1605,12 +1665,12 @@
     </div>
 
     <!-- Upload Document Modal -->
-    <div class="modal fade" id="uploadDocumentModal" tabindex="-1">
+    <div class="modal fade" id="uploadDocumentModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
         <div class="modal-dialog modal-lg">
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title"><i class="bi bi-file-earmark-plus"></i> Upload KYC Document</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    <button type="button" class="btn-modal-close" data-bs-dismiss="modal"><i class="bi bi-x-lg"></i>Close</button>
                 </div>
                 <form id="uploadDocumentForm">
                     <div class="modal-body">
@@ -1670,12 +1730,12 @@
     </div>
 
     <!-- Generate DDS Modal -->
-    <div class="modal fade" id="generateDDSModal" tabindex="-1">
+    <div class="modal fade" id="generateDDSModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
         <div class="modal-dialog modal-lg">
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title"><i class="bi bi-file-earmark-plus"></i> Generate DDS (Due Diligence Statement)</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    <button type="button" class="btn-modal-close" data-bs-dismiss="modal"><i class="bi bi-x-lg"></i>Close</button>
                 </div>
                 <form id="generateDDSForm">
                     <div class="modal-body">
@@ -1788,13 +1848,32 @@
         </div>
     </div>
 
+    <!-- View DDS Modal -->
+    <div class="modal fade" id="viewDDSModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title"><i class="bi bi-file-earmark-text me-2"></i>DDS Details</h5>
+                    <button type="button" class="btn-modal-close" data-bs-dismiss="modal"><i class="bi bi-x-lg"></i>Close</button>
+                </div>
+                <div class="modal-body" id="viewDDSContent">
+                    <!-- Content filled dynamically -->
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-primary" id="btnExportDDSFromView"><i class="bi bi-download"></i> Export XML</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- View/Edit Farm Modal -->
-    <div class="modal fade" id="viewFarmModal" tabindex="-1">
+    <div class="modal fade" id="viewFarmModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
         <div class="modal-dialog modal-xl modal-dialog-scrollable">
             <div class="modal-content">
                 <div class="modal-header" style="background:linear-gradient(135deg,#2d6a4f,#40916c);color:#fff;">
                     <h5 class="modal-title"><i class="bi bi-geo-alt-fill me-2"></i><span id="viewFarmModalTitle">Farm Details</span></h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    <button type="button" class="btn-modal-close" data-bs-dismiss="modal"><i class="bi bi-x-lg"></i>Close</button>
                 </div>
                 <div class="modal-body p-0">
                     <div id="farmDetailsContent">
@@ -1812,46 +1891,60 @@
     </div>
 
     <!-- Farm Polygon Capture/Recapture Modal -->
-    <div class="modal fade" id="farmCaptureModal" tabindex="-1" aria-labelledby="farmCaptureModalLabel">
-        <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal fade" id="farmCaptureModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false" aria-labelledby="farmCaptureModalLabel">
+        <div class="modal-dialog modal-xl">
             <div class="modal-content">
                 <div class="modal-header bg-success text-white">
                     <h5 class="modal-title" id="farmCaptureModalLabel"><i class="bi bi-geo-alt-fill me-2"></i>Capture Farm Boundary</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    <button type="button" class="btn-modal-close" data-bs-dismiss="modal"><i class="bi bi-x-lg"></i>Close</button>
                 </div>
                 <div class="modal-body p-0">
                     <input type="hidden" id="captureFarmId">
+                    <!-- Capture controls always visible above the map -->
+                    <div class="px-3 py-2 border-bottom bg-light">
+                        <!-- Row 1: Mode + Layer toggles + GPS stats -->
+                        <div class="d-flex gap-2 flex-wrap align-items-center mb-2">
+                            <!-- Mode toggle -->
+                            <div class="btn-group btn-group-sm" role="group" aria-label="Capture mode">
+                                <input type="radio" class="btn-check" name="captureModeRadio" id="modeWalkBtn" autocomplete="off" checked>
+                                <label class="btn btn-outline-success" for="modeWalkBtn"><i class="bi bi-person-walking me-1"></i>Walk</label>
+                                <input type="radio" class="btn-check" name="captureModeRadio" id="modeClickBtn" autocomplete="off">
+                                <label class="btn btn-outline-primary" for="modeClickBtn"><i class="bi bi-cursor-fill me-1"></i>Click</label>
+                            </div>
+                            <span class="ms-auto text-muted small">
+                                Points: <strong id="capturePointCount">0</strong> &nbsp;|&nbsp;
+                                Area: <strong id="captureAreaDisplay">--</strong> ha &nbsp;|&nbsp;
+                                GPS: <strong id="captureAccuracy">--</strong> m
+                            </span>
+                        </div>
+                        <!-- Row 2: Action buttons -->
+                        <div class="d-flex gap-2 flex-wrap align-items-center">
+                            <button class="btn btn-success btn-sm" id="captureStartBtn"><i class="bi bi-play-fill me-1"></i>Start Capture</button>
+                            <button class="btn btn-primary btn-sm" id="captureAddPointBtn" disabled><i class="bi bi-plus-circle me-1"></i>Add Point</button>
+                            <button class="btn btn-warning btn-sm" id="captureFinishBtn" disabled><i class="bi bi-check-circle-fill me-1"></i>Finish</button>
+                            <button class="btn btn-outline-danger btn-sm" id="captureClearBtn"><i class="bi bi-trash me-1"></i>Clear</button>
+                            <button class="btn btn-outline-secondary btn-sm" id="captureNewPolygonBtn" style="display:none"><i class="bi bi-pencil-square me-1"></i>New Polygon</button>
+                        </div>
+                    </div>
                     <div class="row g-0">
                         <!-- Map Panel -->
                         <div class="col-lg-8">
-                            <div id="captureMapContainer" style="height:480px;background:#e9ecef;position:relative;">
+                            <div id="captureMapContainer" style="height:460px;background:#e9ecef;">
                                 <div id="captureMap" style="height:100%;width:100%;"></div>
-                            </div>
-                            <div class="p-3 border-top bg-light d-flex gap-2 flex-wrap align-items-center">
-                                <button class="btn btn-success btn-sm" id="captureStartBtn"><i class="bi bi-play-fill me-1"></i>Start Capture</button>
-                                <button class="btn btn-primary btn-sm" id="captureAddPointBtn" disabled><i class="bi bi-plus-circle me-1"></i>Add Point</button>
-                                <button class="btn btn-warning btn-sm" id="captureFinishBtn" disabled><i class="bi bi-stop-fill me-1"></i>Finish</button>
-                                <button class="btn btn-outline-danger btn-sm" id="captureClearBtn"><i class="bi bi-trash me-1"></i>Clear</button>
-                                <span class="ms-auto text-muted small">Points: <strong id="capturePointCount">0</strong> | Area: <strong id="captureAreaDisplay">--</strong> ha</span>
                             </div>
                         </div>
                         <!-- Info Panel -->
                         <div class="col-lg-4 border-start p-3 d-flex flex-column gap-3">
                             <div class="alert alert-info py-2 small mb-0">
-                                <i class="bi bi-info-circle me-1"></i>Walk around your farm boundary. Press <b>Start Capture</b>, then <b>Add Point</b> at each corner (min 4 points).
-                            </div>
-                            <div>
-                                <label class="form-label small fw-semibold">GPS Accuracy</label>
-                                <div class="input-group input-group-sm">
-                                    <input type="text" class="form-control" id="captureAccuracy" readonly placeholder="--">
-                                    <span class="input-group-text">m</span>
-                                </div>
+                                <i class="bi bi-info-circle me-1"></i>
+                                <b>Walk mode:</b> Press Start, walk the boundary — points auto-add every 5 m. Press <b>Add Point</b> at key corners.<br class="mt-1">
+                                <b>Click mode:</b> Press Start, tap the map at each boundary corner (min 3).
                             </div>
                             <div>
                                 <label class="form-label small fw-semibold">Estimated Area (ha)</label>
                                 <input type="number" class="form-control form-control-sm" id="captureAreaInput" placeholder="Or enter manually" step="0.01" min="0.01">
                             </div>
-                            <div id="captureStatusMsg" class="text-muted small">Ready to capture.</div>
+                            <div id="captureStatusMsg" class="text-muted small fw-semibold">Ready to capture.</div>
                         </div>
                     </div>
                 </div>
@@ -1864,12 +1957,12 @@
     </div>
 
     <!-- View User Modal -->
-    <div class="modal fade" id="viewUserModal" tabindex="-1">
+    <div class="modal fade" id="viewUserModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
         <div class="modal-dialog modal-lg">
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title"><i class="bi bi-person"></i> User Details</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    <button type="button" class="btn-modal-close" data-bs-dismiss="modal"><i class="bi bi-x-lg"></i>Close</button>
                 </div>
                 <div class="modal-body">
                     <div id="userDetailsContent">
@@ -1886,12 +1979,12 @@
     </div>
 
     <!-- Add Parcel Modal -->
-    <div class="modal fade" id="addParcelModal" tabindex="-1">
+    <div class="modal fade" id="addParcelModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
         <div class="modal-dialog modal-xl">
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title"><i class="bi bi-boundary"></i> Add & Map Parcel</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    <button type="button" class="btn-modal-close" data-bs-dismiss="modal"><i class="bi bi-x-lg"></i>Close</button>
                 </div>
                 <form id="addParcelForm">
                     <div class="modal-body">
@@ -2275,6 +2368,15 @@
                     }
                 });
 
+                // Step 4 has the Leaflet map — init or resize once it becomes visible
+                if (tab1CurrentStep === 4 && typeof app !== 'undefined') {
+                    if (!app.farmMap) {
+                        app.initFarmMap();
+                    } else {
+                        setTimeout(() => app.farmMap && app.farmMap.invalidateSize(), 50);
+                    }
+                }
+
                 // Update step indicators
                 tab1StepItems.forEach((item, index) => {
                     if (index + 1 < tab1CurrentStep) {
@@ -2292,8 +2394,7 @@
                 tab1PrevBtn.style.visibility = tab1CurrentStep === 1 ? 'hidden' : 'visible';
 
                 if (tab1CurrentStep === tab1TotalSteps) {
-                    tab1NextBtn.innerHTML = 'Next Tab <i class="bi bi-arrow-right"></i>';
-                    populateTab1Review();
+                    tab1NextBtn.innerHTML = 'Continue to Tab 2 <i class="bi bi-arrow-right"></i>';
                 } else {
                     tab1NextBtn.innerHTML = 'Next <i class="bi bi-arrow-right"></i>';
                 }
@@ -2334,7 +2435,7 @@
                     'Location': document.getElementById('farmLocation')?.value || '-',
                     'Approx. Size': document.getElementById('farmAreaEstimate')?.value ? document.getElementById('farmAreaEstimate').value + ' ha' : '-',
                     'Ownership Type': document.getElementById('landOwnershipType')?.value || '-',
-                    'Coffee Variety': document.getElementById('coffeeVariety')?.value || '-',
+                    'Coffee Variety': Array.from(document.querySelectorAll('input[name="coffeeVariety"]:checked')).map(cb => cb.value).join(', ') || '-',
                     'Est. Annual Yield': document.getElementById('estimatedYield')?.value ? document.getElementById('estimatedYield').value + ' kg' : '-',
                     'Farming Method': document.getElementById('farmingMethod')?.value || '-',
                     'GPS Points': document.getElementById('pointCount')?.innerText || '0',
@@ -2433,16 +2534,20 @@
                 ];
 
                 fields.forEach(id => {
+                    if (id === 'intercroppedSpecies') {
+                        if (document.querySelectorAll('.intercrop-check:checked').length > 0) filledFields++;
+                        return;
+                    }
+                    if (id === 'certificationStatus') {
+                        if (document.querySelectorAll('.cert-check:checked').length > 0) filledFields++;
+                        return;
+                    }
                     const el = document.getElementById(id);
                     if (el) {
                         if (el.type === 'checkbox' || el.type === 'radio') {
                             if (el.checked) filledFields++;
-                        } else if (el.value.trim()) {
-                            if (id === 'intercroppedSpecies' || id === 'certificationStatus') {
-                                filledFields += el.selectedOptions.length;
-                            } else {
-                                filledFields++;
-                            }
+                        } else if (el.value && el.value.trim()) {
+                            filledFields++;
                         }
                     }
                 });
@@ -2451,16 +2556,22 @@
             }
 
             function populateTab2Review() {
+                // Populate Tab 1 section first (basic info at top)
+                populateTab1Review();
+
                 const reviewContent = document.getElementById('tab2ReviewContent');
                 const progress = calculateTab2Progress();
-                
+
                 document.getElementById('tab2ProgressBar').style.width = progress + '%';
                 document.getElementById('tab2ProgressBar').innerText = progress + '% Complete';
+
+                const intercropSelected = Array.from(document.querySelectorAll('.intercrop-check:checked')).map(cb => cb.value).join(', ') || 'None';
+                const certSelected = Array.from(document.querySelectorAll('.cert-check:checked')).map(cb => cb.value).join(', ') || 'None';
 
                 const farmData = {
                     'Document Upload': document.getElementById('documentUpload')?.files?.[0]?.name || 'Not uploaded',
                     'Parent Parcel': document.getElementById('parentParcelLink')?.value || 'None',
-                    'Intercropped Species': Array.from(document.getElementById('intercroppedSpecies')?.selectedOptions || []).map(o => o.value).join(', ') || 'None',
+                    'Intercropped Species': intercropSelected,
                     'Shade Trees': document.querySelector('input[name="shadeTrees"]:checked')?.value === 'yes' ? 'Yes' : 'No',
                     'Coffee Trees': document.getElementById('coffeeTreeCount')?.value || '-',
                     'Agroforestry Start': document.getElementById('agroforestryStartYear')?.value || '-',
@@ -2468,7 +2579,7 @@
                     'Last Harvest': document.getElementById('lastHarvestingDate')?.value || '-',
                     'Farm Established': document.getElementById('farmEstablishedYear')?.value || '-',
                     'Previous Land Use': document.getElementById('previousLandUse')?.value || '-',
-                    'Certification': Array.from(document.getElementById('certificationStatus')?.selectedOptions || []).map(o => o.value).join(', ') || 'None',
+                    'Certification': certSelected,
                     'NGO Support': document.getElementById('ngoSupport')?.value || 'None'
                 };
 
@@ -2580,9 +2691,30 @@
                 gpsPolygonValid = false;
             };
 
+
             // Initialize
             updateTab1Steps();
             updateTab2Steps();
+        });
+    </script>
+    <script>
+        function toggleCustomDropdown(menuId, btn) {
+            const menu = document.getElementById(menuId);
+            if (!menu) return;
+            const isOpen = menu.style.display !== 'none';
+            // Close all other custom dropdowns
+            document.querySelectorAll('[id$="Menu"][style*="position:absolute"]').forEach(m => { m.style.display = 'none'; });
+            if (!isOpen) menu.style.display = 'block';
+        }
+        function updateCheckboxDropdown(cls, textElId, placeholder) {
+            const vals = Array.from(document.querySelectorAll('.' + cls + ':checked')).map(cb => cb.value);
+            const el = document.getElementById(textElId);
+            if (el) el.textContent = vals.length ? vals.join(', ') : placeholder;
+        }
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('[onclick*="toggleCustomDropdown"]') && !e.target.closest('[id$="Menu"]')) {
+                document.querySelectorAll('#intercroppedMenu,#certificationMenu').forEach(m => { m.style.display = 'none'; });
+            }
         });
     </script>
     <!-- html2canvas for screenshots -->

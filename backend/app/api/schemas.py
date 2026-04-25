@@ -365,11 +365,28 @@ class ParcelCreate(BaseModel):
 class ParcelResponse(BaseModel):
     """Parcel response schema"""
     id: str
-    parcel_number: int
+    parcel_number: Optional[str] = None
     parcel_name: Optional[str] = None
     area_hectares: Optional[float] = None
+    coffee_area_hectares: Optional[float] = None
     boundary_geojson: Optional[Dict[str, Any]] = None
     land_use_type: Optional[LandUseTypeEnum] = None
+    ownership_type: Optional[str] = None
+    soil_type: Optional[str] = None
+    altitude_meters: Optional[float] = None
+    slope_degrees: Optional[float] = None
+    gps_accuracy_meters: Optional[float] = None
+    mapping_date: Optional[datetime] = None
+    estimated_coffee_plants: Optional[int] = None
+    canopy_cover: Optional[str] = None
+    irrigation_type: Optional[str] = None
+    planting_method: Optional[str] = None
+    practice_mixed_farming: Optional[int] = None
+    other_crops: Optional[Any] = None
+    ndvi_baseline: Optional[float] = None
+    agroforestry_start_year: Optional[int] = None
+    previous_land_use: Optional[str] = None
+    programme_support: Optional[Any] = None
     verification_status: Optional[str] = None
     created_at: datetime
 
@@ -379,33 +396,21 @@ class ParcelResponse(BaseModel):
 
 class FarmCreate(BaseModel):
     """Schema for creating a farm - EUDR Compliant with Phase 2 fields"""
-    # Basic identification
     farm_name: Optional[str] = None
     total_area_hectares: Optional[float] = None
+    coffee_area_hectares: Optional[float] = None
     coffee_varieties: List[str] = []
     years_farming: Optional[int] = None
     average_annual_production_kg: Optional[float] = None
-    
-    # Centroid coordinates
+    land_use_type: Optional[str] = None
     centroid_lat: Optional[float] = None
     centroid_lon: Optional[float] = None
-    
-    # Parcels
     parcels: List[ParcelCreate] = []
-    
-    # Farmer details (extracted from user in handleCreateFarm)
-    # These are handled separately - stored on user model
-    # gender, payout_recipient_id, data_consent, consent_timestamp
-    
-    # Land parcel details (stored on parcel)
-    # display_name, administrative_area, ownership_type, entry_state
-    
-    # Delivery details
-    # crop_variety, estimated_yield_kg
-    
-    # Sustainability details (stored on parcel)
-    # heritage_score, agroforestry_start_year, previous_land_use
-    # certification_status, programme_support, shaded_crop
+    # Extra fields from the form (saved to parcel or user)
+    farmer: Optional[Dict[str, Any]] = None
+    land_parcel: Optional[Dict[str, Any]] = None
+    sustainability: Optional[Dict[str, Any]] = None
+    delivery: Optional[Dict[str, Any]] = None
 
 
 class FarmResponse(BaseModel):
@@ -413,14 +418,27 @@ class FarmResponse(BaseModel):
     id: str
     owner_id: str
     farm_name: Optional[str] = None
+    farm_code: Optional[str] = None
     total_area_hectares: Optional[float] = None
+    coffee_area_hectares: Optional[float] = None
     coffee_varieties: List[str] = []
     land_use_type: Optional[LandUseTypeEnum] = None
+    years_farming: Optional[int] = None
+    average_annual_production_kg: Optional[float] = None
     deforestation_risk_score: Optional[float] = None
     compliance_status: Optional[str] = None
     verification_status: Optional[str] = None
+    centroid_lat: Optional[float] = None
+    centroid_lon: Optional[float] = None
     parcels: List[ParcelResponse] = []
     created_at: datetime
+    # Farmer identity (populated from owner in GET endpoints)
+    farmer_name: Optional[str] = None
+    farmer_phone: Optional[str] = None
+    farmer_national_id: Optional[str] = None
+    farmer_gender: Optional[str] = None
+    farmer_location: Optional[str] = None
+    coop_member_no: Optional[str] = None
 
     class Config:
         from_attributes = True
