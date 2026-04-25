@@ -5543,7 +5543,9 @@ class PlotraDashboard {
     }
 
     async showAddFarmModal() {
-        if (this.currentUser?.verification_status !== 'verified') {
+        const role = this.currentUser?.role;
+        const isOfficer = role === 'cooperative_officer' || role === 'COOPERATIVE_OFFICER';
+        if (!isOfficer && this.currentUser?.verification_status !== 'verified') {
             this.showToast('Your account must be fully verified before you can register a farm.', 'error');
             return;
         }

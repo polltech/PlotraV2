@@ -135,7 +135,9 @@ async def create_farm(
     db: AsyncSession = Depends(get_db)
 ):
     """Create a new farm with parcel boundaries."""
-    if getattr(current_user, 'verification_status', None) != VerificationStatus.VERIFIED:
+    user_role = getattr(current_user, 'role', None)
+    is_officer = hasattr(user_role, 'value') and user_role.value == 'cooperative_officer'
+    if not is_officer and getattr(current_user, 'verification_status', None) != VerificationStatus.VERIFIED:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Your account must be fully verified by your Cooperative and Kipawa admin before you can register a farm."
