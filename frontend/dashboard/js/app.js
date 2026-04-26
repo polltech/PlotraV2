@@ -506,6 +506,7 @@ class PlotraDashboard {
 
         const coopOfficerNav = [
             { id: 'dashboard', icon: 'bi-speedometer2', label: 'Dashboard' },
+            { id: 'coop-farmers', icon: 'bi-people', label: 'Farmers' },
             { id: 'coop-farms', icon: 'bi-geo-alt', label: 'Farms' },
             { id: 'farm-approvals', icon: 'bi-geo-alt-fill', label: 'Farm Approvals' },
             { id: 'farmer-approvals', icon: 'bi-shield-check', label: 'Farmer Approvals' },
@@ -1558,7 +1559,7 @@ class PlotraDashboard {
         }
         
         // Cooperative-only pages
-        if (page === 'farm-approvals' || page === 'coop-team' || page === 'coop-farms') {
+        if (page === 'farm-approvals' || page === 'coop-team' || page === 'coop-farms' || page === 'coop-farmers') {
             return role === 'COOPERATIVE_OFFICER';
         }
 
@@ -1662,6 +1663,10 @@ class PlotraDashboard {
                 case 'farmer-approvals':
                     if (title) title.textContent = 'Farmer Approvals';
                     await this.loadFarmerApprovals(content);
+                    break;
+                case 'coop-farmers':
+                    if (title) title.textContent = 'Farmers';
+                    await this.loadCoopFarmersList(content);
                     break;
                 case 'coop-farms':
                     if (title) title.textContent = 'Farms';
@@ -3088,6 +3093,121 @@ class PlotraDashboard {
         } catch(e) { this.showToast(e.message || 'Failed to reject', 'error'); }
     }
 
+    async loadCoopFarmersList(content) {
+        const statusBadge = (f) => {
+            const vs = f.verification_status;
+            const cs = f.coop_status;
+            if (vs === 'verified') return `<span class="badge bg-soft-success text-success">Verified</span>`;
+            if (vs === 'rejected') return `<span class="badge bg-soft-danger text-danger">Rejected</span>`;
+            if (cs === 'coop_rejected') return `<span class="badge bg-soft-danger text-danger">Coop Rejected</span>`;
+            if (cs === 'coop_approved') return `<span class="badge bg-soft-info text-info">Coop Approved</span>`;
+            return `<span class="badge bg-soft-warning text-warning">Pending</span>`;
+        };
+
+        content.innerHTML = `
+            <div class="row g-4 mb-4">
+                <div class="col-md-3">
+                    <div class="card bg-soft-primary text-primary h-100">
+                        <div class="card-body">
+                            <h6 class="text-uppercase small mb-2">Total Farmers</h6>
+                            <h3 class="mb-0" id="cfl-stat-total">...</h3>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-soft-success text-success h-100">
+                        <div class="card-body">
+                            <h6 class="text-uppercase small mb-2">Fully Verified</h6>
+                            <h3 class="mb-0" id="cfl-stat-verified">...</h3>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-soft-info text-info h-100">
+                        <div class="card-body">
+                            <h6 class="text-uppercase small mb-2">Coop Approved</h6>
+                            <h3 class="mb-0" id="cfl-stat-coop">...</h3>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-soft-warning text-warning h-100">
+                        <div class="card-body">
+                            <h6 class="text-uppercase small mb-2">Pending Review</h6>
+                            <h3 class="mb-0" id="cfl-stat-pending">...</h3>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <h4 class="card-title mb-0">Farmers in Cooperative</h4>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="app.loadCoopFarmersList(document.getElementById('pageContent'))">
+                        <i class="bi bi-arrow-clockwise me-1"></i>Refresh
+                    </button>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0" style="min-width:700px">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Phone / ID</th>
+                                    <th>County</th>
+                                    <th>Farms</th>
+                                    <th>Status</th>
+                                    <th>Registered</th>
+                                </tr>
+                            </thead>
+                            <tbody id="cfl-farmers-tbody">
+                                <tr><td colspan="6" class="text-center py-4"><div class="spinner-border spinner-border-sm text-primary me-2"></div>Loading farmers...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>`;
+
+        try {
+            const farmers = await api.getCoopAllFarmers();
+            const list = Array.isArray(farmers) ? farmers : [];
+
+            document.getElementById('cfl-stat-total').textContent = list.length;
+            document.getElementById('cfl-stat-verified').textContent = list.filter(f => f.verification_status === 'verified').length;
+            document.getElementById('cfl-stat-coop').textContent = list.filter(f => f.coop_status === 'coop_approved' && f.verification_status !== 'verified').length;
+            document.getElementById('cfl-stat-pending').textContent = list.filter(f => !f.coop_status || f.coop_status === 'pending').length;
+
+            const tbody = document.getElementById('cfl-farmers-tbody');
+            if (!list.length) {
+                tbody.innerHTML = `<tr><td colspan="6" class="text-center py-5 text-muted"><i class="bi bi-people fs-3 d-block mb-2"></i>No farmers in your cooperative yet</td></tr>`;
+                return;
+            }
+            tbody.innerHTML = list.map(f => {
+                const name = `${f.first_name || ''} ${f.last_name || ''}`.trim() || 'Unknown';
+                const date = f.created_at ? new Date(f.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
+                return `
+                    <tr>
+                        <td>
+                            <div class="fw-bold">${name}</div>
+                            <div class="text-muted small">${f.email || ''}</div>
+                        </td>
+                        <td>
+                            <div>${f.phone || '—'}</div>
+                            <div class="text-muted small">ID: ${f.national_id || '—'}</div>
+                        </td>
+                        <td>${f.county || '—'}</td>
+                        <td>${f.farm_count ?? 0}</td>
+                        <td>${statusBadge(f)}</td>
+                        <td class="text-muted small">${date}</td>
+                    </tr>`;
+            }).join('');
+        } catch(e) {
+            console.error(e);
+            const tbody = document.getElementById('cfl-farmers-tbody');
+            if (tbody) tbody.innerHTML = `<tr><td colspan="6" class="text-center text-danger py-4">Error loading farmers: ${e.message}</td></tr>`;
+        }
+    }
+
     async loadCoopTeam(content) {
         let coopId = this.currentUser?.cooperative_id;
         if (!coopId) {
@@ -3446,16 +3566,20 @@ class PlotraDashboard {
 
         try {
             let farmers = [];
+            let allFarmers = [];
             if (isCoop) {
                 farmers = await api.getCoopPendingFarmers();
+                farmers = Array.isArray(farmers) ? farmers : [];
+                allFarmers = await api.getCoopAllFarmers();
+                allFarmers = Array.isArray(allFarmers) ? allFarmers : farmers;
             } else if (isAdmin) {
                 const res = await api.getAdminPendingFarmers();
                 farmers = Array.isArray(res) ? res : (res.users || res.farmers || []);
+                const allRes = await api.getUsers({ role: 'FARMER' });
+                allFarmers = allRes?.users || farmers;
             }
 
             // Stats
-            const allRes = isAdmin ? (await api.getUsers({ role: 'FARMER' })) : null;
-            const allFarmers = allRes ? (allRes.users || []) : farmers;
             document.getElementById('fa-stat-pending').textContent = farmers.filter(f => !f.coop_status || f.coop_status === 'pending').length;
             document.getElementById('fa-stat-coop').textContent = allFarmers.filter(f => f.coop_status === 'coop_approved' && f.verification_status !== 'verified').length;
             document.getElementById('fa-stat-verified').textContent = allFarmers.filter(f => f.verification_status === 'verified').length;
@@ -8784,6 +8908,9 @@ class PlotraDashboard {
                 break;
             case 'farmer-approvals':
                 await this.loadFarmerApprovals(pageContent);
+                break;
+            case 'coop-farmers':
+                await this.loadCoopFarmersList(pageContent);
                 break;
             case 'coop-farms':
                 await this.loadCoopFarms(pageContent);

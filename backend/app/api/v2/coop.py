@@ -694,6 +694,53 @@ async def verify_farmer_member(
     return user
 
 
+@router.get("/farmers")
+async def get_coop_all_farmers(
+    current_user: User = Depends(require_coop_admin),
+    db: AsyncSession = Depends(get_db)
+):
+    """Get all farmers (any coop_status) that are members of this cooperative."""
+    coop_id = await _get_coop_id_for_officer(current_user, db)
+    if not coop_id:
+        return []
+
+    farmer_ids = await _get_farmer_ids_for_coop(coop_id, db)
+    if not farmer_ids:
+        return []
+
+    result = await db.execute(
+        select(User).where(
+            User.id.in_(farmer_ids),
+            User.role == UserRole.FARMER
+        ).order_by(User.created_at.desc())
+    )
+    farmers = result.scalars().all()
+
+    output = []
+    for f in farmers:
+        farm_count_res = await db.execute(
+            select(func.count(Farm.id)).where(
+                Farm.owner_id == f.id, Farm.deleted_at == None
+            )
+        )
+        farm_count = farm_count_res.scalar() or 0
+        output.append({
+            "id": f.id,
+            "first_name": f.first_name,
+            "last_name": f.last_name,
+            "email": f.email,
+            "phone": f.phone,
+            "national_id": getattr(f, 'national_id', None),
+            "county": f.county,
+            "gender": getattr(f, 'gender', None),
+            "verification_status": f.verification_status.value if hasattr(f.verification_status, 'value') else str(f.verification_status),
+            "coop_status": f.coop_status,
+            "farm_count": farm_count,
+            "created_at": f.created_at.isoformat() if f.created_at else None,
+        })
+    return output
+
+
 @router.get("/farmers/pending")
 async def get_coop_pending_farmers(
     current_user: User = Depends(require_coop_admin),

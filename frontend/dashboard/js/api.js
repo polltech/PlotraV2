@@ -412,6 +412,9 @@ Attempted URL: ${url}`;
     async getAdminPendingFarmers() {
         return this.request('/admin/farmers/pending');
     }
+    async getCoopAllFarmers() {
+        return this.request('/coop/farmers');
+    }
     async getCoopPendingFarmers() {
         return this.request('/coop/farmers/pending');
     }
