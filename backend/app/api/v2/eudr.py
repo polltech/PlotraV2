@@ -373,7 +373,7 @@ async def get_four_tier_status(
     Status flow:
     1. Draft
     2. Cooperative Approved
-    3. Kipawa Verified
+    3. Plotra Verified
     4. EUDR Submitted
     """
     from sqlalchemy import func

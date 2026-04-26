@@ -353,7 +353,7 @@ async def get_system_info(
     coop_count = await db.execute(select(func.count()).select_from(Cooperative))
     
     return {
-        "app_name": "Kipawa Platform",
+        "app_name": "Plotra Platform",
         "version": "1.0.0",
         "total_users": user_count.scalar() or 0,
         "total_cooperatives": coop_count.scalar() or 0,

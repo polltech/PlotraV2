@@ -333,7 +333,7 @@ async def admin_request_farm_update(
         id=str(__import__('uuid').uuid4()),
         recipient_id=farm.owner_id,
         title=f'Action Required: Update Your Farm — {farm.farm_name}',
-        message=f'Kipawa admin has requested changes to your farm before final approval.\n\nIssue: {issue}',
+        message=f'Plotra admin has requested changes to your farm before final approval.\n\nIssue: {issue}',
         type='warning',
         reference_id=farm_id,
         reference_type='farm',
@@ -350,7 +350,7 @@ async def approve_farm(
     current_user: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db)
 ):
-    """Approve a pending farm (Kipawa/admin level)."""
+    """Approve a pending farm (Plotra/admin level)."""
     from app.models.notification import Notification
     result = await db.execute(select(Farm).where(Farm.id == farm_id))
     farm = result.scalar_one_or_none()
@@ -366,8 +366,8 @@ async def approve_farm(
     # Notify farmer
     notif = Notification(
         recipient_id=farm.owner_id,
-        title="Farm Approved by Kipawa",
-        message=f"Your farm '{farm.farm_name}' has been approved by Kipawa admin. {reason or ''}".strip(),
+        title="Farm Approved by Plotra",
+        message=f"Your farm '{farm.farm_name}' has been approved by Plotra admin. {reason or ''}".strip(),
         type="success",
         reference_id=farm_id,
         reference_type="farm"
@@ -384,7 +384,7 @@ async def reject_farm(
     current_user: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db)
 ):
-    """Reject a farm submission (Kipawa/admin level)."""
+    """Reject a farm submission (Plotra/admin level)."""
     from app.models.notification import Notification
     result = await db.execute(select(Farm).where(Farm.id == farm_id))
     farm = result.scalar_one_or_none()
@@ -398,8 +398,8 @@ async def reject_farm(
     farm.update_requested = False
     notif = Notification(
         recipient_id=farm.owner_id,
-        title="Farm Rejected by Kipawa",
-        message=f"Your farm '{farm.farm_name}' was rejected by Kipawa admin. Reason: {reason or 'No reason provided'}",
+        title="Farm Rejected by Plotra",
+        message=f"Your farm '{farm.farm_name}' was rejected by Plotra admin. Reason: {reason or 'No reason provided'}",
         type="error",
         reference_id=farm_id,
         reference_type="farm"
@@ -1509,7 +1509,7 @@ async def admin_request_farmer_update(
         id=str(__import__('uuid').uuid4()),
         recipient_id=farmer.id,
         title='Action Required: Update Your Profile',
-        message=f'The Kipawa admin has requested you to update your profile before final approval.\n\nIssue: {issue}',
+        message=f'Plotra admin has requested you to update your profile before final approval.\n\nIssue: {issue}',
         type='warning',
         reference_type='farmer',
     )
@@ -1525,7 +1525,7 @@ async def admin_approve_farmer(
     current_user: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db)
 ):
-    """Admin (Kipawa) approves a farmer — sets final verification_status=verified."""
+    """Admin (Plotra) approves a farmer — sets final verification_status=verified."""
     from datetime import datetime
     from app.models.notification import Notification
     farmer = await db.get(User, farmer_id)
@@ -1541,7 +1541,7 @@ async def admin_approve_farmer(
         id=str(__import__('uuid').uuid4()),
         recipient_id=farmer.id,
         title='Account Fully Verified',
-        message=f'Your account has been fully verified and approved by Kipawa admin.',
+        message=f'Your account has been fully verified and approved by Plotra admin.',
         type='success',
         reference_type='farmer',
     )
@@ -1557,7 +1557,7 @@ async def admin_reject_farmer(
     current_user: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db)
 ):
-    """Admin (Kipawa) rejects a farmer."""
+    """Admin (Plotra) rejects a farmer."""
     from datetime import datetime
     from app.models.notification import Notification
     farmer = await db.get(User, farmer_id)
@@ -1573,7 +1573,7 @@ async def admin_reject_farmer(
         id=str(__import__('uuid').uuid4()),
         recipient_id=farmer.id,
         title='Account Verification Rejected',
-        message=f'Your account verification was rejected by Kipawa admin{(": " + reason) if reason else "."}',
+        message=f'Your account verification was rejected by Plotra admin{(": " + reason) if reason else "."}',
         type='error',
         reference_type='farmer',
     )

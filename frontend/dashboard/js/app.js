@@ -2297,19 +2297,19 @@ class PlotraDashboard {
             if (adminApproved && coopApproved) {
                 farmerBadge = `<i class="bi bi-check-circle-fill me-1"></i>Fully Approved`;
                 farmerDotColor = '#198754';
-                farmerBy = `Cooperative${u.coop_verified_by_name ? ' (' + u.coop_verified_by_name + ')' : ''} &amp; Kipawa${u.admin_verified_by_name ? ' (' + u.admin_verified_by_name + ')' : ''}`;
+                farmerBy = `Cooperative${u.coop_verified_by_name ? ' (' + u.coop_verified_by_name + ')' : ''} &amp; Plotra${u.admin_verified_by_name ? ' (' + u.admin_verified_by_name + ')' : ''}`;
             } else if (coopRejected) {
                 farmerBadge = `<i class="bi bi-x-circle-fill me-1"></i>Rejected by Cooperative`;
                 farmerDotColor = '#dc3545';
                 farmerBy = u.coop_notes ? `Reason: ${u.coop_notes}` : (u.coop_verified_by_name || '');
             } else if (adminRejected) {
-                farmerBadge = `<i class="bi bi-x-circle-fill me-1"></i>Rejected by Kipawa`;
+                farmerBadge = `<i class="bi bi-x-circle-fill me-1"></i>Rejected by Plotra`;
                 farmerDotColor = '#dc3545';
                 farmerBy = u.admin_notes ? `Reason: ${u.admin_notes}` : (u.admin_verified_by_name || '');
             } else if (coopApproved && !adminApproved) {
                 farmerBadge = `<i class="bi bi-check-circle-fill me-1"></i>Cooperative Approved`;
                 farmerDotColor = '#0dcaf0';
-                farmerBy = `by ${u.coop_verified_by_name || 'Cooperative'} — Pending Kipawa review`;
+                farmerBy = `by ${u.coop_verified_by_name || 'Cooperative'} — Pending Plotra Review &amp; Approval`;
             } else {
                 farmerBadge = `<i class="bi bi-hourglass-split me-1"></i>Pending Verification`;
                 farmerDotColor = '#ffc107';
@@ -2463,13 +2463,13 @@ class PlotraDashboard {
                                                 let badge, byWho;
                                                 if (vs === 'verified') {
                                                     badge = `<span class="badge bg-success">Approved</span>`;
-                                                    byWho = `by Kipawa`;
+                                                    byWho = `by Plotra`;
                                                 } else if (vs === 'rejected') {
                                                     badge = `<span class="badge bg-danger">Rejected</span>`;
-                                                    byWho = cs === 'coop_rejected' ? 'by Cooperative' : 'by Kipawa';
+                                                    byWho = cs === 'coop_rejected' ? 'by Cooperative' : 'by Plotra';
                                                 } else if (cs === 'coop_approved') {
                                                     badge = `<span class="badge bg-info text-dark">Coop ✓</span>`;
-                                                    byWho = `Pending Kipawa`;
+                                                    byWho = `Pending Plotra Review`;
                                                 } else if (cs === 'coop_rejected') {
                                                     badge = `<span class="badge bg-danger">Coop Rejected</span>`;
                                                     byWho = f.coop_notes ? `"${f.coop_notes.slice(0,30)}"` : '';
@@ -6150,7 +6150,7 @@ class PlotraDashboard {
                                         ? `<button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addFarmModal"><i class="bi bi-plus-circle me-1"></i>Register Your First Farm</button>`
                                         : `<div class="alert alert-warning d-inline-flex align-items-center gap-2 px-4 py-2 rounded-pill mt-1" style="font-size:0.85rem;">
                                                 <i class="bi bi-hourglass-split fs-5"></i>
-                                                <span><strong>Please wait to be verified.</strong> Your account must be approved by your Cooperative and Kipawa admin before you can register a farm.</span>
+                                                <span><strong>Please wait to be verified.</strong> Your account must be approved by your Cooperative and Plotra admin before you can register a farm.</span>
                                             </div>`}
                                 </div>`}
                             </div>
