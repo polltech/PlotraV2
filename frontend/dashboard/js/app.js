@@ -3645,22 +3645,15 @@ class PlotraDashboard {
                 return;
             }
 
+            // Store farmers map for the view modal
+            this._farmersApprovalMap = {};
+            farmers.forEach(f => { this._farmersApprovalMap[f.id] = f; });
+
             tbody.innerHTML = farmers.map(f => {
                 const name = `${f.first_name || ''} ${f.last_name || ''}`.trim() || 'Unknown';
                 const date = f.created_at ? new Date(f.created_at).toLocaleDateString() : '—';
                 const farmerName = `${f.first_name || ''} ${f.last_name || ''}`.trim();
-                let actionBtns = '';
-                if (isCoop) {
-                    actionBtns = `
-                        <button class="btn btn-sm btn-success" title="Approve" onclick="app._showFarmerApprovalModal('${f.id}','approve','coop')"><i class="bi bi-check-lg"></i></button>
-                        <button class="btn btn-sm btn-outline-danger" title="Reject" onclick="app._showFarmerApprovalModal('${f.id}','reject','coop')"><i class="bi bi-x-lg"></i></button>
-                        <button class="btn btn-sm btn-outline-warning" title="Request Update" onclick="app._showRequestUpdateModal('${f.id}','${farmerName.replace(/'/g,"\\'")}','coop')"><i class="bi bi-exclamation-triangle"></i></button>`;
-                } else if (isAdmin) {
-                    actionBtns = `
-                        <button class="btn btn-sm btn-success" title="Approve" onclick="app._showFarmerApprovalModal('${f.id}','approve','admin')"><i class="bi bi-check-lg"></i></button>
-                        <button class="btn btn-sm btn-outline-danger" title="Reject" onclick="app._showFarmerApprovalModal('${f.id}','reject','admin')"><i class="bi bi-x-lg"></i></button>
-                        <button class="btn btn-sm btn-outline-warning" title="Request Update" onclick="app._showRequestUpdateModal('${f.id}','${farmerName.replace(/'/g,"\\'")}','admin')"><i class="bi bi-exclamation-triangle"></i></button>`;
-                }
+                const actor = isCoop ? 'coop' : 'admin';
                 return `
                     <tr>
                         <td>
@@ -3674,7 +3667,11 @@ class PlotraDashboard {
                         <td>${f.county || '—'}</td>
                         <td class="text-muted small">${date}</td>
                         <td>${farmerStatusBadge(f)}</td>
-                        <td class="text-end"><div class="d-flex gap-1 justify-content-end">${actionBtns}</div></td>
+                        <td class="text-end">
+                            <div class="d-flex gap-1 justify-content-end">
+                                <button class="btn btn-sm btn-outline-primary" title="View Details" onclick="app._showFarmerDetailsModal('${f.id}','${actor}')"><i class="bi bi-eye me-1"></i>View</button>
+                            </div>
+                        </td>
                     </tr>`;
             }).join('');
         } catch (e) {
@@ -3688,6 +3685,9 @@ class PlotraDashboard {
 
     _showFarmerApprovalModal(farmerId, action, actor) {
         this._farmerApprovalState = { farmerId, action, actor };
+        // Close details modal if open
+        const details = document.getElementById('farmerDetailsModal');
+        if (details) bootstrap.Modal.getInstance(details)?.hide();
         const modal = document.getElementById('verificationReasonModal');
         if (!modal) return;
         const label = modal.querySelector('.modal-title');
@@ -3727,6 +3727,9 @@ class PlotraDashboard {
 
     _showRequestUpdateModal(farmerId, farmerName, actor) {
         this._requestUpdateState = { farmerId, actor };
+        // Close details modal if open
+        const details = document.getElementById('farmerDetailsModal');
+        if (details) bootstrap.Modal.getInstance(details)?.hide();
         // Remove any stale modal first
         const old = document.getElementById('requestUpdateModal');
         if (old) { bootstrap.Modal.getInstance(old)?.dispose(); old.remove(); }
@@ -3777,6 +3780,90 @@ class PlotraDashboard {
         } catch(e) {
             this.showToast(`Error: ${e.message}`, 'error');
         }
+    }
+
+    _showFarmerDetailsModal(farmerId, actor) {
+        const f = (this._farmersApprovalMap || {})[farmerId];
+        if (!f) { this.showToast('Farmer data not found', 'error'); return; }
+
+        const name = `${f.first_name || ''} ${f.last_name || ''}`.trim() || 'Unknown';
+        const farmerName = name.replace(/'/g, "\\'");
+        const kycData = f.kyc_data || {};
+        const date = f.created_at ? new Date(f.created_at).toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' }) : '—';
+
+        const row = (label, value) => value
+            ? `<div class="col-6 mb-3"><div class="text-muted small">${label}</div><div class="fw-semibold">${value}</div></div>`
+            : '';
+
+        const updateBanner = f.update_requested
+            ? `<div class="alert alert-warning d-flex gap-2 align-items-start mb-3">
+                   <i class="bi bi-exclamation-triangle-fill text-warning mt-1 flex-shrink-0"></i>
+                   <div><strong>Update Requested</strong>${f.update_requested_by_name ? ` by ${f.update_requested_by_name}` : ''}<br><span class="small">${f.update_request_notes || ''}</span></div>
+               </div>` : '';
+
+        const old = document.getElementById('farmerDetailsModal');
+        if (old) { bootstrap.Modal.getInstance(old)?.dispose(); old.remove(); }
+
+        const el = document.createElement('div');
+        el.innerHTML = `
+            <div class="modal fade" id="farmerDetailsModal" tabindex="-1">
+                <div class="modal-dialog modal-lg modal-dialog-scrollable">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title"><i class="bi bi-person-circle me-2 text-primary"></i>${name}</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            ${updateBanner}
+                            <h6 class="text-uppercase text-muted small fw-bold mb-3 border-bottom pb-2">Personal Information</h6>
+                            <div class="row">
+                                ${row('First Name', f.first_name)}
+                                ${row('Last Name', f.last_name)}
+                                ${row('Email', f.email)}
+                                ${row('Phone', f.phone)}
+                                ${row('National ID', f.national_id)}
+                                ${row('Date of Birth', f.date_of_birth ? new Date(f.date_of_birth).toLocaleDateString('en-GB') : null)}
+                                ${row('Gender', f.gender)}
+                                ${row('Registered', date)}
+                            </div>
+                            <h6 class="text-uppercase text-muted small fw-bold mb-3 border-bottom pb-2 mt-2">Location</h6>
+                            <div class="row">
+                                ${row('County', f.county)}
+                                ${row('Sub-County', f.subcounty)}
+                                ${row('Ward', f.ward)}
+                            </div>
+                            ${kycData.cooperative_code ? `
+                            <h6 class="text-uppercase text-muted small fw-bold mb-3 border-bottom pb-2 mt-2">Cooperative</h6>
+                            <div class="row">
+                                ${row('Cooperative Code', kycData.cooperative_code)}
+                                ${row('Payout Method', kycData.payout_method)}
+                                ${row('Payout ID / Account', kycData.payout_recipient_id || kycData.payout_account_number)}
+                            </div>` : ''}
+                            <h6 class="text-uppercase text-muted small fw-bold mb-3 border-bottom pb-2 mt-2">Verification Status</h6>
+                            <div class="row">
+                                ${row('Coop Status', f.coop_status || 'Pending')}
+                                ${row('Admin Status', f.verification_status || 'Pending')}
+                                ${f.coop_notes ? row('Coop Notes', f.coop_notes) : ''}
+                                ${f.admin_notes ? row('Admin Notes', f.admin_notes) : ''}
+                            </div>
+                        </div>
+                        <div class="modal-footer flex-wrap gap-2">
+                            <button type="button" class="btn btn-secondary me-auto" data-bs-dismiss="modal">Close</button>
+                            <button type="button" class="btn btn-outline-warning" onclick="app._showRequestUpdateModal('${farmerId}','${farmerName}','${actor}')">
+                                <i class="bi bi-exclamation-triangle me-1"></i>Request Update
+                            </button>
+                            <button type="button" class="btn btn-outline-danger" onclick="app._showFarmerApprovalModal('${farmerId}','reject','${actor}')">
+                                <i class="bi bi-x-lg me-1"></i>Reject
+                            </button>
+                            <button type="button" class="btn btn-success" onclick="app._showFarmerApprovalModal('${farmerId}','approve','${actor}')">
+                                <i class="bi bi-check-lg me-1"></i>Approve
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+        document.body.appendChild(el.firstElementChild);
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('farmerDetailsModal')).show();
     }
 
     _showFarmUpdateRequestModal(farmId, farmName, actor) {
