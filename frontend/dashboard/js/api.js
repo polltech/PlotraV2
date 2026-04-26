@@ -430,6 +430,12 @@ Attempted URL: ${url}`;
     async coopRejectFarmerAccount(farmerId, reason) {
         return this.request(`/coop/farmers/${farmerId}/reject`, { method: 'PATCH', body: JSON.stringify({ reason }) });
     }
+    async coopRequestFarmerUpdate(farmerId, issue) {
+        return this.request(`/coop/farmers/${farmerId}/request-update`, { method: 'PATCH', body: JSON.stringify({ issue }) });
+    }
+    async adminRequestFarmerUpdate(farmerId, issue) {
+        return this.request(`/admin/farmers/${farmerId}/request-update`, { method: 'PATCH', body: JSON.stringify({ issue }) });
+    }
 
     // Verification (Cooperative)
     async getCoopPendingFarms() {

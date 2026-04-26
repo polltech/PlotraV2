@@ -3568,8 +3568,12 @@ class PlotraDashboard {
             if (vs === 'verified') return `<span class="badge bg-success">Fully Verified</span>`;
             if (vs === 'rejected') return `<span class="badge bg-danger">Admin Rejected</span>`;
             if (cs === 'coop_rejected') return `<span class="badge bg-danger">Coop Rejected</span>`;
+            if (f.update_requested || cs === 'update_requested') {
+                const tip = f.update_request_notes ? ` title="${f.update_request_notes.replace(/"/g,"'")}"` : '';
+                return `<span class="badge bg-warning text-dark"${tip}><i class="bi bi-exclamation-triangle-fill me-1"></i>Update Requested</span>`;
+            }
             if (cs === 'coop_approved') return `<span class="badge bg-info text-dark">Coop Approved <small class="ms-1 opacity-75">(awaiting admin)</small></span>`;
-            return `<span class="badge bg-warning text-dark">Pending Coop Review</span>`;
+            return `<span class="badge bg-warning text-dark">Pending Review</span>`;
         };
 
         content.innerHTML = `
@@ -3638,15 +3642,18 @@ class PlotraDashboard {
             tbody.innerHTML = farmers.map(f => {
                 const name = `${f.first_name || ''} ${f.last_name || ''}`.trim() || 'Unknown';
                 const date = f.created_at ? new Date(f.created_at).toLocaleDateString() : '—';
+                const farmerName = `${f.first_name || ''} ${f.last_name || ''}`.trim();
                 let actionBtns = '';
                 if (isCoop) {
                     actionBtns = `
                         <button class="btn btn-sm btn-success" title="Approve" onclick="app._showFarmerApprovalModal('${f.id}','approve','coop')"><i class="bi bi-check-lg"></i></button>
-                        <button class="btn btn-sm btn-outline-danger" title="Reject" onclick="app._showFarmerApprovalModal('${f.id}','reject','coop')"><i class="bi bi-x-lg"></i></button>`;
+                        <button class="btn btn-sm btn-outline-danger" title="Reject" onclick="app._showFarmerApprovalModal('${f.id}','reject','coop')"><i class="bi bi-x-lg"></i></button>
+                        <button class="btn btn-sm btn-outline-warning" title="Request Update" onclick="app._showRequestUpdateModal('${f.id}','${farmerName.replace(/'/g,"\\'")}','coop')"><i class="bi bi-exclamation-triangle"></i></button>`;
                 } else if (isAdmin) {
                     actionBtns = `
                         <button class="btn btn-sm btn-success" title="Approve" onclick="app._showFarmerApprovalModal('${f.id}','approve','admin')"><i class="bi bi-check-lg"></i></button>
-                        <button class="btn btn-sm btn-outline-danger" title="Reject" onclick="app._showFarmerApprovalModal('${f.id}','reject','admin')"><i class="bi bi-x-lg"></i></button>`;
+                        <button class="btn btn-sm btn-outline-danger" title="Reject" onclick="app._showFarmerApprovalModal('${f.id}','reject','admin')"><i class="bi bi-x-lg"></i></button>
+                        <button class="btn btn-sm btn-outline-warning" title="Request Update" onclick="app._showRequestUpdateModal('${f.id}','${farmerName.replace(/'/g,"\\'")}','admin')"><i class="bi bi-exclamation-triangle"></i></button>`;
                 }
                 return `
                     <tr>
@@ -3706,6 +3713,62 @@ class PlotraDashboard {
             this.showToast(`Farmer ${action === 'approve' ? 'approved' : 'rejected'} successfully`, 'success');
             await this.loadFarmerApprovals(document.getElementById('pageContent'));
         } catch (e) {
+            this.showToast(`Error: ${e.message}`, 'error');
+        }
+    }
+
+    _requestUpdateState = {};
+
+    _showRequestUpdateModal(farmerId, farmerName, actor) {
+        this._requestUpdateState = { farmerId, actor };
+        // Remove any stale modal first
+        const old = document.getElementById('requestUpdateModal');
+        if (old) { bootstrap.Modal.getInstance(old)?.dispose(); old.remove(); }
+
+        const el = document.createElement('div');
+        el.innerHTML = `
+            <div class="modal fade" id="requestUpdateModal" tabindex="-1">
+                <div class="modal-dialog modal-dialog-scrollable">
+                    <div class="modal-content">
+                        <div class="modal-header bg-warning bg-opacity-10 border-bottom-0">
+                            <h5 class="modal-title"><i class="bi bi-exclamation-triangle-fill text-warning me-2"></i>Request Update from Farmer</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <p class="text-muted mb-3">Describe the issue that <strong>${farmerName || 'this farmer'}</strong> needs to correct before you can approve their account. They will receive a notification with your message.</p>
+                            <label class="form-label fw-semibold">Issue / Action Required <span class="text-danger">*</span></label>
+                            <textarea id="requestUpdateIssueInput" class="form-control" rows="4" placeholder="e.g. Please upload a clear photo of your national ID. The current document is blurry and unreadable."></textarea>
+                            <div class="form-text">Be specific so the farmer knows exactly what to fix.</div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                            <button type="button" class="btn btn-warning" id="requestUpdateConfirmBtn">
+                                <i class="bi bi-send me-1"></i>Send Request
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+        document.body.appendChild(el.firstElementChild);
+        document.getElementById('requestUpdateConfirmBtn').addEventListener('click', () => this._confirmRequestUpdate());
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('requestUpdateModal')).show();
+    }
+
+    async _confirmRequestUpdate() {
+        const { farmerId, actor } = this._requestUpdateState;
+        const issue = document.getElementById('requestUpdateIssueInput')?.value?.trim() || '';
+        if (!issue) { this.showToast('Please describe the issue before sending.', 'error'); return; }
+        const modal = document.getElementById('requestUpdateModal');
+        if (modal) bootstrap.Modal.getOrCreateInstance(modal).hide();
+        try {
+            if (actor === 'coop') {
+                await api.coopRequestFarmerUpdate(farmerId, issue);
+            } else {
+                await api.adminRequestFarmerUpdate(farmerId, issue);
+            }
+            this.showToast('Update request sent to farmer via notification', 'success');
+            await this.loadFarmerApprovals(document.getElementById('pageContent'));
+        } catch(e) {
             this.showToast(`Error: ${e.message}`, 'error');
         }
     }

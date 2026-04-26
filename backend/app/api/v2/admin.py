@@ -1449,6 +1449,39 @@ async def reject_farmer(
     return user
 
 
+@router.patch("/farmers/{farmer_id}/request-update")
+async def admin_request_farmer_update(
+    farmer_id: str,
+    body: dict = {},
+    current_user: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db)
+):
+    """Admin requests farmer to update/correct their profile before final approval."""
+    from datetime import datetime
+    from app.models.notification import Notification
+    farmer = await db.get(User, farmer_id)
+    if not farmer or farmer.role.value != 'farmer':
+        raise HTTPException(status_code=404, detail="Farmer not found")
+    issue = body.get('issue', '').strip() if isinstance(body, dict) else ''
+    if not issue:
+        raise HTTPException(status_code=400, detail="Issue description is required")
+    farmer.update_requested = True
+    farmer.update_requested_by_name = current_user.first_name + ' ' + current_user.last_name
+    farmer.update_request_notes = issue
+    farmer.update_requested_at = datetime.utcnow()
+    notif = Notification(
+        id=str(__import__('uuid').uuid4()),
+        recipient_id=farmer.id,
+        title='Action Required: Update Your Profile',
+        message=f'The Kipawa admin has requested you to update your profile before final approval.\n\nIssue: {issue}',
+        type='warning',
+        reference_type='farmer',
+    )
+    db.add(notif)
+    await db.commit()
+    return {"message": "Update request sent to farmer"}
+
+
 @router.patch("/farmers/{farmer_id}/approve")
 async def admin_approve_farmer(
     farmer_id: str,
@@ -1467,6 +1500,7 @@ async def admin_approve_farmer(
     farmer.admin_verified_at = datetime.utcnow()
     farmer.admin_notes = body.get('notes', '') if isinstance(body, dict) else ''
     farmer.status = UserStatus.ACTIVE
+    farmer.update_requested = False
     notif = Notification(
         id=str(__import__('uuid').uuid4()),
         recipient_id=farmer.id,
@@ -1498,6 +1532,7 @@ async def admin_reject_farmer(
     farmer.admin_verified_by_name = current_user.first_name + ' ' + current_user.last_name
     farmer.admin_verified_at = datetime.utcnow()
     farmer.admin_notes = reason
+    farmer.update_requested = False
     notif = Notification(
         id=str(__import__('uuid').uuid4()),
         recipient_id=farmer.id,

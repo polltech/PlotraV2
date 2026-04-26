@@ -69,6 +69,14 @@ async def init_db():
     """Initialize database tables"""
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        # Safely add new columns that may not exist on older deployments
+        for sql in [
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS update_requested BOOLEAN DEFAULT FALSE",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS update_requested_by_name VARCHAR(150)",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS update_request_notes TEXT",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS update_requested_at TIMESTAMP",
+        ]:
+            await conn.execute(__import__('sqlalchemy').text(sql))
 
 
 async def close_db():

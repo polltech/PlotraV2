@@ -87,13 +87,19 @@ class User(BaseModel):
     )
 
     # Two-stage farmer verification tracking
-    coop_status = Column(String(50), nullable=True)          # coop_approved / coop_rejected
+    coop_status = Column(String(50), nullable=True)          # coop_approved / coop_rejected / update_requested
     coop_verified_by_name = Column(String(150), nullable=True)
     coop_verified_at = Column(DateTime, nullable=True)
     coop_notes = Column(Text, nullable=True)
     admin_verified_by_name = Column(String(150), nullable=True)
     admin_verified_at = Column(DateTime, nullable=True)
     admin_notes = Column(Text, nullable=True)
+
+    # Update request tracking (either coop or admin can request farmer to fix issues)
+    update_requested = Column(Boolean, default=False, nullable=True)
+    update_requested_by_name = Column(String(150), nullable=True)
+    update_request_notes = Column(Text, nullable=True)
+    update_requested_at = Column(DateTime, nullable=True)
 
     # Password reset fields
     password_reset_token = Column(String(255), nullable=True, unique=True)
