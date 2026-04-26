@@ -761,7 +761,7 @@ async def get_coop_pending_farmers(
 
     query = select(User).where(
         User.role == UserRole.FARMER,
-        (User.coop_status == None) | (User.coop_status == 'pending')
+        (User.coop_status == None) | (User.coop_status == 'pending') | (User.coop_status == 'update_requested')
     )
     if coop_id:
         # Filter to farmers in this cooperative
