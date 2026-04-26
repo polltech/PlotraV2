@@ -875,13 +875,8 @@ async def coop_reject_farm(
     return {"message": "Farm rejected by cooperative", "verification_status": farm.verification_status}
 
 
-@router.get("/farms")
-async def get_coop_farms(
-    status_filter: Optional[str] = None,
-    current_user: User = Depends(require_coop_admin),
-    db: AsyncSession = Depends(get_db)
-):
-    """Get all farms for this cooperative with optional status filter."""
+async def _get_coop_id_for_officer(current_user: User, db: AsyncSession) -> Optional[str]:
+    """Resolve the cooperative ID for the current officer via membership or primary_officer_id."""
     coop_id = getattr(current_user, 'cooperative_id', None)
     if not coop_id:
         coop_result = await db.execute(
@@ -889,13 +884,39 @@ async def get_coop_farms(
         )
         coop = coop_result.scalar_one_or_none()
         coop_id = str(coop.id) if coop else None
+    return coop_id
 
-    query = select(Farm).join(User, Farm.owner_id == User.id).where(
-        Farm.deleted_at == None,
-        User.role == "farmer"
+
+async def _get_farmer_ids_for_coop(coop_id: str, db: AsyncSession):
+    """Return list of farmer user IDs that are members of this cooperative."""
+    result = await db.execute(
+        select(CooperativeMember.user_id).where(
+            CooperativeMember.cooperative_id == coop_id,
+            CooperativeMember.is_active == True
+        )
     )
-    if coop_id:
-        query = query.where(Farm.cooperative_id == coop_id)
+    return result.scalars().all()
+
+
+@router.get("/farms")
+async def get_coop_farms(
+    status_filter: Optional[str] = None,
+    current_user: User = Depends(require_coop_admin),
+    db: AsyncSession = Depends(get_db)
+):
+    """Get all farms whose owners are members of this cooperative."""
+    coop_id = await _get_coop_id_for_officer(current_user, db)
+    if not coop_id:
+        return {"farms": [], "total": 0}
+
+    farmer_ids = await _get_farmer_ids_for_coop(coop_id, db)
+    if not farmer_ids:
+        return {"farms": [], "total": 0}
+
+    query = select(Farm).where(
+        Farm.owner_id.in_(farmer_ids),
+        Farm.deleted_at == None
+    )
     if status_filter:
         query = query.where(Farm.verification_status == status_filter)
 
@@ -928,21 +949,21 @@ async def get_pending_farms(
     db: AsyncSession = Depends(get_db)
 ):
     """Get farms pending coop verification for this cooperative."""
-    coop_result = await db.execute(
-        select(Cooperative).where(Cooperative.primary_officer_id == current_user.id)
-    )
-    coop = coop_result.scalar_one_or_none()
-    coop_id = coop.id if coop else None
+    coop_id = await _get_coop_id_for_officer(current_user, db)
+    if not coop_id:
+        return []
 
-    query = select(Farm).join(User, Farm.owner_id == User.id).where(
-        Farm.verification_status.in_(["pending", "coop_approved", "draft"]),
-        Farm.deleted_at == None,
-        User.role == "farmer"
-    )
-    if coop_id:
-        query = query.where(Farm.cooperative_id == coop_id)
+    farmer_ids = await _get_farmer_ids_for_coop(coop_id, db)
+    if not farmer_ids:
+        return []
 
-    result = await db.execute(query.order_by(Farm.created_at.desc()))
+    result = await db.execute(
+        select(Farm).where(
+            Farm.owner_id.in_(farmer_ids),
+            Farm.verification_status.in_(["pending", "coop_approved", "draft"]),
+            Farm.deleted_at == None
+        ).order_by(Farm.created_at.desc())
+    )
     farms = result.scalars().all()
 
     output = []
@@ -969,17 +990,20 @@ async def record_delivery(
     current_user: User = Depends(require_coop_admin),
     db: AsyncSession = Depends(get_db)
 ):
-    """
-    Record a coffee delivery from a farmer.
-    Creates weighing records and initial quality assessment.
-    """
-    # Generate delivery number
+    """Record a coffee delivery — farm must belong to a farmer in this cooperative."""
+    coop_id = await _get_coop_id_for_officer(current_user, db)
+    if coop_id:
+        # Verify the farm belongs to a member of this cooperative
+        farm_res = await db.execute(select(Farm).where(Farm.id == delivery_data.farm_id))
+        farm = farm_res.scalar_one_or_none()
+        if farm:
+            farmer_ids = await _get_farmer_ids_for_coop(coop_id, db)
+            if farmer_ids and str(farm.owner_id) not in [str(fid) for fid in farmer_ids]:
+                raise HTTPException(status_code=403, detail="Farm does not belong to a farmer in your cooperative")
+
     delivery_number = f"DEL-{datetime.utcnow().strftime('%Y%m%d')}-{uuid.uuid4().hex[:6].upper()}"
-    
-    # Calculate net weight
     net_weight = delivery_data.gross_weight_kg - delivery_data.tare_weight_kg
-    
-    # Create delivery
+
     delivery = Delivery(
         delivery_number=delivery_number,
         farm_id=delivery_data.farm_id,
@@ -993,11 +1017,9 @@ async def record_delivery(
         status=DeliveryStatus.PENDING,
         received_by_id=current_user.id
     )
-    
     db.add(delivery)
     await db.commit()
     await db.refresh(delivery)
-    
     return delivery
 
 
@@ -1009,25 +1031,32 @@ async def get_deliveries(
     current_user: User = Depends(require_coop_admin),
     db: AsyncSession = Depends(get_db)
 ):
-    """
-    Get coffee deliveries for the cooperative.
-    Supports date range and status filtering.
-    """
+    """Get deliveries for farms belonging to farmers in this cooperative."""
+    coop_id = await _get_coop_id_for_officer(current_user, db)
+
     query = select(Delivery)
-    
+
+    if coop_id:
+        farmer_ids = await _get_farmer_ids_for_coop(coop_id, db)
+        if farmer_ids:
+            farm_res = await db.execute(
+                select(Farm.id).where(Farm.owner_id.in_(farmer_ids))
+            )
+            farm_ids = farm_res.scalars().all()
+            if farm_ids:
+                query = query.where(Delivery.farm_id.in_(farm_ids))
+            else:
+                return []
+
     if start_date:
         query = query.where(Delivery.created_at >= start_date)
     if end_date:
         query = query.where(Delivery.created_at <= end_date)
     if status_filter:
         query = query.where(Delivery.status == DeliveryStatus(status_filter))
-    
-    query = query.order_by(Delivery.created_at.desc())
-    
-    result = await db.execute(query)
-    deliveries = result.scalars().all()
-    
-    return deliveries
+
+    result = await db.execute(query.order_by(Delivery.created_at.desc()))
+    return result.scalars().all()
 
 
 @router.post("/batches", response_model=BatchResponse, status_code=status.HTTP_201_CREATED)

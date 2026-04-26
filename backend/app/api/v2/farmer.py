@@ -11,7 +11,7 @@ from sqlalchemy import select, func
 
 from app.core.database import get_db
 from app.core.auth import get_current_user, require_farmer
-from app.models.user import User, VerificationStatus
+from app.models.user import User, VerificationStatus, CooperativeMember
 from app.models.farm import Farm, LandParcel, LandDocument, DocumentType, OwnershipType
 from app.models.traceability import Delivery
 from app.models.payments import PaymentEscrow, PayoutStatus
@@ -168,6 +168,17 @@ async def create_farm(
     )
     db.add(farm)
     await db.flush()
+
+    # Tag farm with cooperative_id from farmer's CooperativeMember record
+    member_res = await db.execute(
+        select(CooperativeMember).where(
+            CooperativeMember.user_id == current_user.id,
+            CooperativeMember.is_active == True
+        )
+    )
+    membership = member_res.scalar_one_or_none()
+    if membership:
+        farm.cooperative_id = str(membership.cooperative_id)
 
     # Apply extra fields from form sub-objects
     sustainability = farm_data.sustainability or {}
