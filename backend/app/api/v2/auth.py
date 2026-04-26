@@ -498,14 +498,18 @@ async def update_user_profile(
     # Build update fields (only non-None values)
     update_fields = {}
     allowed_fields = [
-        'phone', 'id_number', 'date_of_birth', 'gender',
+        'phone', 'date_of_birth', 'gender',
         'county', 'subcounty', 'ward', 'address', 'first_name', 'last_name',
         'profile_photo_url'
     ]
-    
+
     for field in allowed_fields:
         if field in profile_data and profile_data[field] is not None:
             update_fields[field] = profile_data[field]
+
+    # id_number from the frontend maps to national_id column
+    if 'id_number' in profile_data and profile_data['id_number'] is not None:
+        update_fields['national_id'] = profile_data['id_number']
     
     # Handle kyc_data fields
     kyc_fields = ['id_type', 'gender', 'cooperative_code', 'payout_method', 
