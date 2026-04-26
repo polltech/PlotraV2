@@ -499,7 +499,7 @@ async def update_user_profile(
     update_fields = {}
     allowed_fields = [
         'phone', 'date_of_birth', 'gender',
-        'county', 'subcounty', 'ward', 'address', 'first_name', 'last_name',
+        'county', 'ward', 'address', 'first_name', 'last_name',
         'profile_photo_url'
     ]
 
@@ -510,6 +510,10 @@ async def update_user_profile(
     # id_number from the frontend maps to national_id column
     if 'id_number' in profile_data and profile_data['id_number'] is not None:
         update_fields['national_id'] = profile_data['id_number']
+
+    # subcounty from the frontend maps to district column
+    if 'subcounty' in profile_data and profile_data['subcounty'] is not None:
+        update_fields['district'] = profile_data['subcounty']
     
     # Handle kyc_data fields
     kyc_fields = ['id_type', 'gender', 'cooperative_code', 'payout_method', 
