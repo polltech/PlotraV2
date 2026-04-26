@@ -1262,6 +1262,7 @@ async def get_my_cooperative(
 ):
     """Return the cooperative linked to the current officer."""
     coop_id = getattr(current_user, 'cooperative_id', None)
+    coop = None
     if not coop_id:
         coop_result = await db.execute(
             select(Cooperative).where(Cooperative.primary_officer_id == current_user.id)
@@ -1270,7 +1271,9 @@ async def get_my_cooperative(
         coop_id = str(coop.id) if coop else None
     if not coop_id:
         raise HTTPException(status_code=404, detail="No cooperative linked to your account")
-    return {"cooperative_id": coop_id}
+    if not coop:
+        coop = await db.get(Cooperative, coop_id)
+    return {"cooperative_id": coop_id, "cooperative_name": coop.name if coop else None}
 
 
 @router.get("/stats")

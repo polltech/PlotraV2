@@ -425,6 +425,33 @@ class PlotraDashboard {
             const el = document.getElementById(id);
             if (el) el.style.display = isFarmerUser ? 'none' : '';
         });
+
+        // Navbar search area: coop officers see cooperative name; others see nothing
+        const searchArea = document.getElementById('navbarSearchArea');
+        if (searchArea) {
+            if (roleStr === 'COOPERATIVE_OFFICER') {
+                searchArea.outerHTML = `<div id="navbarSearchArea" class="d-none d-lg-flex align-items-center gap-2">
+                    <i class="bi bi-building" style="color:#daa520;font-size:1.1rem;"></i>
+                    <span id="navCoopName" style="color:#f5f5dc;font-weight:600;font-size:0.95rem;white-space:nowrap;">Loading...</span>
+                </div>`;
+                // Fetch and display cooperative name
+                api.request('/coop/me').then(res => {
+                    const el = document.getElementById('navCoopName');
+                    if (el && res?.cooperative_name) el.textContent = res.cooperative_name;
+                    // Cache for later use
+                    if (res?.cooperative_id && this.currentUser) {
+                        this.currentUser.cooperative_id = res.cooperative_id;
+                        this.currentUser.cooperative_name = res.cooperative_name;
+                        localStorage.setItem('plotra_user', JSON.stringify(this.currentUser));
+                    }
+                }).catch(() => {
+                    const el = document.getElementById('navCoopName');
+                    if (el) el.textContent = 'Cooperative';
+                });
+            } else {
+                searchArea.outerHTML = `<div id="navbarSearchArea"></div>`;
+            }
+        }
     }
 
     async loadCurrentUser() {
