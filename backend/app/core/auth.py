@@ -253,8 +253,8 @@ async def authenticate_user(
         query = select(User).where(User.phone.in_(candidates))
 
     result = await db.execute(query)
-    user = result.scalar_one_or_none()
-    
+    user = result.scalars().first()
+
     if not user:
         return None
     
