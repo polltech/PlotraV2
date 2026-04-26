@@ -5,7 +5,7 @@ PostGIS geometry, parent-child parcels, and land documents
 import enum
 from datetime import datetime
 from typing import Dict, Optional
-from sqlalchemy import Column, String, Integer, Float, Text, ForeignKey, Enum, JSON, DateTime
+from sqlalchemy import Column, String, Integer, Float, Text, ForeignKey, Enum, JSON, DateTime, Boolean
 from sqlalchemy.orm import relationship
 from geoalchemy2 import Geometry
 from app.models.base import BaseModel, GeoModel, SafeGeometry
