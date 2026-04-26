@@ -6054,16 +6054,11 @@ class PlotraDashboard {
                                                     <label class="form-label small fw-semibold">Phone Number</label>
                                                     <input type="tel" class="form-control profile-field" id="pPhone" value="${user?.phone || user?.phone_number || ''}" disabled>
                                                 </div>
-                                                <div class="col-md-6">
-                                                    <label class="form-label small fw-semibold">Email</label>
-                                                    <input type="email" class="form-control profile-field" id="pEmail" value="${user?.email || ''}" disabled>
-                                                </div>
                                                 <div class="col-md-4">
                                                     <label class="form-label small fw-semibold">Gender</label>
                                                     <select class="form-select profile-field" id="pGender" disabled>
                                                         <option value="">Select...</option>
-                                                        <option value="M" ${(user?.gender || kyc.gender) === 'M' ? 'selected' : ''}>Male</option>
-                                                        <option value="F" ${(user?.gender || kyc.gender) === 'F' ? 'selected' : ''}>Female</option>
+                                                        ${(() => { const g = (user?.gender || kyc.gender || '').toLowerCase(); const isM = g === 'm' || g === 'male'; const isF = g === 'f' || g === 'female'; return `<option value="Male" ${isM ? 'selected' : ''}>Male</option><option value="Female" ${isF ? 'selected' : ''}>Female</option>`; })()}
                                                     </select>
                                                 </div>
                                                 <div class="col-md-4">
@@ -6084,11 +6079,15 @@ class PlotraDashboard {
                                                 </div>
                                                 <div class="col-md-6">
                                                     <label class="form-label small fw-semibold">Sub-County</label>
-                                                    <input type="text" class="form-control profile-field" id="pSubcounty" value="${user?.subcounty || ''}" disabled>
+                                                    <input type="text" class="form-control profile-field" id="pSubcounty" value="${user?.subcounty || user?.district || ''}" disabled>
                                                 </div>
                                                 <div class="col-md-6">
                                                     <label class="form-label small fw-semibold">Cooperative</label>
-                                                    <input type="text" class="form-control profile-field" id="pCoop" value="${kyc.cooperative_name || kyc.cooperative_code || user?.cooperative_code || ''}" disabled>
+                                                    <input type="text" class="form-control" id="pCoop" value="${kyc.cooperative_name || kyc.cooperative_code || user?.cooperative_code || ''}" disabled>
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <label class="form-label small fw-semibold">Email</label>
+                                                    <input type="email" class="form-control" value="${user?.email || ''}" disabled>
                                                 </div>
                                             </div>
                                         </div>

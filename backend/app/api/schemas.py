@@ -3,7 +3,7 @@ Plotra Platform - Pydantic Schemas for API Validation
 """
 from datetime import datetime
 from typing import List, Optional, Dict, Any
-from pydantic import BaseModel, Field, EmailStr, field_validator, ConfigDict, model_validator
+from pydantic import BaseModel, Field, EmailStr, field_validator, ConfigDict, model_validator, AliasChoices
 from enum import Enum
 
 
@@ -243,9 +243,10 @@ class UserResponse(BaseModel):
     verification_status: Optional[VerificationStatusEnum] = None
     country: Optional[str] = None
     county: Optional[str] = None
-    subcounty: Optional[str] = None
+    subcounty: Optional[str] = Field(None, validation_alias=AliasChoices('subcounty', 'district'))
     gender: Optional[str] = None
     national_id: Optional[str] = None
+    kyc_data: Optional[dict] = None
     created_at: datetime
     # Two-stage farmer verification tracking
     coop_status: Optional[str] = None
