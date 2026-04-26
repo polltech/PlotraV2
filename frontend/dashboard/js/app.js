@@ -3030,6 +3030,7 @@ class PlotraDashboard {
         const coopStatusBadge = (s) => {
             if (s === 'coop_approved') return `<span class="badge bg-info text-dark">Coop Approved</span>`;
             if (s === 'coop_rejected') return `<span class="badge bg-danger">Coop Rejected</span>`;
+            if (s === 'update_requested') return `<span class="badge bg-warning text-dark"><i class="bi bi-exclamation-triangle me-1"></i>Update Requested</span>`;
             return `<span class="badge bg-warning text-dark">Awaiting Coop</span>`;
         };
 
@@ -3065,7 +3066,7 @@ class PlotraDashboard {
             const res = await api.request('/coop/farms');
             const farms = res.farms || [];
             document.getElementById('cf-total').textContent = res.total || farms.length;
-            document.getElementById('cf-pending').textContent = farms.filter(f => !f.coop_status || f.coop_status === 'pending').length;
+            document.getElementById('cf-pending').textContent = farms.filter(f => !f.coop_status || f.coop_status === 'pending' || f.coop_status === 'update_requested').length;
             document.getElementById('cf-approved').textContent = farms.filter(f => f.coop_status === 'coop_approved').length;
             document.getElementById('cf-rejected').textContent = farms.filter(f => f.coop_status === 'coop_rejected').length;
 
@@ -3075,14 +3076,18 @@ class PlotraDashboard {
                 return;
             }
             tbody.innerHTML = farms.map(f => {
-                const canApprove = !f.coop_status || f.coop_status === 'pending' || f.coop_status === 'coop_rejected';
+                const canApprove = !f.coop_status || f.coop_status === 'pending' || f.coop_status === 'coop_rejected' || f.coop_status === 'update_requested';
                 const canReject = f.coop_status !== 'coop_rejected';
+                const farmName = (f.farm_name || 'Unnamed Farm').replace(/'/g, "\\'");
                 return `<tr>
                     <td>
                         <div class="fw-semibold">${f.farmer_name || 'Unknown'}</div>
                         <div class="text-muted" style="font-size:.75rem">${f.farmer_phone || ''}</div>
                     </td>
-                    <td>${f.farm_name || 'Unnamed Farm'}</td>
+                    <td>
+                        <div>${f.farm_name || 'Unnamed Farm'}</div>
+                        ${f.update_requested && f.update_request_notes ? `<div class="text-warning small mt-1"><i class="bi bi-exclamation-circle me-1"></i>${f.update_request_notes}</div>` : ''}
+                    </td>
                     <td class="text-nowrap">${f.total_area_hectares ? f.total_area_hectares + ' ha' : '—'}</td>
                     <td>${statusBadge(f.verification_status)}</td>
                     <td>${coopStatusBadge(f.coop_status)}</td>
@@ -3091,6 +3096,7 @@ class PlotraDashboard {
                         <div class="d-flex gap-1 flex-wrap">
                             ${canApprove ? `<button class="btn btn-sm btn-success" onclick="app.coopApproveFarm('${f.id}')"><i class="bi bi-check-circle me-1"></i>Approve</button>` : ''}
                             ${canReject ? `<button class="btn btn-sm btn-outline-danger" onclick="app.coopRejectFarm('${f.id}')"><i class="bi bi-x-circle me-1"></i>Reject</button>` : ''}
+                            <button class="btn btn-sm btn-outline-warning" title="Request Update" onclick="app._showFarmUpdateRequestModal('${f.id}','${farmName}','coop')"><i class="bi bi-exclamation-triangle"></i></button>
                         </div>
                     </td>
                 </tr>`;
@@ -3768,6 +3774,74 @@ class PlotraDashboard {
             }
             this.showToast('Update request sent to farmer via notification', 'success');
             await this.loadFarmerApprovals(document.getElementById('pageContent'));
+        } catch(e) {
+            this.showToast(`Error: ${e.message}`, 'error');
+        }
+    }
+
+    _showFarmUpdateRequestModal(farmId, farmName, actor) {
+        this._farmUpdateRequestState = { farmId, actor };
+        const old = document.getElementById('farmUpdateRequestModal');
+        if (old) { bootstrap.Modal.getInstance(old)?.dispose(); old.remove(); }
+
+        const el = document.createElement('div');
+        el.innerHTML = `
+            <div class="modal fade" id="farmUpdateRequestModal" tabindex="-1">
+                <div class="modal-dialog modal-dialog-scrollable">
+                    <div class="modal-content">
+                        <div class="modal-header bg-warning bg-opacity-10 border-bottom-0">
+                            <h5 class="modal-title"><i class="bi bi-exclamation-triangle-fill text-warning me-2"></i>Request Farm Update</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <p class="text-muted mb-3">Describe the issue with <strong>${farmName || 'this farm'}</strong> that the farmer needs to correct before you can approve. They will receive a notification with your message.</p>
+                            <label class="form-label fw-semibold">Issue / Action Required <span class="text-danger">*</span></label>
+                            <textarea id="farmUpdateRequestIssueInput" class="form-control" rows="4" placeholder="e.g. The farm boundary on the map appears incorrect. Please re-capture the farm polygon accurately."></textarea>
+                            <div class="form-text">Be specific so the farmer knows exactly what to fix.</div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                            <button type="button" class="btn btn-warning" id="farmUpdateRequestConfirmBtn">
+                                <i class="bi bi-send me-1"></i>Send Request
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+        document.body.appendChild(el.firstElementChild);
+        document.getElementById('farmUpdateRequestConfirmBtn').addEventListener('click', () => this._confirmFarmUpdateRequest());
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('farmUpdateRequestModal')).show();
+    }
+
+    async _confirmFarmUpdateRequest() {
+        const { farmId, actor } = this._farmUpdateRequestState;
+        const issue = document.getElementById('farmUpdateRequestIssueInput')?.value?.trim() || '';
+        if (!issue) { this.showToast('Please describe the issue before sending.', 'error'); return; }
+        const modal = document.getElementById('farmUpdateRequestModal');
+        if (modal) bootstrap.Modal.getOrCreateInstance(modal).hide();
+        try {
+            if (actor === 'coop') {
+                await api.coopRequestFarmUpdate(farmId, issue);
+            } else {
+                await api.adminRequestFarmUpdate(farmId, issue);
+            }
+            this.showToast('Update request sent to farmer via notification', 'success');
+            if (actor === 'coop') {
+                await this.loadCoopFarmApprovals(document.getElementById('pageContent'));
+            } else {
+                await this.loadVerification(document.getElementById('pageContent'));
+            }
+        } catch(e) {
+            this.showToast(`Error: ${e.message}`, 'error');
+        }
+    }
+
+    async resubmitFarmForReview(farmId) {
+        if (!confirm('Resubmit this farm for cooperative review? Make sure you have updated the necessary details first.')) return;
+        try {
+            await api.resubmitFarmForReview(farmId);
+            this.showToast('Farm resubmitted for review. The cooperative officer has been notified.', 'success');
+            await this.loadFarmerFarms();
         } catch(e) {
             this.showToast(`Error: ${e.message}`, 'error');
         }
@@ -5113,22 +5187,31 @@ class PlotraDashboard {
                         : f.coop_status === 'coop_rejected'
                         ? `<span class="badge bg-danger">Coop Rejected</span>`
                         : `<span class="badge bg-secondary">Awaiting Coop</span>`;
+                    const updateBadge = f.update_requested
+                        ? `<span class="badge bg-warning text-dark ms-1"><i class="bi bi-exclamation-triangle me-1"></i>Update Requested</span>`
+                        : '';
+                    const actor = isAdmin ? 'admin' : 'coop';
+                    const farmName = (f.farm_name || f.name || 'Unnamed Farm').replace(/'/g, "\\'");
                     return `
                     <tr>
                         <td>
                             <div class="fw-bold">${f.farm_name || f.name || 'Unnamed Farm'}</div>
                             <div class="text-muted small">${f.crop_type || ''}</div>
+                            ${f.update_requested && f.update_request_notes ? `<div class="text-warning small mt-1"><i class="bi bi-exclamation-circle me-1"></i>${f.update_request_notes}</div>` : ''}
                         </td>
                         <td>
                             <div>${f.farmer_name || 'N/A'}</div>
                             <div class="text-muted small">${f.farmer_phone || ''}</div>
                         </td>
                         <td>${f.sub_county || f.county || 'N/A'}</td>
-                        <td>${f.total_area_hectares || '—'}</td>
+                        <td>
+                            ${f.total_area_hectares || '—'}
+                            ${updateBadge}
+                        </td>
                         ${isAdmin ? `<td>${coopBadge}${f.coop_approver ? `<div class="text-muted small mt-1">by ${f.coop_approver}</div>` : ''}</td>` : ''}
                         <td>${f.created_at ? new Date(f.created_at).toLocaleDateString() : 'N/A'}</td>
                         <td>
-                            <div class="btn-group">
+                            <div class="d-flex gap-1 flex-wrap">
                                 <button class="btn btn-sm btn-outline-success"
                                     onclick="app.showVerificationApproveModal('${f.id}', ${isAdmin})"
                                     title="Approve">
@@ -5138,6 +5221,11 @@ class PlotraDashboard {
                                     onclick="app.showVerificationRejectModal('${f.id}', ${isAdmin})"
                                     title="Reject">
                                     <i class="bi bi-x-lg"></i> Reject
+                                </button>
+                                <button class="btn btn-sm btn-outline-warning"
+                                    onclick="app._showFarmUpdateRequestModal('${f.id}','${farmName}','${actor}')"
+                                    title="Request Update">
+                                    <i class="bi bi-exclamation-triangle"></i>
                                 </button>
                             </div>
                         </td>
@@ -9250,10 +9338,23 @@ class PlotraDashboard {
                     const hasPolygon = !!(farm.parcels && farm.parcels.length > 0 && farm.parcels[0].boundary_geojson);
                     const statusColor = { draft:'secondary', pending:'warning', verified:'success', rejected:'danger' }[farm.verification_status] || 'secondary';
                     const compColor = farm.compliance_status === 'Compliant' ? 'success' : farm.compliance_status === 'Under Review' ? 'warning' : 'secondary';
+                    const updateBanner = farm.update_requested
+                        ? `<div class="alert alert-warning py-2 px-3 mb-2 d-flex align-items-start gap-2" style="font-size:.82rem">
+                               <i class="bi bi-exclamation-triangle-fill text-warning mt-1 flex-shrink-0"></i>
+                               <div class="flex-grow-1">
+                                   <strong>Update Required</strong>${farm.update_requested_by_name ? ` by ${farm.update_requested_by_name}` : ''}<br>
+                                   ${farm.update_request_notes || ''}
+                               </div>
+                               <button class="btn btn-sm btn-warning ms-2" onclick="app.resubmitFarmForReview('${farm.id}')">
+                                   <i class="bi bi-arrow-repeat me-1"></i>Resubmit
+                               </button>
+                           </div>`
+                        : '';
                     return `
                 <div class="col-12 col-sm-6 col-xl-4">
                     <div class="card h-100 shadow-sm" style="border:none;border-left:4px solid var(--bs-${statusColor});min-width:240px;">
                         <div class="card-body d-flex flex-column p-3">
+                            ${updateBanner}
                             <div class="d-flex justify-content-between align-items-start mb-2">
                                 <h6 class="card-title mb-0 fw-semibold" style="word-break:break-word;flex:1;padding-right:8px">${farm.farm_name || 'Unnamed Farm'}</h6>
                                 <span class="badge bg-${statusColor} text-capitalize flex-shrink-0">${farm.verification_status || 'draft'}</span>

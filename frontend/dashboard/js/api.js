@@ -459,6 +459,16 @@ Attempted URL: ${url}`;
         });
     }
 
+    async coopRequestFarmUpdate(farmId, issue) {
+        return this.request(`/coop/farms/${farmId}/request-update`, { method: 'PATCH', body: JSON.stringify({ issue }) });
+    }
+    async adminRequestFarmUpdate(farmId, issue) {
+        return this.request(`/admin/farms/${farmId}/request-update`, { method: 'PATCH', body: JSON.stringify({ issue }) });
+    }
+    async resubmitFarmForReview(farmId) {
+        return this.request(`/farmer/farm/${farmId}/resubmit`, { method: 'PATCH' });
+    }
+
     // Notifications
     async getNotifications() {
         return this.request('/farmer/notifications');
