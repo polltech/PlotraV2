@@ -3075,10 +3075,10 @@ class PlotraDashboard {
                 tbody.innerHTML = `<tr><td colspan="7" class="text-center py-5 text-muted"><i class="bi bi-geo-alt fs-3 d-block mb-2"></i>No farms in your cooperative yet</td></tr>`;
                 return;
             }
+            this._farmsApprovalMap = this._farmsApprovalMap || {};
+            farms.forEach(f => { this._farmsApprovalMap[f.id] = { ...f, _actor: 'coop' }; });
+
             tbody.innerHTML = farms.map(f => {
-                const canApprove = !f.coop_status || f.coop_status === 'pending' || f.coop_status === 'coop_rejected' || f.coop_status === 'update_requested';
-                const canReject = f.coop_status !== 'coop_rejected';
-                const farmName = (f.farm_name || 'Unnamed Farm').replace(/'/g, "\\'");
                 return `<tr>
                     <td>
                         <div class="fw-semibold">${f.farmer_name || 'Unknown'}</div>
@@ -3086,18 +3086,16 @@ class PlotraDashboard {
                     </td>
                     <td>
                         <div>${f.farm_name || 'Unnamed Farm'}</div>
-                        ${f.update_requested && f.update_request_notes ? `<div class="text-warning small mt-1"><i class="bi bi-exclamation-circle me-1"></i>${f.update_request_notes}</div>` : ''}
+                        ${f.update_requested ? `<span class="badge bg-warning text-dark mt-1"><i class="bi bi-exclamation-triangle me-1"></i>Update Requested</span>` : ''}
                     </td>
                     <td class="text-nowrap">${f.total_area_hectares ? f.total_area_hectares + ' ha' : '—'}</td>
                     <td>${statusBadge(f.verification_status)}</td>
                     <td>${coopStatusBadge(f.coop_status)}</td>
                     <td class="text-muted" style="font-size:.8rem">${f.created_at ? new Date(f.created_at).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}) : '—'}</td>
                     <td>
-                        <div class="d-flex gap-1 flex-wrap">
-                            ${canApprove ? `<button class="btn btn-sm btn-success" onclick="app.coopApproveFarm('${f.id}')"><i class="bi bi-check-circle me-1"></i>Approve</button>` : ''}
-                            ${canReject ? `<button class="btn btn-sm btn-outline-danger" onclick="app.coopRejectFarm('${f.id}')"><i class="bi bi-x-circle me-1"></i>Reject</button>` : ''}
-                            <button class="btn btn-sm btn-outline-warning" title="Request Update" onclick="app._showFarmUpdateRequestModal('${f.id}','${farmName}','coop')"><i class="bi bi-exclamation-triangle"></i></button>
-                        </div>
+                        <button class="btn btn-sm btn-outline-primary" onclick="app._showFarmDetailsModal('${f.id}')">
+                            <i class="bi bi-eye me-1"></i>View
+                        </button>
                     </td>
                 </tr>`;
             }).join('');
@@ -3727,9 +3725,11 @@ class PlotraDashboard {
 
     _showRequestUpdateModal(farmerId, farmerName, actor) {
         this._requestUpdateState = { farmerId, actor };
-        // Close details modal if open
-        const details = document.getElementById('farmerDetailsModal');
-        if (details) bootstrap.Modal.getInstance(details)?.hide();
+        // Close any open details modal first
+        ['farmerDetailsModal','farmDetailsModal'].forEach(id => {
+            const m = document.getElementById(id);
+            if (m) bootstrap.Modal.getInstance(m)?.hide();
+        });
         // Remove any stale modal first
         const old = document.getElementById('requestUpdateModal');
         if (old) { bootstrap.Modal.getInstance(old)?.dispose(); old.remove(); }
@@ -3864,6 +3864,111 @@ class PlotraDashboard {
             </div>`;
         document.body.appendChild(el.firstElementChild);
         bootstrap.Modal.getOrCreateInstance(document.getElementById('farmerDetailsModal')).show();
+    }
+
+    _showFarmDetailsModal(farmId) {
+        const f = (this._farmsApprovalMap || {})[farmId];
+        if (!f) { this.showToast('Farm data not found', 'error'); return; }
+
+        const actor = f._actor || 'coop';
+        const isAdmin = actor === 'admin';
+        const farmName = (f.farm_name || f.name || 'Unnamed Farm').replace(/'/g, "\\'");
+        const date = f.created_at ? new Date(f.created_at).toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' }) : '—';
+
+        const row = (label, value) => value
+            ? `<div class="col-6 mb-3"><div class="text-muted small">${label}</div><div class="fw-semibold">${value}</div></div>`
+            : '';
+
+        const coopStatusLabel = { coop_approved:'Coop Approved', coop_rejected:'Coop Rejected', update_requested:'Update Requested' }[f.coop_status] || 'Pending Coop Review';
+        const verificationLabel = { verified:'Verified', rejected:'Rejected', pending:'Pending', draft:'Draft', coop_approved:'Coop Approved' }[f.verification_status] || f.verification_status || 'Draft';
+
+        const updateBanner = f.update_requested
+            ? `<div class="alert alert-warning d-flex gap-2 align-items-start mb-3">
+                   <i class="bi bi-exclamation-triangle-fill text-warning mt-1 flex-shrink-0"></i>
+                   <div><strong>Update Requested</strong>${f.update_requested_by_name ? ` by ${f.update_requested_by_name}` : ''}<br><span class="small">${f.update_request_notes || ''}</span></div>
+               </div>` : '';
+
+        const old = document.getElementById('farmDetailsModal');
+        if (old) { bootstrap.Modal.getInstance(old)?.dispose(); old.remove(); }
+
+        const el = document.createElement('div');
+        el.innerHTML = `
+            <div class="modal fade" id="farmDetailsModal" tabindex="-1">
+                <div class="modal-dialog modal-lg modal-dialog-scrollable">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title"><i class="bi bi-geo-alt-fill me-2 text-success"></i>${f.farm_name || f.name || 'Unnamed Farm'}</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            ${updateBanner}
+                            <h6 class="text-uppercase text-muted small fw-bold mb-3 border-bottom pb-2">Farm Information</h6>
+                            <div class="row">
+                                ${row('Farm Name', f.farm_name || f.name)}
+                                ${row('Crop Type', f.crop_type)}
+                                ${row('Total Area', f.total_area_hectares ? f.total_area_hectares + ' ha' : null)}
+                                ${row('Coffee Area', f.coffee_area_hectares ? f.coffee_area_hectares + ' ha' : null)}
+                                ${row('Registered', date)}
+                                ${row('Compliance', f.compliance_status)}
+                            </div>
+                            <h6 class="text-uppercase text-muted small fw-bold mb-3 border-bottom pb-2 mt-2">Location</h6>
+                            <div class="row">
+                                ${row('County', f.county)}
+                                ${row('Sub-County', f.sub_county || f.subcounty)}
+                                ${row('Ward', f.ward)}
+                            </div>
+                            <h6 class="text-uppercase text-muted small fw-bold mb-3 border-bottom pb-2 mt-2">Farmer</h6>
+                            <div class="row">
+                                ${row('Farmer Name', f.farmer_name)}
+                                ${row('Phone', f.farmer_phone)}
+                                ${row('Cooperative', f.cooperative_name || f.cooperative_code)}
+                            </div>
+                            <h6 class="text-uppercase text-muted small fw-bold mb-3 border-bottom pb-2 mt-2">Verification Status</h6>
+                            <div class="row">
+                                ${row('Coop Status', coopStatusLabel)}
+                                ${row('Admin Status', verificationLabel)}
+                                ${f.coop_notes ? row('Coop Notes', f.coop_notes) : ''}
+                                ${f.admin_notes ? row('Admin Notes', f.admin_notes) : ''}
+                                ${f.coop_approver ? row('Coop Approver', f.coop_approver) : ''}
+                            </div>
+                        </div>
+                        <div class="modal-footer flex-wrap gap-2">
+                            <button type="button" class="btn btn-secondary me-auto" data-bs-dismiss="modal">Close</button>
+                            <button type="button" class="btn btn-outline-warning" onclick="app._showFarmUpdateRequestModal('${farmId}','${farmName}','${actor}')">
+                                <i class="bi bi-exclamation-triangle me-1"></i>Request Update
+                            </button>
+                            <button type="button" class="btn btn-outline-danger" onclick="app._farmDetailsReject('${farmId}',${isAdmin})">
+                                <i class="bi bi-x-lg me-1"></i>Reject
+                            </button>
+                            <button type="button" class="btn btn-success" onclick="app._farmDetailsApprove('${farmId}',${isAdmin})">
+                                <i class="bi bi-check-lg me-1"></i>Approve
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+        document.body.appendChild(el.firstElementChild);
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('farmDetailsModal')).show();
+    }
+
+    _farmDetailsApprove(farmId, isAdmin) {
+        const modal = document.getElementById('farmDetailsModal');
+        if (modal) bootstrap.Modal.getInstance(modal)?.hide();
+        if (isAdmin) {
+            this.showVerificationApproveModal(farmId, true);
+        } else {
+            this.coopApproveFarm(farmId);
+        }
+    }
+
+    _farmDetailsReject(farmId, isAdmin) {
+        const modal = document.getElementById('farmDetailsModal');
+        if (modal) bootstrap.Modal.getInstance(modal)?.hide();
+        if (isAdmin) {
+            this.showVerificationRejectModal(farmId, true);
+        } else {
+            this.coopRejectFarm(farmId);
+        }
     }
 
     _showFarmUpdateRequestModal(farmId, farmName, actor) {
@@ -5268,53 +5373,34 @@ class PlotraDashboard {
 
             if (farms.length > 0) {
                 const cols = isAdmin ? 7 : 6;
+                this._farmsApprovalMap = this._farmsApprovalMap || {};
+                farms.forEach(f => { this._farmsApprovalMap[f.id] = { ...f, _actor: isAdmin ? 'admin' : 'coop' }; });
+
                 list.innerHTML = farms.map(f => {
                     const coopBadge = f.coop_status === 'coop_approved'
                         ? `<span class="badge bg-success">Coop Approved</span>`
                         : f.coop_status === 'coop_rejected'
                         ? `<span class="badge bg-danger">Coop Rejected</span>`
                         : `<span class="badge bg-secondary">Awaiting Coop</span>`;
-                    const updateBadge = f.update_requested
-                        ? `<span class="badge bg-warning text-dark ms-1"><i class="bi bi-exclamation-triangle me-1"></i>Update Requested</span>`
-                        : '';
-                    const actor = isAdmin ? 'admin' : 'coop';
-                    const farmName = (f.farm_name || f.name || 'Unnamed Farm').replace(/'/g, "\\'");
                     return `
                     <tr>
                         <td>
                             <div class="fw-bold">${f.farm_name || f.name || 'Unnamed Farm'}</div>
                             <div class="text-muted small">${f.crop_type || ''}</div>
-                            ${f.update_requested && f.update_request_notes ? `<div class="text-warning small mt-1"><i class="bi bi-exclamation-circle me-1"></i>${f.update_request_notes}</div>` : ''}
+                            ${f.update_requested ? `<span class="badge bg-warning text-dark mt-1"><i class="bi bi-exclamation-triangle me-1"></i>Update Requested</span>` : ''}
                         </td>
                         <td>
                             <div>${f.farmer_name || 'N/A'}</div>
                             <div class="text-muted small">${f.farmer_phone || ''}</div>
                         </td>
                         <td>${f.sub_county || f.county || 'N/A'}</td>
-                        <td>
-                            ${f.total_area_hectares || '—'}
-                            ${updateBadge}
-                        </td>
+                        <td>${f.total_area_hectares || '—'}</td>
                         ${isAdmin ? `<td>${coopBadge}${f.coop_approver ? `<div class="text-muted small mt-1">by ${f.coop_approver}</div>` : ''}</td>` : ''}
                         <td>${f.created_at ? new Date(f.created_at).toLocaleDateString() : 'N/A'}</td>
                         <td>
-                            <div class="d-flex gap-1 flex-wrap">
-                                <button class="btn btn-sm btn-outline-success"
-                                    onclick="app.showVerificationApproveModal('${f.id}', ${isAdmin})"
-                                    title="Approve">
-                                    <i class="bi bi-check-lg"></i> Approve
-                                </button>
-                                <button class="btn btn-sm btn-outline-danger"
-                                    onclick="app.showVerificationRejectModal('${f.id}', ${isAdmin})"
-                                    title="Reject">
-                                    <i class="bi bi-x-lg"></i> Reject
-                                </button>
-                                <button class="btn btn-sm btn-outline-warning"
-                                    onclick="app._showFarmUpdateRequestModal('${f.id}','${farmName}','${actor}')"
-                                    title="Request Update">
-                                    <i class="bi bi-exclamation-triangle"></i>
-                                </button>
-                            </div>
+                            <button class="btn btn-sm btn-outline-primary" onclick="app._showFarmDetailsModal('${f.id}')">
+                                <i class="bi bi-eye me-1"></i>View
+                            </button>
                         </td>
                     </tr>`;
                 }).join('');
