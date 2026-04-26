@@ -1664,7 +1664,11 @@ class PlotraDashboard {
                     break;
                 case 'farm-approvals':
                     if (title) title.textContent = 'Farm Approvals';
-                    await this.loadFarms(content);
+                    if ((this.currentUser?.role || '').toLowerCase() === 'cooperative_officer') {
+                        await this.loadCoopFarmApprovals(content);
+                    } else {
+                        await this.loadFarms(content);
+                    }
                     break;
                 case 'coop-team':
                     if (title) title.textContent = 'Cooperative Team';
@@ -2900,6 +2904,104 @@ class PlotraDashboard {
             console.error(error);
             content.innerHTML = `<div class="alert alert-danger">Error loading dashboard: ${error.message}</div>`;
         }
+    }
+
+    async loadCoopFarmApprovals(content) {
+        const statusBadge = (s) => {
+            const map = { draft: 'bg-secondary', pending: 'bg-warning text-dark', verified: 'bg-success', coop_approved: 'bg-info text-dark', rejected: 'bg-danger', coop_rejected: 'bg-danger' };
+            return `<span class="badge ${map[s] || 'bg-secondary'} text-capitalize">${s?.replace('_', ' ') || 'draft'}</span>`;
+        };
+        const coopStatusBadge = (s) => {
+            if (s === 'coop_approved') return `<span class="badge bg-info text-dark">Coop Approved</span>`;
+            if (s === 'coop_rejected') return `<span class="badge bg-danger">Coop Rejected</span>`;
+            return `<span class="badge bg-warning text-dark">Awaiting Coop</span>`;
+        };
+
+        content.innerHTML = `
+            <div class="row g-3 mb-4">
+                <div class="col-6 col-md-3"><div class="card text-center h-100"><div class="card-body py-3"><div class="text-muted small">Total Farms</div><h3 class="mb-0" id="cf-total">—</h3></div></div></div>
+                <div class="col-6 col-md-3"><div class="card text-center h-100"><div class="card-body py-3"><div class="text-muted small">Awaiting Review</div><h3 class="mb-0 text-warning" id="cf-pending">—</h3></div></div></div>
+                <div class="col-6 col-md-3"><div class="card text-center h-100"><div class="card-body py-3"><div class="text-muted small">Coop Approved</div><h3 class="mb-0 text-info" id="cf-approved">—</h3></div></div></div>
+                <div class="col-6 col-md-3"><div class="card text-center h-100"><div class="card-body py-3"><div class="text-muted small">Rejected</div><h3 class="mb-0 text-danger" id="cf-rejected">—</h3></div></div></div>
+            </div>
+            <div class="card">
+                <div class="card-header d-flex align-items-center flex-wrap gap-2">
+                    <span class="fw-semibold me-auto">Cooperative Farms</span>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="app.loadCoopFarmApprovals(document.getElementById('pageContent'))">
+                        <i class="bi bi-arrow-clockwise me-1"></i>Refresh
+                    </button>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0" style="min-width:700px">
+                            <thead class="table-light">
+                                <tr><th>Farmer</th><th>Farm Name</th><th>Area</th><th>Status</th><th>Coop Status</th><th>Registered</th><th>Actions</th></tr>
+                            </thead>
+                            <tbody id="cf-tbody">
+                                <tr><td colspan="7" class="text-center py-4"><div class="spinner-border spinner-border-sm text-primary me-2"></div>Loading...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>`;
+
+        try {
+            const res = await api.request('/coop/farms');
+            const farms = res.farms || [];
+            document.getElementById('cf-total').textContent = res.total || farms.length;
+            document.getElementById('cf-pending').textContent = farms.filter(f => !f.coop_status || f.coop_status === 'pending').length;
+            document.getElementById('cf-approved').textContent = farms.filter(f => f.coop_status === 'coop_approved').length;
+            document.getElementById('cf-rejected').textContent = farms.filter(f => f.coop_status === 'coop_rejected').length;
+
+            const tbody = document.getElementById('cf-tbody');
+            if (!farms.length) {
+                tbody.innerHTML = `<tr><td colspan="7" class="text-center py-5 text-muted"><i class="bi bi-geo-alt fs-3 d-block mb-2"></i>No farms in your cooperative yet</td></tr>`;
+                return;
+            }
+            tbody.innerHTML = farms.map(f => {
+                const canApprove = !f.coop_status || f.coop_status === 'pending' || f.coop_status === 'coop_rejected';
+                const canReject = f.coop_status !== 'coop_rejected';
+                return `<tr>
+                    <td>
+                        <div class="fw-semibold">${f.farmer_name || 'Unknown'}</div>
+                        <div class="text-muted" style="font-size:.75rem">${f.farmer_phone || ''}</div>
+                    </td>
+                    <td>${f.farm_name || 'Unnamed Farm'}</td>
+                    <td class="text-nowrap">${f.total_area_hectares ? f.total_area_hectares + ' ha' : '—'}</td>
+                    <td>${statusBadge(f.verification_status)}</td>
+                    <td>${coopStatusBadge(f.coop_status)}</td>
+                    <td class="text-muted" style="font-size:.8rem">${f.created_at ? new Date(f.created_at).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}) : '—'}</td>
+                    <td>
+                        <div class="d-flex gap-1 flex-wrap">
+                            ${canApprove ? `<button class="btn btn-sm btn-success" onclick="app.coopApproveFarm('${f.id}')"><i class="bi bi-check-circle me-1"></i>Approve</button>` : ''}
+                            ${canReject ? `<button class="btn btn-sm btn-outline-danger" onclick="app.coopRejectFarm('${f.id}')"><i class="bi bi-x-circle me-1"></i>Reject</button>` : ''}
+                        </div>
+                    </td>
+                </tr>`;
+            }).join('');
+        } catch (e) {
+            console.error(e);
+            this.showToast('Error loading farms', 'error');
+        }
+    }
+
+    async coopApproveFarm(farmId) {
+        if (!confirm('Approve this farm for your cooperative?')) return;
+        try {
+            await api.request(`/coop/farms/${farmId}/approve`, { method: 'PATCH' });
+            this.showToast('Farm approved', 'success');
+            this.loadCoopFarmApprovals(document.getElementById('pageContent'));
+        } catch(e) { this.showToast(e.message || 'Failed to approve', 'error'); }
+    }
+
+    async coopRejectFarm(farmId) {
+        const reason = prompt('Reason for rejection (optional):') ?? '';
+        if (reason === null) return;
+        try {
+            await api.request(`/coop/farms/${farmId}/reject?reason=${encodeURIComponent(reason)}`, { method: 'PATCH' });
+            this.showToast('Farm rejected', 'warning');
+            this.loadCoopFarmApprovals(document.getElementById('pageContent'));
+        } catch(e) { this.showToast(e.message || 'Failed to reject', 'error'); }
     }
 
     async loadCoopTeam(content) {
@@ -8600,7 +8702,11 @@ class PlotraDashboard {
                 await this.loadFarmerApprovals(pageContent);
                 break;
             case 'farm-approvals':
-                await this.loadFarms(pageContent);
+                if ((this.currentUser?.role || '').toLowerCase() === 'cooperative_officer') {
+                    await this.loadCoopFarmApprovals(pageContent);
+                } else {
+                    await this.loadFarms(pageContent);
+                }
                 break;
             case 'coop-team':
                 await this.loadCoopTeam(pageContent);

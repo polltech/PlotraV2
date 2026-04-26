@@ -875,6 +875,51 @@ async def coop_reject_farm(
     return {"message": "Farm rejected by cooperative", "verification_status": farm.verification_status}
 
 
+@router.get("/farms")
+async def get_coop_farms(
+    status_filter: Optional[str] = None,
+    current_user: User = Depends(require_coop_admin),
+    db: AsyncSession = Depends(get_db)
+):
+    """Get all farms for this cooperative with optional status filter."""
+    coop_id = getattr(current_user, 'cooperative_id', None)
+    if not coop_id:
+        coop_result = await db.execute(
+            select(Cooperative).where(Cooperative.primary_officer_id == current_user.id)
+        )
+        coop = coop_result.scalar_one_or_none()
+        coop_id = str(coop.id) if coop else None
+
+    query = select(Farm).join(User, Farm.owner_id == User.id).where(
+        Farm.deleted_at == None,
+        User.role == "farmer"
+    )
+    if coop_id:
+        query = query.where(Farm.cooperative_id == coop_id)
+    if status_filter:
+        query = query.where(Farm.verification_status == status_filter)
+
+    result = await db.execute(query.order_by(Farm.created_at.desc()))
+    farms = result.scalars().all()
+
+    output = []
+    for f in farms:
+        owner_res = await db.execute(select(User).where(User.id == f.owner_id))
+        owner = owner_res.scalar_one_or_none()
+        output.append({
+            "id": f.id,
+            "farm_name": f.farm_name,
+            "farmer_name": f"{owner.first_name} {owner.last_name}" if owner else "Unknown",
+            "farmer_phone": owner.phone if owner else None,
+            "total_area_hectares": f.total_area_hectares,
+            "verification_status": f.verification_status,
+            "coop_status": f.coop_status,
+            "coop_notes": f.coop_notes,
+            "created_at": f.created_at.isoformat() if f.created_at else None,
+        })
+    return {"farms": output, "total": len(output)}
+
+
 @router.get("/farms/pending")
 async def get_pending_farms(
     current_user: User = Depends(require_coop_admin),
