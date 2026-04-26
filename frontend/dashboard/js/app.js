@@ -3268,11 +3268,17 @@ class PlotraDashboard {
                         </table>
                     </div>`}
                 </div>
-            </div>
+            </div>`;
 
-            <!-- Add Team Member Modal -->
+        // Inject modals directly into body so Bootstrap backdrop/positioning works correctly
+        ['addTeamMemberModal', 'editPermissionsModal'].forEach(id => {
+            const old = document.getElementById(id);
+            if (old) { bootstrap.Modal.getInstance(old)?.dispose(); old.remove(); }
+        });
+
+        const addModalHTML = `
             <div class="modal fade" id="addTeamMemberModal" tabindex="-1">
-                <div class="modal-dialog">
+                <div class="modal-dialog modal-dialog-scrollable">
                     <div class="modal-content">
                         <div class="modal-header">
                             <h5 class="modal-title"><i class="bi bi-person-plus-fill me-2"></i>Add Team Member</h5>
@@ -3281,10 +3287,10 @@ class PlotraDashboard {
                         <div class="modal-body">
                             <form id="addTeamMemberForm">
                                 <div class="row g-3">
-                                    <div class="col-6"><label class="form-label">First Name</label><input class="form-control" id="tmFirstName" required></div>
-                                    <div class="col-6"><label class="form-label">Last Name</label><input class="form-control" id="tmLastName" required></div>
-                                    <div class="col-12"><label class="form-label">Email</label><input class="form-control" type="email" id="tmEmail" required></div>
-                                    <div class="col-12"><label class="form-label">Phone</label><input class="form-control" id="tmPhone" required></div>
+                                    <div class="col-6"><label class="form-label">First Name <span class="text-danger">*</span></label><input class="form-control" id="tmFirstName" required></div>
+                                    <div class="col-6"><label class="form-label">Last Name <span class="text-danger">*</span></label><input class="form-control" id="tmLastName" required></div>
+                                    <div class="col-12"><label class="form-label">Email <span class="text-danger">*</span></label><input class="form-control" type="email" id="tmEmail" required></div>
+                                    <div class="col-12"><label class="form-label">Phone <span class="text-danger">*</span></label><input class="form-control" id="tmPhone" required></div>
                                     <div class="col-12"><label class="form-label">Job Title</label><input class="form-control" id="tmJobTitle" placeholder="e.g. Contact Person, Field Officer"></div>
                                     <div class="col-12">
                                         <label class="form-label fw-semibold">Page Access</label>
@@ -3302,24 +3308,24 @@ class PlotraDashboard {
                         </div>
                         <div class="modal-footer">
                             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                            <button type="button" class="btn btn-primary" onclick="app.submitAddTeamMember('${coopId}')">
+                            <button type="button" class="btn btn-primary" id="addTeamMemberSubmitBtn">
                                 <i class="bi bi-person-plus-fill me-1"></i>Add & Send Email
                             </button>
                         </div>
                     </div>
                 </div>
-            </div>
+            </div>`;
 
-            <!-- Edit Permissions Modal -->
+        const editModalHTML = `
             <div class="modal fade" id="editPermissionsModal" tabindex="-1">
-                <div class="modal-dialog">
+                <div class="modal-dialog modal-dialog-scrollable">
                     <div class="modal-content">
                         <div class="modal-header">
                             <h5 class="modal-title">Edit Page Permissions</h5>
                             <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                         </div>
                         <div class="modal-body">
-                            <p class="text-muted" id="editPermMemberName"></p>
+                            <p class="text-muted fw-semibold" id="editPermMemberName"></p>
                             <div class="border rounded p-3" id="editPermChecks">
                                 ${availablePages.map(p => `
                                 <div class="form-check">
@@ -3335,6 +3341,17 @@ class PlotraDashboard {
                     </div>
                 </div>
             </div>`;
+
+        const addEl = document.createElement('div');
+        addEl.innerHTML = addModalHTML;
+        document.body.appendChild(addEl.firstElementChild);
+
+        const editEl = document.createElement('div');
+        editEl.innerHTML = editModalHTML;
+        document.body.appendChild(editEl.firstElementChild);
+
+        // Wire submit button now that element is in DOM
+        document.getElementById('addTeamMemberSubmitBtn').addEventListener('click', () => this.submitAddTeamMember(coopId));
     }
 
     async submitAddTeamMember(coopId) {
