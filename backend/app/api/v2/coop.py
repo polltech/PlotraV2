@@ -909,12 +909,14 @@ async def get_coop_farms(
         output.append({
             "id": f.id,
             "farm_name": f.farm_name,
+            "farm_code": getattr(f, 'farm_code', None),
             "farmer_name": f"{owner.first_name} {owner.last_name}" if owner else "Unknown",
             "farmer_phone": owner.phone if owner else None,
             "total_area_hectares": f.total_area_hectares,
             "verification_status": f.verification_status,
             "coop_status": f.coop_status,
             "coop_notes": f.coop_notes,
+            "centroid_lat": getattr(f, 'centroid_lat', None),
             "created_at": f.created_at.isoformat() if f.created_at else None,
         })
     return {"farms": output, "total": len(output)}

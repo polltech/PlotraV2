@@ -506,6 +506,7 @@ class PlotraDashboard {
 
         const coopOfficerNav = [
             { id: 'dashboard', icon: 'bi-speedometer2', label: 'Dashboard' },
+            { id: 'coop-farms', icon: 'bi-geo-alt', label: 'Farms' },
             { id: 'farm-approvals', icon: 'bi-geo-alt-fill', label: 'Farm Approvals' },
             { id: 'farmer-approvals', icon: 'bi-shield-check', label: 'Farmer Approvals' },
             { id: 'deliveries', icon: 'bi-box-seam', label: 'Deliveries' },
@@ -1557,7 +1558,7 @@ class PlotraDashboard {
         }
         
         // Cooperative-only pages
-        if (page === 'farm-approvals' || page === 'coop-team') {
+        if (page === 'farm-approvals' || page === 'coop-team' || page === 'coop-farms') {
             return role === 'COOPERATIVE_OFFICER';
         }
 
@@ -1661,6 +1662,10 @@ class PlotraDashboard {
                 case 'farmer-approvals':
                     if (title) title.textContent = 'Farmer Approvals';
                     await this.loadFarmerApprovals(content);
+                    break;
+                case 'coop-farms':
+                    if (title) title.textContent = 'Farms';
+                    await this.loadCoopFarms(content);
                     break;
                 case 'farm-approvals':
                     if (title) title.textContent = 'Farm Approvals';
@@ -2903,6 +2908,85 @@ class PlotraDashboard {
         } catch (error) {
             console.error(error);
             content.innerHTML = `<div class="alert alert-danger">Error loading dashboard: ${error.message}</div>`;
+        }
+    }
+
+    async loadCoopFarms(content) {
+        const statusBadge = (s) => {
+            const map = { draft: 'bg-secondary', pending: 'bg-warning text-dark', verified: 'bg-success', coop_approved: 'bg-info text-dark', rejected: 'bg-danger', coop_rejected: 'bg-danger' };
+            return `<span class="badge ${map[s] || 'bg-secondary'} text-capitalize">${s?.replace(/_/g,' ') || 'draft'}</span>`;
+        };
+        const coopBadge = (s) => {
+            if (s === 'coop_approved') return `<span class="badge bg-info text-dark">Coop ✓</span>`;
+            if (s === 'coop_rejected') return `<span class="badge bg-danger">Coop ✗</span>`;
+            return `<span class="badge bg-secondary bg-opacity-50">Awaiting Coop</span>`;
+        };
+
+        content.innerHTML = `
+            <div class="row g-3 mb-4">
+                <div class="col-6 col-md-3"><div class="card text-center h-100"><div class="card-body py-3"><div class="text-muted small">Total Farms</div><h3 class="mb-0" id="cfl-total">—</h3></div></div></div>
+                <div class="col-6 col-md-3"><div class="card text-center h-100"><div class="card-body py-3"><div class="text-muted small">Pending Review</div><h3 class="mb-0 text-warning" id="cfl-pending">—</h3></div></div></div>
+                <div class="col-6 col-md-3"><div class="card text-center h-100"><div class="card-body py-3"><div class="text-muted small">Verified</div><h3 class="mb-0 text-success" id="cfl-verified">—</h3></div></div></div>
+                <div class="col-6 col-md-3"><div class="card text-center h-100"><div class="card-body py-3"><div class="text-muted small">Draft</div><h3 class="mb-0 text-secondary" id="cfl-draft">—</h3></div></div></div>
+            </div>
+            <div class="card">
+                <div class="card-header d-flex align-items-center flex-wrap gap-2">
+                    <span class="fw-semibold me-auto">Farms in Cooperative</span>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="app.loadCoopFarms(document.getElementById('pageContent'))">
+                        <i class="bi bi-arrow-clockwise me-1"></i>Refresh
+                    </button>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0" style="min-width:700px">
+                            <thead class="table-light">
+                                <tr><th>Farmer</th><th>Farm Name</th><th>Area</th><th>Coop Status</th><th>Status</th><th>Registered</th><th>Actions</th></tr>
+                            </thead>
+                            <tbody id="cfl-tbody">
+                                <tr><td colspan="7" class="text-center py-4"><div class="spinner-border spinner-border-sm text-primary me-2"></div>Loading...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>`;
+
+        try {
+            const res = await api.request('/coop/farms');
+            const farms = res.farms || [];
+            document.getElementById('cfl-total').textContent = farms.length;
+            document.getElementById('cfl-pending').textContent = farms.filter(f => f.verification_status === 'pending').length;
+            document.getElementById('cfl-verified').textContent = farms.filter(f => f.verification_status === 'verified').length;
+            document.getElementById('cfl-draft').textContent = farms.filter(f => f.verification_status === 'draft').length;
+
+            const tbody = document.getElementById('cfl-tbody');
+            if (!farms.length) {
+                tbody.innerHTML = `<tr><td colspan="7" class="text-center py-5 text-muted"><i class="bi bi-geo-alt fs-3 d-block mb-2"></i>No farms in your cooperative yet</td></tr>`;
+                return;
+            }
+            tbody.innerHTML = farms.map(f => `
+                <tr>
+                    <td>
+                        <div class="fw-semibold">${f.farmer_name || 'N/A'}</div>
+                        <div class="text-muted" style="font-size:.75rem">${f.farmer_phone || ''}</div>
+                    </td>
+                    <td>
+                        <div>${f.farm_name || 'Unnamed Farm'}</div>
+                        <div class="text-muted" style="font-size:.75rem">${f.farm_code || ''}</div>
+                    </td>
+                    <td class="text-nowrap">${f.total_area_hectares ? f.total_area_hectares + ' ha' : '—'}</td>
+                    <td>${coopBadge(f.coop_status)}</td>
+                    <td>${statusBadge(f.verification_status)}</td>
+                    <td class="text-muted" style="font-size:.8rem">${f.created_at ? new Date(f.created_at).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}) : '—'}</td>
+                    <td>
+                        <div class="d-flex gap-1 flex-wrap">
+                            <button class="btn btn-sm btn-outline-primary" onclick="app.adminViewFarm('${f.id}')"><i class="bi bi-eye me-1"></i>View</button>
+                            <button class="btn btn-sm btn-outline-info" onclick="app.requestSatelliteAnalysis('${f.id}')" ${!f.centroid_lat ? 'disabled title="No polygon for this farm"' : ''}><i class="bi bi-satellite-fill me-1"></i>Analyse</button>
+                        </div>
+                    </td>
+                </tr>`).join('');
+        } catch(e) {
+            console.error(e);
+            this.showToast('Error loading farms', 'error');
         }
     }
 
@@ -8700,6 +8784,9 @@ class PlotraDashboard {
                 break;
             case 'farmer-approvals':
                 await this.loadFarmerApprovals(pageContent);
+                break;
+            case 'coop-farms':
+                await this.loadCoopFarms(pageContent);
                 break;
             case 'farm-approvals':
                 if ((this.currentUser?.role || '').toLowerCase() === 'cooperative_officer') {
