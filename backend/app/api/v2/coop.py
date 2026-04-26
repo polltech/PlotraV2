@@ -899,6 +899,42 @@ async def coop_request_farmer_update(
     return {"message": "Update request sent to farmer"}
 
 
+@router.patch("/farms/{farm_id}/request-update")
+async def coop_request_farm_update(
+    farm_id: str,
+    body: dict = {},
+    current_user: User = Depends(require_coop_admin),
+    db: AsyncSession = Depends(get_db)
+):
+    """Request farmer to update/correct their farm before cooperative approves."""
+    from datetime import datetime
+    from app.models.notification import Notification
+    result = await db.execute(select(Farm).where(Farm.id == farm_id))
+    farm = result.scalar_one_or_none()
+    if not farm:
+        raise HTTPException(status_code=404, detail="Farm not found")
+    issue = body.get('issue', '').strip() if isinstance(body, dict) else ''
+    if not issue:
+        raise HTTPException(status_code=400, detail="Issue description is required")
+    farm.update_requested = True
+    farm.update_requested_by_name = current_user.first_name + ' ' + current_user.last_name
+    farm.update_request_notes = issue
+    farm.update_requested_at = datetime.utcnow()
+    farm.coop_status = 'update_requested'
+    notif = Notification(
+        id=str(__import__('uuid').uuid4()),
+        recipient_id=farm.owner_id,
+        title=f'Action Required: Update Your Farm — {farm.farm_name}',
+        message=f'Your cooperative officer has requested changes to your farm before approval.\n\nIssue: {issue}',
+        type='warning',
+        reference_id=farm_id,
+        reference_type='farm',
+    )
+    db.add(notif)
+    await db.commit()
+    return {"message": "Update request sent to farmer"}
+
+
 @router.patch("/farms/{farm_id}/approve")
 async def coop_approve_farm(
     farm_id: str,
@@ -918,6 +954,7 @@ async def coop_approve_farm(
     farm.coop_verified_by_id = current_user.id
     farm.coop_verified_at = datetime.utcnow()
     farm.coop_notes = reason or None
+    farm.update_requested = False
     notif = Notification(
         recipient_id=farm.owner_id,
         title="Farm Approved by Cooperative",
@@ -951,6 +988,7 @@ async def coop_reject_farm(
     farm.coop_verified_at = datetime.utcnow()
     farm.coop_notes = reason or "Rejected by cooperative"
     farm.notes = f"Rejected by cooperative: {reason}" if reason else "Rejected by cooperative"
+    farm.update_requested = False
     notif = Notification(
         recipient_id=farm.owner_id,
         title="Farm Rejected by Cooperative",
@@ -1026,6 +1064,9 @@ async def get_coop_farms(
             "verification_status": f.verification_status,
             "coop_status": f.coop_status,
             "coop_notes": f.coop_notes,
+            "update_requested": bool(getattr(f, 'update_requested', False)),
+            "update_request_notes": getattr(f, 'update_request_notes', None),
+            "update_requested_by_name": getattr(f, 'update_requested_by_name', None),
             "centroid_lat": getattr(f, 'centroid_lat', None),
             "created_at": f.created_at.isoformat() if f.created_at else None,
         })

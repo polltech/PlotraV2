@@ -75,6 +75,10 @@ async def init_db():
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS update_requested_by_name VARCHAR(150)",
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS update_request_notes TEXT",
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS update_requested_at TIMESTAMP",
+            "ALTER TABLE farms ADD COLUMN IF NOT EXISTS update_requested BOOLEAN DEFAULT FALSE",
+            "ALTER TABLE farms ADD COLUMN IF NOT EXISTS update_requested_by_name VARCHAR(150)",
+            "ALTER TABLE farms ADD COLUMN IF NOT EXISTS update_request_notes TEXT",
+            "ALTER TABLE farms ADD COLUMN IF NOT EXISTS update_requested_at TIMESTAMP",
         ]:
             await conn.execute(__import__('sqlalchemy').text(sql))
 

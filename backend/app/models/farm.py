@@ -224,13 +224,19 @@ class Farm(BaseModel):
     certification_expiry = Column(DateTime, nullable=True)
 
     # Two-stage approval tracking
-    coop_status = Column(String(50), nullable=True)          # pending_coop / coop_approved / coop_rejected
+    coop_status = Column(String(50), nullable=True)          # pending_coop / coop_approved / coop_rejected / update_requested
     coop_verified_by_id = Column(String(36), ForeignKey("users.id"), nullable=True)
     coop_verified_at = Column(DateTime, nullable=True)
     coop_notes = Column(Text, nullable=True)                 # reason from cooperative
     admin_verified_by_id = Column(String(36), ForeignKey("users.id"), nullable=True)
     admin_verified_at = Column(DateTime, nullable=True)
     admin_notes = Column(Text, nullable=True)                # reason from admin
+
+    # Update request tracking
+    update_requested = Column(Boolean, default=False, nullable=True)
+    update_requested_by_name = Column(String(150), nullable=True)
+    update_request_notes = Column(Text, nullable=True)
+    update_requested_at = Column(DateTime, nullable=True)
     
     # Relationships
     owner = relationship("User", foreign_keys="Farm.owner_id")

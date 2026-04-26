@@ -309,6 +309,40 @@ async def get_farm(
     }
 
 
+@router.patch("/farms/{farm_id}/request-update")
+async def admin_request_farm_update(
+    farm_id: str,
+    body: dict = {},
+    current_user: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db)
+):
+    """Admin requests farmer to update/correct their farm before final approval."""
+    from app.models.notification import Notification
+    result = await db.execute(select(Farm).where(Farm.id == farm_id))
+    farm = result.scalar_one_or_none()
+    if not farm:
+        raise HTTPException(status_code=404, detail="Farm not found")
+    issue = body.get('issue', '').strip() if isinstance(body, dict) else ''
+    if not issue:
+        raise HTTPException(status_code=400, detail="Issue description is required")
+    farm.update_requested = True
+    farm.update_requested_by_name = current_user.first_name + ' ' + current_user.last_name
+    farm.update_request_notes = issue
+    farm.update_requested_at = datetime.utcnow()
+    notif = Notification(
+        id=str(__import__('uuid').uuid4()),
+        recipient_id=farm.owner_id,
+        title=f'Action Required: Update Your Farm — {farm.farm_name}',
+        message=f'Kipawa admin has requested changes to your farm before final approval.\n\nIssue: {issue}',
+        type='warning',
+        reference_id=farm_id,
+        reference_type='farm',
+    )
+    db.add(notif)
+    await db.commit()
+    return {"message": "Update request sent to farmer"}
+
+
 @router.patch("/farms/{farm_id}/approve")
 async def approve_farm(
     farm_id: str,
@@ -328,6 +362,7 @@ async def approve_farm(
     farm.admin_verified_by_id = current_user.id
     farm.admin_verified_at = datetime.utcnow()
     farm.admin_notes = reason or None
+    farm.update_requested = False
     # Notify farmer
     notif = Notification(
         recipient_id=farm.owner_id,
@@ -360,6 +395,7 @@ async def reject_farm(
     farm.admin_verified_at = datetime.utcnow()
     farm.admin_notes = reason or "Rejected by admin"
     farm.notes = f"Rejected by admin: {reason}" if reason else "Rejected by admin"
+    farm.update_requested = False
     notif = Notification(
         recipient_id=farm.owner_id,
         title="Farm Rejected by Kipawa",
@@ -1559,10 +1595,14 @@ async def get_pending_verifications(
     Returns farms in pending state with their owner info.
     """
     # Return only farms owned by farmer-role users that are pending verification
+    from sqlalchemy import or_ as _or
     result = await db.execute(
         select(Farm).join(User, Farm.owner_id == User.id)
         .where(
-            Farm.verification_status.in_(["pending", "coop_approved"]),
+            _or(
+                Farm.verification_status.in_(["pending", "coop_approved"]),
+                Farm.update_requested == True
+            ),
             Farm.deleted_at == None,
             User.role == UserRole.FARMER.value
         )
@@ -1599,6 +1639,9 @@ async def get_pending_verifications(
             "coop_status": f.coop_status,
             "coop_approver": coop_approver_name,
             "coop_notes": f.coop_notes,
+            "update_requested": bool(getattr(f, 'update_requested', False)),
+            "update_request_notes": getattr(f, 'update_request_notes', None),
+            "update_requested_by_name": getattr(f, 'update_requested_by_name', None),
             "total_area_hectares": f.total_area_hectares,
             "created_at": f.created_at.isoformat() if f.created_at else None,
         })

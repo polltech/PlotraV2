@@ -125,6 +125,11 @@ def _farm_to_dict(farm: Farm) -> dict:
         "farmer_gender": farmer_gender,
         "farmer_location": farmer_location,
         "coop_member_no": coop_member_no,
+        "coop_status": getattr(farm, 'coop_status', None),
+        "coop_notes": getattr(farm, 'coop_notes', None),
+        "update_requested": bool(getattr(farm, 'update_requested', False)),
+        "update_request_notes": getattr(farm, 'update_request_notes', None),
+        "update_requested_by_name": getattr(farm, 'update_requested_by_name', None),
     }
 
 
@@ -1780,6 +1785,64 @@ async def store_historical_analysis(
         "status": "stored",
         "analysis_year": historical.analysis_year
     }
+
+
+@router.patch("/farm/{farm_id}/resubmit")
+async def resubmit_farm_for_review(
+    farm_id: str,
+    current_user: User = Depends(require_farmer),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Farmer resubmits a farm for review after fixing a requested update.
+    Clears update_requested flag, resets coop_status, and notifies the reviewer.
+    """
+    from app.models.notification import Notification
+    from app.models.user import Cooperative
+
+    result = await db.execute(
+        select(Farm).where(Farm.id == farm_id, Farm.owner_id == current_user.id)
+    )
+    farm = result.scalar_one_or_none()
+    if not farm:
+        raise HTTPException(status_code=404, detail="Farm not found")
+    if not farm.update_requested:
+        raise HTTPException(status_code=400, detail="No update request is pending for this farm")
+
+    farm.update_requested = False
+    farm.update_request_notes = None
+    farm.update_requested_by_name = None
+    farm.update_requested_at = None
+    farm.coop_status = None  # reset to pending coop review
+
+    # Notify cooperative officer
+    member_res = await db.execute(
+        select(CooperativeMember).where(
+            CooperativeMember.user_id == current_user.id,
+            CooperativeMember.is_active == True
+        )
+    )
+    membership = member_res.scalar_one_or_none()
+    if membership:
+        coop_res = await db.execute(
+            select(Cooperative).where(Cooperative.id == membership.cooperative_id)
+        )
+        coop = coop_res.scalar_one_or_none()
+        officer_id = coop.primary_officer_id if coop else None
+        if officer_id:
+            notif = Notification(
+                id=str(__import__('uuid').uuid4()),
+                recipient_id=str(officer_id),
+                title='Farm Updated — Ready for Review',
+                message=f'{current_user.first_name} {current_user.last_name} has updated the farm "{farm.farm_name}" and resubmitted it for your approval.',
+                type='info',
+                reference_id=farm_id,
+                reference_type='farm',
+            )
+            db.add(notif)
+
+    await db.commit()
+    return {"message": "Farm resubmitted for review successfully"}
 
 
 @router.patch("/resubmit")
