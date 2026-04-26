@@ -258,6 +258,9 @@ Attempted URL: ${url}`;
             body: JSON.stringify(userData)
         });
     }
+    async resubmitForReview() {
+        return this.request('/farmer/resubmit', { method: 'PATCH' });
+    }
     
     // Farms
     async getFarms(filters = {}) {

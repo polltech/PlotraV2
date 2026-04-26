@@ -257,6 +257,11 @@ class UserResponse(BaseModel):
     admin_notes: Optional[str] = None
     page_permissions: Optional[list] = None
     cooperative_id: Optional[str] = None
+    # Update request tracking
+    update_requested: Optional[bool] = None
+    update_request_notes: Optional[str] = None
+    update_requested_by_name: Optional[str] = None
+    update_requested_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True

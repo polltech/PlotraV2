@@ -5817,7 +5817,27 @@ class PlotraDashboard {
             const photoSrc = user?.profile_photo_url || this._pendingProfilePhoto ||
                 `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.full_name || user?.first_name || 'U')}&background=6f4e37&color=fff&size=120`;
 
-            content.innerHTML = `
+            const updateRequested = user?.update_requested;
+        const updateNotes = user?.update_request_notes || '';
+        const updateBy = user?.update_requested_by_name || 'your cooperative officer';
+
+        content.innerHTML = `
+                ${updateRequested ? `
+                <div class="alert alert-warning border-warning d-flex gap-3 align-items-start mb-4 shadow-sm" style="border-left:5px solid #ffc107!important;">
+                    <i class="bi bi-exclamation-triangle-fill text-warning fs-4 mt-1 flex-shrink-0"></i>
+                    <div class="flex-grow-1">
+                        <div class="fw-bold mb-1">Action Required — Update Requested by ${updateBy}</div>
+                        <p class="mb-2">${updateNotes || 'Please review and update your profile details, then resubmit for approval.'}</p>
+                        <div class="d-flex gap-2 flex-wrap">
+                            <button class="btn btn-sm btn-warning fw-semibold" onclick="app.enableProfileEdit()">
+                                <i class="bi bi-pencil me-1"></i>Edit Profile Now
+                            </button>
+                            <button class="btn btn-sm btn-success fw-semibold" id="resubmitBtn" onclick="app.resubmitForReview()">
+                                <i class="bi bi-send-check me-1"></i>Resubmit for Review
+                            </button>
+                        </div>
+                    </div>
+                </div>` : ''}
                 <div class="row g-4">
                     <!-- Profile Card -->
                     <div class="col-12">
@@ -6017,6 +6037,22 @@ class PlotraDashboard {
         }
     }
 
+
+    async resubmitForReview() {
+        const btn = document.getElementById('resubmitBtn');
+        if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Submitting...'; }
+        try {
+            await api.resubmitForReview();
+            this.showToast('Resubmitted! Your cooperative officer has been notified.', 'success');
+            // Refresh user so the banner disappears
+            const me = await api.getCurrentUser();
+            if (me) { this.currentUser = me; localStorage.setItem('plotra_user', JSON.stringify(me)); }
+            this.loadProfile(document.getElementById('pageContent'));
+        } catch(e) {
+            this.showToast(e.message || 'Failed to resubmit', 'error');
+            if (btn) { btn.disabled = false; btn.innerHTML = '<i class="bi bi-send-check me-1"></i>Resubmit for Review'; }
+        }
+    }
 
     async showUploadDocumentModal() {
         try {

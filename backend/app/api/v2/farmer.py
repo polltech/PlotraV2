@@ -1780,3 +1780,57 @@ async def store_historical_analysis(
         "status": "stored",
         "analysis_year": historical.analysis_year
     }
+
+
+@router.patch("/resubmit")
+async def resubmit_for_review(
+    current_user: User = Depends(require_farmer),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Farmer resubmits their profile for review after fixing a requested update.
+    Clears the update_requested flag and resets coop_status so they reappear
+    in the cooperative's and admin's pending approval lists.
+    Sends a notification to the cooperative officer.
+    """
+    from app.models.notification import Notification
+    from app.models.user import Cooperative
+
+    if not current_user.update_requested:
+        raise HTTPException(status_code=400, detail="No update request is pending for your account")
+
+    # Clear update request flags and reset coop_status to pending
+    current_user.update_requested = False
+    current_user.update_request_notes = None
+    current_user.update_requested_by_name = None
+    current_user.update_requested_at = None
+    current_user.coop_status = None  # back to pending coop review
+
+    # Notify coop officer
+    member_res = await db.execute(
+        select(CooperativeMember).where(
+            CooperativeMember.user_id == current_user.id,
+            CooperativeMember.is_active == True
+        )
+    )
+    membership = member_res.scalar_one_or_none()
+    if membership:
+        coop_res = await db.execute(
+            select(Cooperative).where(Cooperative.id == membership.cooperative_id)
+        )
+        coop = coop_res.scalar_one_or_none()
+        officer_id = coop.primary_officer_id if coop else None
+        if officer_id:
+            notif = Notification(
+                id=str(__import__('uuid').uuid4()),
+                recipient_id=str(officer_id),
+                title='Farmer Profile Updated — Ready for Review',
+                message=f'{current_user.first_name} {current_user.last_name} has updated their profile and resubmitted for your approval.',
+                type='info',
+                reference_id=str(current_user.id),
+                reference_type='farmer',
+            )
+            db.add(notif)
+
+    await db.commit()
+    return {"message": "Resubmitted for review successfully"}
