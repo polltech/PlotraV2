@@ -2819,18 +2819,20 @@ class PlotraDashboard {
         const coopId = this.currentUser?.cooperative_id;
         const userName = `${this.currentUser?.first_name || ''} ${this.currentUser?.last_name || ''}`.trim();
         try {
-            const [farmerApprovals, farmApprovals, deliveries] = await Promise.allSettled([
-                api.getFarmerApprovals ? api.getFarmerApprovals() : Promise.resolve([]),
-                api.request('/admin/farms?page_size=100'),
+            const [farmerApprovals, farmApprovals, pendingFarmerApprovals, deliveries] = await Promise.allSettled([
+                api.getCoopAllFarmers(),
+                api.request('/coop/farms'),
+                api.getCoopPendingFarmers(),
                 api.getDeliveries({ limit: 5 })
             ]);
 
-            const farmers = farmerApprovals.value || [];
-            const farms = farmApprovals.value?.farms || [];
-            const recentDeliveries = deliveries.value || [];
+            const farmers = Array.isArray(farmerApprovals.value) ? farmerApprovals.value : [];
+            const farms = farmApprovals.value?.farms || (Array.isArray(farmApprovals.value) ? farmApprovals.value : []);
+            const pendingFarmersList = Array.isArray(pendingFarmerApprovals.value) ? pendingFarmerApprovals.value : [];
+            const recentDeliveries = Array.isArray(deliveries.value) ? deliveries.value : [];
 
-            const pendingFarmers = farmers.filter(f => !f.coop_status || f.coop_status === 'pending').length;
-            const pendingFarms = farms.filter(f => f.verification_status === 'pending').length;
+            const pendingFarmers = pendingFarmersList.length;
+            const pendingFarms = farms.filter(f => !f.coop_status || f.coop_status === 'pending' || f.coop_status === 'update_requested').length;
             const totalFarmers = farmers.length;
             const totalDeliveries = recentDeliveries.length;
 
