@@ -39,6 +39,9 @@ p/* Plotra Dashboard - Bootstrap Styles */
 
     /* Font - Match Farmer Dashboard */
     --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    
+    /* Base font size for professional compact styling */
+    --base-font-size: 14px;
 }
 
 /* Fix body text color - default hope-ui color is too light */
@@ -766,11 +769,7 @@ body.auth-active #app-container {
     70% { box-shadow: 0 0 0 10px rgba(45, 80, 22, 0); }
     100% { box-shadow: 0 0 0 0 rgba(45, 80, 22, 0); }
 }
-.table th { font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.025em; padding: 0.4rem 0.5rem; }  
-.table td { font-size: 0.7rem; padding: 0.3rem 0.5rem; }  
-.btn-sm { font-size: 0.65rem; padding: 0.15rem 0.4rem; }  
-.badge { font-size: 0.6rem; }  
-.nav-link { font-size: 0.75rem !important; padding: 0.4rem 1rem !important; } 
+/* typography overrides moved to end of file */
 
 /* Cooperative Form Multi-Step Styles */
 .coop-form-steps {
@@ -1087,4 +1086,86 @@ a:hover { color:#3d2314; }
 
 /* Page content background */
 #app-container,.main-content,#pageContent { background:#faf4ed !important; }
+
+/* ============================================================
+   TYPOGRAPHY — Professional compact sizing
+   Scales Bootstrap's 16px rem grid down to 13.5px.
+   All rem-based values (spacing, sizing) reduce proportionally.
+   ============================================================ */
+
+html { font-size: 13.5px; }
+
+/* Headings — cap large sizes for dashboard context */
+h1, .h1 { font-size: 1.65rem !important; font-weight: 600 !important; letter-spacing: -0.01em; }
+h2, .h2 { font-size: 1.4rem  !important; font-weight: 600 !important; letter-spacing: -0.01em; }
+h3, .h3 { font-size: 1.2rem  !important; font-weight: 600 !important; }
+h4, .h4 { font-size: 1.05rem !important; font-weight: 600 !important; }
+h5, .h5 { font-size: 0.95rem !important; font-weight: 600 !important; }
+h6, .h6 { font-size: 0.85rem !important; font-weight: 600 !important; }
+
+/* Body & paragraph */
+body      { font-size: 0.875rem; line-height: 1.55; }
+p         { font-size: 0.875rem; margin-bottom: 0.6rem; }
+small, .small { font-size: 0.775rem !important; }
+.text-muted   { font-size: 0.8rem; }
+
+/* Labels & form elements */
+.form-label                  { font-size: 0.775rem !important; font-weight: 500; margin-bottom: 0.25rem; }
+.form-control, .form-select  { font-size: 0.838rem !important; padding: 0.35rem 0.65rem !important; }
+.form-text                   { font-size: 0.75rem !important; }
+.form-check-label            { font-size: 0.825rem !important; }
+.input-group-text            { font-size: 0.825rem !important; }
+
+/* Buttons */
+.btn    { font-size: 0.8rem   !important; padding: 0.38rem 0.85rem  !important; }
+.btn-sm { font-size: 0.725rem !important; padding: 0.2rem  0.5rem   !important; }
+.btn-lg { font-size: 0.9rem   !important; padding: 0.5rem  1.1rem   !important; }
+
+/* Badges */
+.badge { font-size: 0.65rem !important; padding: 0.28em 0.55em !important; }
+
+/* Tables */
+.table th { font-size: 0.7rem  !important; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; padding: 0.45rem 0.6rem !important; }
+.table td { font-size: 0.795rem !important; padding: 0.38rem 0.6rem !important; vertical-align: middle; }
+
+/* Cards */
+.card-title   { font-size: 0.95rem !important; font-weight: 600; }
+.card-subtitle{ font-size: 0.78rem !important; }
+.card-text    { font-size: 0.838rem !important; }
+.card-header  { font-size: 0.875rem !important; font-weight: 600; padding: 0.6rem 1rem !important; }
+.card-body    { padding: 0.9rem 1rem !important; }
+
+/* Modals */
+.modal-title  { font-size: 0.95rem !important; font-weight: 600; }
+.modal-body   { font-size: 0.838rem !important; }
+.modal-header { padding: 0.65rem 1rem !important; }
+.modal-footer { padding: 0.55rem 1rem !important; }
+
+/* Sidebar nav */
+.sidebar .nav-link,
+.sidebar .iq-menu-item { font-size: 0.8rem !important; padding: 0.42rem 1rem !important; }
+
+/* Top navbar */
+.iq-navbar .nav-link,
+.navbar .nav-link { font-size: 0.82rem !important; }
+.navbar-brand      { font-size: 0.95rem !important; font-weight: 700; }
+
+/* Dropdown */
+.dropdown-item  { font-size: 0.82rem !important; padding: 0.35rem 1rem !important; }
+.dropdown-header{ font-size: 0.7rem  !important; text-transform: uppercase; letter-spacing: 0.05em; }
+
+/* List groups */
+.list-group-item { font-size: 0.838rem !important; padding: 0.5rem 0.9rem !important; }
+
+/* Alerts */
+.alert { font-size: 0.838rem !important; padding: 0.65rem 0.9rem !important; }
+
+/* Stat card numbers — keep readable even at smaller base */
+.stat-card .stat-value { font-size: 1.65rem !important; }
+.stat-card .stat-label { font-size: 0.78rem  !important; }
+
+/* Auth modal inputs keep slightly larger for usability */
+.auth-modal .form-control,
+.auth-modal .form-select { font-size: 0.9rem !important; padding: 0.55rem 0.85rem !important; }
+.auth-modal h4            { font-size: 1.25rem !important; }
 
