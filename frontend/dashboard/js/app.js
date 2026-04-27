@@ -10049,7 +10049,17 @@ class PlotraDashboard {
     }
 
     _startCaptureGPSWatch(centerOnFix = false) {
-        if (!navigator.geolocation) return;
+        const statusEl = document.getElementById('captureStatusMsg');
+        if (!navigator.geolocation || !window.isSecureContext) {
+            if (statusEl) {
+                statusEl.style.color = '#dc3545';
+                statusEl.dataset.gpsError = '1';
+                statusEl.innerHTML = '⚠️ GPS requires a secure (HTTPS) connection. Switched to <strong>Click Mode</strong> — tap the map to place boundary points.';
+            }
+            const clickRadio = document.getElementById('captureInputClick');
+            if (clickRadio) { clickRadio.checked = true; this._captureInputMode = 'click'; }
+            return;
+        }
         if (this._captureWatchId) return; // already watching
 
         this._captureWatchId = navigator.geolocation.watchPosition(pos => {
@@ -10072,6 +10082,16 @@ class PlotraDashboard {
                 this._captureAccuracyCircle.setRadius(accuracy || 0);
                 if (this._captureMap && !this._captureMap.hasLayer(this._captureAccuracyCircle)) {
                     this._captureAccuracyCircle.addTo(this._captureMap);
+                }
+            }
+
+            // Clear any GPS error message and restore normal status
+            const statusEl = document.getElementById('captureStatusMsg');
+            if (statusEl && statusEl.dataset.gpsError) {
+                delete statusEl.dataset.gpsError;
+                if (!this._captureCapturing) {
+                    statusEl.textContent = 'GPS locked. Press Start Capture to begin.';
+                    statusEl.style.color = '';
                 }
             }
 
@@ -10099,7 +10119,32 @@ class PlotraDashboard {
                 this._captureMap.panTo([lat, lng], { animate: true, duration: 0.3 });
             }
         }, err => {
-            console.warn('Capture GPS error:', err.message);
+            console.warn('Capture GPS error:', err.code, err.message);
+            const statusEl = document.getElementById('captureStatusMsg');
+            if (!statusEl) return;
+            statusEl.dataset.gpsError = '1';
+            statusEl.style.color = '#dc3545';
+            if (err.code === 1) {
+                // PERMISSION_DENIED
+                statusEl.innerHTML = '⚠️ Location access denied. Please allow location in your browser settings, then reload. Or switch to <strong>Click Mode</strong> to tap the map instead.';
+                // Auto-switch to click mode so the user can still proceed
+                const clickRadio = document.getElementById('captureInputClick');
+                if (clickRadio && !clickRadio.checked) {
+                    clickRadio.checked = true;
+                    this._captureInputMode = 'click';
+                }
+            } else if (err.code === 2) {
+                // POSITION_UNAVAILABLE
+                statusEl.innerHTML = '⚠️ GPS unavailable on this device. Switched to <strong>Click Mode</strong> — tap the map to place boundary points.';
+                const clickRadio = document.getElementById('captureInputClick');
+                if (clickRadio && !clickRadio.checked) {
+                    clickRadio.checked = true;
+                    this._captureInputMode = 'click';
+                }
+            } else {
+                // TIMEOUT or other
+                statusEl.innerHTML = '⚠️ GPS signal timeout. Move to open ground or switch to <strong>Click Mode</strong> to tap the map.';
+            }
         }, { enableHighAccuracy: true, maximumAge: 5000, timeout: 30000 });
     }
 
