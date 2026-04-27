@@ -9519,9 +9519,14 @@ class PlotraDashboard {
                                    <strong>Update Required</strong>${farm.update_requested_by_name ? ` by ${farm.update_requested_by_name}` : ''}<br>
                                    ${farm.update_request_notes || ''}
                                </div>
-                               <button class="btn btn-sm btn-warning ms-2" onclick="app.resubmitFarmForReview('${farm.id}')">
-                                   <i class="bi bi-arrow-repeat me-1"></i>Resubmit
-                               </button>
+                               <div class="d-flex gap-1 ms-2 flex-shrink-0">
+                                   <button class="btn btn-sm btn-primary" onclick="app.viewFarmDetails('${farm.id}')">
+                                       <i class="bi bi-pencil-fill me-1"></i>Edit
+                                   </button>
+                                   <button class="btn btn-sm btn-success" onclick="app.resubmitFarmForReview('${farm.id}')">
+                                       <i class="bi bi-send-check me-1"></i>Resubmit
+                                   </button>
+                               </div>
                            </div>`
                         : '';
                     return `
