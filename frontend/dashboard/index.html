@@ -924,37 +924,6 @@
                                                 <input type="hidden" id="primaryCrop" value="Coffee">
                                             </div>
                                             <div class="col-md-6">
-                                                <label class="form-label">Coffee Variety *</label>
-                                                <div id="coffeeVarietyGroup" class="d-flex flex-wrap gap-3 pt-1 ps-2">
-                                                    <div class="form-check">
-                                                        <input class="form-check-input" type="checkbox" name="coffeeVariety" id="cvRuiru11" value="Ruiru 11">
-                                                        <label class="form-check-label" for="cvRuiru11">Ruiru 11</label>
-                                                    </div>
-                                                    <div class="form-check">
-                                                        <input class="form-check-input" type="checkbox" name="coffeeVariety" id="cvBatian" value="Batian">
-                                                        <label class="form-check-label" for="cvBatian">Batian</label>
-                                                    </div>
-                                                    <div class="form-check">
-                                                        <input class="form-check-input" type="checkbox" name="coffeeVariety" id="cvSL28" value="SL28">
-                                                        <label class="form-check-label" for="cvSL28">SL28</label>
-                                                    </div>
-                                                    <div class="form-check">
-                                                        <input class="form-check-input" type="checkbox" name="coffeeVariety" id="cvSL34" value="SL34">
-                                                        <label class="form-check-label" for="cvSL34">SL34</label>
-                                                    </div>
-                                                    <div class="form-check">
-                                                        <input class="form-check-input" type="checkbox" name="coffeeVariety" id="cvOther" value="Other">
-                                                        <label class="form-check-label" for="cvOther">Other</label>
-                                                    </div>
-                                                </div>
-                                                <div id="coffeeVarietyError" class="text-danger small mt-1" style="display:none;">Please select at least one coffee variety</div>
-                                            </div>
-                                            <div class="col-md-6">
-                                                <label class="form-label">Estimated Annual Yield (kg) *</label>
-                                                <input type="number" class="form-control" id="estimatedYield" step="0.1" required placeholder="Last full season">
-                                                <div class="invalid-feedback">Estimated annual yield is required</div>
-                                            </div>
-                                            <div class="col-md-6">
                                                 <label class="form-label">Farming Method at Registration *</label>
                                                 <select class="form-select" id="farmingMethod" required>
                                                     <option value="">Select farming method</option>
@@ -963,6 +932,47 @@
                                                     <option value="Agroforestry">Agroforestry</option>
                                                 </select>
                                                 <div class="invalid-feedback">Farming method is required</div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label class="form-label">Estimated Annual Yield (kg) *</label>
+                                                <input type="number" class="form-control" id="estimatedYield" step="0.1" required placeholder="Last full season">
+                                                <div class="invalid-feedback">Estimated annual yield is required</div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label class="form-label">Coffee Variety *</label>
+                                                <div id="coffeeVarietyGroup" class="row row-cols-2 g-2 pt-1 ps-2">
+                                                    <div class="col">
+                                                        <div class="form-check">
+                                                            <input class="form-check-input" type="checkbox" name="coffeeVariety" id="cvRuiru11" value="Ruiru 11">
+                                                            <label class="form-check-label" for="cvRuiru11">Ruiru 11</label>
+                                                        </div>
+                                                    </div>
+                                                    <div class="col">
+                                                        <div class="form-check">
+                                                            <input class="form-check-input" type="checkbox" name="coffeeVariety" id="cvBatian" value="Batian">
+                                                            <label class="form-check-label" for="cvBatian">Batian</label>
+                                                        </div>
+                                                    </div>
+                                                    <div class="col">
+                                                        <div class="form-check">
+                                                            <input class="form-check-input" type="checkbox" name="coffeeVariety" id="cvSL28" value="SL28">
+                                                            <label class="form-check-label" for="cvSL28">SL28</label>
+                                                        </div>
+                                                    </div>
+                                                    <div class="col">
+                                                        <div class="form-check">
+                                                            <input class="form-check-input" type="checkbox" name="coffeeVariety" id="cvSL34" value="SL34">
+                                                            <label class="form-check-label" for="cvSL34">SL34</label>
+                                                        </div>
+                                                    </div>
+                                                    <div class="col">
+                                                        <div class="form-check">
+                                                            <input class="form-check-input" type="checkbox" name="coffeeVariety" id="cvOther" value="Other">
+                                                            <label class="form-check-label" for="cvOther">Other</label>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div id="coffeeVarietyError" class="text-danger small mt-1" style="display:none;">Please select at least one coffee variety</div>
                                             </div>
                                         </div>
                                     </div>
