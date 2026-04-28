@@ -91,7 +91,30 @@ class StorageConfig(BaseModel):
 
 
 class CORSConfig(BaseModel):
-    allowed_origins: list = ["http://localhost:3000", "http://localhost:8080", "http://127.0.0.1:8080", "http://localhost:8081", "http://127.0.0.1:8081", "http://localhost:8000", "http://127.0.0.1:8000"]
+    allowed_origins: list = [
+        # Development
+        "http://localhost:3000",          # Web frontend dev
+        "http://localhost:8080",          # API docs dev
+        "http://localhost:8081",          # React dev
+        "http://localhost:8000",          # Backend direct
+        "http://localhost:19006",         # Expo dev web
+        "http://127.0.0.1:19006",
+        "exp://localhost:19000",          # Expo tunnel
+        "exp://127.0.0.1:19000",
+        # LAN IP for testing
+        "http://192.168.100.5:19006",     # Your LAN IP (adjust if needed)
+        "http://192.168.100.5:8000",
+        # Production domains
+        "https://dev.plotra.eu",          # Production mobile app
+        "http://dev.plotra.eu",           # HTTP fallback
+        "https://plotra.eu",              # Main domain
+        "http://plotra.eu",
+        # Nginx proxy origins
+        "https://dev.plotra.eu",
+        "http://dev.plotra.eu",
+        # Allow all for development stage (remove in strict production)
+        "*"
+    ]
 
 
 class LoggingConfig(BaseModel):
@@ -103,17 +126,8 @@ class AuthConfig(BaseModel):
     max_login_attempts: int = 5
     lockout_duration_minutes: int = 15
     password_reset_token_expiry_hours: int = 24
-
-
-class RedisConfig(BaseModel):
-    host: str = "localhost"
-    port: int = 6379
-    db: int = 0
-
-
-class CeleryConfig(BaseModel):
-    broker_url: str = "redis://localhost:6379/1"
-    result_backend: str = "redis://localhost:6379/2"
+    # Polygon capture API key (prototype/URS)
+    polygon_api_key: str = "plotra-prototype-key-2026"
 
 
 class PaymentsConfig(BaseModel):

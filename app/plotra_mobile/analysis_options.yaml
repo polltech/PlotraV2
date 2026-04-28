@@ -1,0 +1,31 @@
+include: package:flutter_lints/flutter.yaml
+
+analyzer:
+  errors:
+    # Treat some warnings as info
+    depend_on_referenced_packages: ignore
+  exclude:
+    - "**/*.g.dart"
+    - "**/*.freezed.dart"
+    - "**/*.gr.dart"
+
+linter:
+  rules:
+    # Style
+    prefer_single_quotes: true
+    sort_child_properties_last: true
+    use_key_in_widget_constructors: false
+    
+    # Flutter specific
+    prefer_const_constructors_in_immutables: true
+    prefer_const_declarations: true
+    prefer_const_literals_to_create_immutables: true
+    
+    # Avoid
+    avoid_print: false
+    avoid_relative_lib_imports: false
+    
+    # UI
+    use_rethrow_when_possible: true
+    prefer_is_empty: true
+    prefer_is_not_empty: true

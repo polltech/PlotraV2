@@ -1,0 +1,24 @@
+{
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal"
+    },
+    "preview": {
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "API_BASE_URL": "http://192.168.100.5:8000/api/v2"
+      }
+    },
+    "production": {
+      "android": {
+        "buildType": "app-bundle"
+      },
+      "env": {
+        "API_BASE_URL": "https://api.plotra.africa/api/v2"
+      }
+    }
+  }
+}

@@ -4,7 +4,7 @@ Includes GeoJSON/PostGIS polygon support for GPS farm boundary mapping
 """
 import enum
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, Float, Text, ForeignKey, Enum, JSON, DateTime, Boolean
+from sqlalchemy import Column, Integer, String, Float, Text, ForeignKey, Enum, JSON, DateTime, Boolean, Index
 from sqlalchemy.orm import relationship
 from geoalchemy2 import Geometry
 from .base import BaseModel, UUIDMixin
@@ -123,7 +123,13 @@ class Farm(BaseModel, UUIDMixin):
     
     # Digital Product Passport
     digital_passport = relationship("DigitalProductPassport", uselist=False, back_populates="farm")
-    
+
+    # GPS captures
+    gps_captures = relationship("GpsCapture", back_populates="farm", cascade="all, delete-orphan")
+
+    # Polygon captures (offline-first boundary walks)
+    polygon_captures = relationship("PolygonCapture", back_populates="farm", cascade="all, delete-orphan")
+
     def get_parcel_count(self) -> int:
         return len(self.parcels)
     
@@ -144,7 +150,11 @@ class LandParcel(BaseModel, UUIDMixin):
     - Child parcel: Sub-division of parent (e.g., inherited portion)
     - Resolves fractional tenure issues
     """
-    
+    __table_args__ = (
+        Index('idx_land_parcel_farm', 'farm_id'),
+        Index('idx_land_parcel_boundary', 'boundary_geometry', postgresql_using='gist'),
+    )
+
     farm_id = Column(Integer, ForeignKey("farm.id"), nullable=False)
     
     # Parcel identification
@@ -190,7 +200,10 @@ class LandParcel(BaseModel, UUIDMixin):
     
     # Relationships
     farm = relationship("Farm", back_populates="parcels")
-    
+
+    # GPS captures for this parcel
+    gps_captures = relationship("GpsCapture", back_populates="parcel", cascade="all, delete-orphan")
+
     # Sustainability practices
     practice_logs = relationship("PracticeLog", back_populates="parcel")
     transition_events = relationship("TransitionEvent", back_populates="parcel")

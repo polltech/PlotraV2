@@ -1,0 +1,55 @@
+# Flutter/Dart/Pub generated files
+.flutter/
+flutter_*.json
+.packages
+.pub-cache/
+.pub/
+build/
+*.iml
+.idea/
+.DS_Store
+*.swp
+*.swo
+*.log
+*.tmp
+
+# Android
+android/.gradle/
+android/.idea/
+android/local.properties
+android/cookies
+android/build/
+android/gradle/
+android/key.properties
+*.jks
+*.keystore
+
+# iOS
+ios/.generated/
+ios/Flutter/.applesimconfig
+ios/Flutter/App.framework
+ios/Flutter/Flutter.podspec
+ios/Flutter/flutter_assets/
+ios/Flutter/Flutter.framework
+ios/Flutter/engine/
+ios/Flutter/symlinks/
+ios/Pods/
+ios/Runner/GeneratedPluginRegistrant.*
+ios/Runner/ServiceDefinitions.json
+ios/Runner.xcodeproj/project.xcworkspace/
+ios/Runner.xcworkspace/
+ios/Runner.xcodeproj/xcuserdata/
+ios/ServiceDefinitions.json
+Darwin/
+
+# Coverage
+coverage/
+test-coverage/
+
+# Hive generated files (will be generated)
+lib/models/*.g.dart
+
+# Exceptions (keep these)
+!lib/models/user.g.dart
+!lib/models/farm.g.dart
+!lib/models/latlng_data.g.dart

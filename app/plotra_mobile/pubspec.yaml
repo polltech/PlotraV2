@@ -1,0 +1,73 @@
+name: plotra_mobile
+description: Plotra EUDR Compliance & Traceability Mobile App
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.3.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  
+  # UI
+  cupertino_icons: ^1.0.6
+  
+  # Maps & Location
+  flutter_map: ^6.1.0
+  latlong2: ^0.9.0
+  location: ^5.0.0
+  geolocator: ^10.1.0
+  
+  # HTTP & API
+  dio: ^5.3.0
+  retrofit: ^4.0.0
+  
+  # State Management
+  provider: ^6.1.0
+  flutter_riverpod: ^2.4.0
+  
+  # Offline Storage
+  hive: ^2.2.3
+  hive_flutter: ^1.1.0
+  sqflite: ^2.3.0
+  shared_preferences: ^2.2.2
+  
+  # Utils
+  intl: ^0.18.1
+  flutter_secure_storage: ^9.0.0
+  
+  # Image Picker
+  image_picker: ^1.0.4
+  
+  # UI Enhancements
+  shimmer: ^3.0.0
+  lottie: ^2.7.0
+  cached_network_image: ^3.3.0
+  pull_to_refresh: ^2.0.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  hive_generator: ^2.0.0
+  build_runner: ^2.4.0
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true
+  
+  assets:
+    - assets/images/
+    - assets/icons/
+    - assets/animations/
+  
+  fonts:
+    - family: Inter
+      fonts:
+        - asset: assets/fonts/Inter-Regular.ttf
+        - asset: assets/fonts/Inter-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Inter-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/Inter-Bold.ttf
+          weight: 700

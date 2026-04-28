@@ -1,0 +1,50 @@
+{
+  "expo": {
+    "name": "Plotra Capture",
+    "slug": "plotra-capture",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#6f4e37"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "africa.plotra.capture",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Plotra Capture uses your GPS location to verify farm boundaries and ensure EUDR compliance. Your location data is sent securely to the Plotra platform.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Plotra Capture needs location access even when the app is in background to ensure accurate farm boundary capture."
+      },
+      "config": {
+        "googleMapsApiKey": "YOUR_GOOGLE_MAPS_API_KEY"  // Optional: if you add maps later
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#6f4e37"
+      },
+      "package": "africa.plotra.capture",
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION"
+      ],
+      "versionCode": 1
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-location"
+    ],
+    "extra": {
+      "API_BASE_URL": "http://192.168.100.5:8000/api/v2"
+    }
+  }
+}

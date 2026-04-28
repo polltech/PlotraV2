@@ -1,0 +1,48 @@
+{
+  "expo": {
+    "name": "Plotra",
+    "slug": "plotra",
+    "platforms": ["ios", "android", "web"],
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "splash": {
+      "image": "./assets/images/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0a0a0a"
+    },
+    "primaryColor": "#d4a853",
+    "androidStatusBar": {
+      "backgroundColor": "#0a0a0a",
+      "translucent": false,
+      "barStyle": "light-content"
+    },
+    "ios": {
+      "bundleIdentifier": "ai.plotra.plotra",
+      "buildNumber": "1",
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Plotra needs your location to map farm boundaries",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Plotra needs your location to map farm boundaries",
+        "NSCameraUsageDescription": "Plotra needs camera access for farm photos"
+      }
+    },
+    "android": {
+      "package": "ai.plotra.plotra_mobile",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/icon.png",
+        "backgroundColor": "#d4a853"
+      },
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "CAMERA",
+        "WRITE_EXTERNAL_STORAGE",
+        "READ_EXTERNAL_STORAGE"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/images/favicon.png"
+    }
+  }
+}

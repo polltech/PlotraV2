@@ -532,6 +532,163 @@ class CertificateResponse(BaseModel):
     is_valid: bool
 
 
+# ============== GPS Capture Schemas ==============
+
+class CaptureTypeEnum(str, Enum):
+    BOUNDARY_POINT = "boundary_point"
+    SAMPLE_POINT = "sample_point"
+    CORNER_POINT = "corner_point"
+    ENTRY_POINT = "entry_point"
+    MISCELLANEOUS = "misc"
+
+
+class CaptureMethodEnum(str, Enum):
+    MANUAL = "manual"
+    GPS_DEVICE = "gps_device"
+    PHONE_GPS = "phone_gps"
+    RTK = "rtk"
+    DGPS = "dgps"
+
+
+class GpsCaptureCreate(BaseModel):
+    """Schema for creating a GPS capture point"""
+    farm_id: int
+    parcel_id: Optional[int] = None
+    latitude: float = Field(..., ge=-90, le=90)
+    longitude: float = Field(..., ge=-180, le=180)
+    altitude: Optional[float] = None  # meters
+    accuracy_meters: Optional[float] = None
+    capture_type: CaptureTypeEnum = CaptureTypeEnum.BOUNDARY_POINT
+    capture_method: CaptureMethodEnum = CaptureMethodEnum.PHONE_GPS
+    device_id: Optional[str] = None
+    device_model: Optional[str] = None
+    app_version: Optional[str] = None
+    notes: Optional[str] = None
+    captured_at: Optional[datetime] = None
+    photo_url: Optional[str] = None
+
+
+class GpsCaptureResponse(BaseModel):
+    """Schema for GPS capture response"""
+    id: int
+    farm_id: int
+    parcel_id: Optional[int]
+    captured_by_id: Optional[str]
+    latitude: float
+    longitude: float
+    altitude: Optional[float]
+    accuracy_meters: Optional[float]
+    capture_type: CaptureTypeEnum
+    capture_method: CaptureMethodEnum
+    gps_fix_type: Optional[str]
+    satellites_used: Optional[int]
+    device_id: Optional[str]
+    device_model: Optional[str]
+    app_version: Optional[str]
+    captured_at: datetime
+    uploaded_at: datetime
+    notes: Optional[str]
+    photo_url: Optional[str]
+    is_outside_parcel: bool
+    analysis_completed: bool
+    analysis_timestamp: Optional[datetime]
+
+    class Config:
+        from_attributes = True
+
+
+class CaptureAnalysisResponse(BaseModel):
+    """Combined capture + analysis response"""
+    capture: GpsCaptureResponse
+    analysis: Optional[Dict[str, Any]] = None
+    parcel_info: Optional[Dict[str, Any]] = None
+    farm_info: Optional[Dict[str, Any]] = None
+    recommendations: Optional[List[str]] = None
+
+
+# ============== Polygon Capture Schemas (URS v0.1 Compliant) ==============
+
+class SyncStatusEnum(str, Enum):
+    PENDING = "pending"
+    SYNCED = "synced"
+    FAILED = "failed"
+
+
+class PolygonCaptureCreate(BaseModel):
+    """
+    Schema for creating a polygon capture (URS Data Captured table).
+    Matches fields exactly per URS Section 5.
+    """
+    farm_id: int  # URS: Farm ID / code (links to farm)
+    polygon_coordinates: List[Dict[str, float]]  # Array of {lat, lng} pairs — WGS84
+    area_ha: float  # Calculated area in hectares (4 decimal places)
+    captured_at: datetime  # ISO 8601 timestamp
+    device_id: str  # Unique device identifier (URS required)
+    accuracy_m: Optional[float] = None  # Mean GPS accuracy across all points (meters)
+    agent_id: Optional[str] = None  # Optional agent identifier
+    parcel_name: Optional[str] = None  # Optional parcel name
+
+    # Internal fields (not in URS but useful)
+    perimeter_meters: Optional[float] = None
+    points_count: Optional[int] = None
+    notes: Optional[str] = None
+    device_info: Optional[Dict[str, str]] = None
+
+
+class PolygonCaptureResponse(BaseModel):
+    """Response for polygon capture (URS + internal fields)"""
+    id: int
+    farm_id: int
+    polygon_coordinates: Optional[List[Dict[str, float]]] = None  # Raw points
+    boundary_geojson: Optional[Dict[str, Any]] = None  # GeoJSON Polygon (internal)
+    area_ha: float
+    captured_at: datetime
+    device_id: str
+    accuracy_m: Optional[float] = None
+    agent_id: Optional[str] = None
+    parcel_name: Optional[str] = None
+    points_count: int
+    perimeter_meters: Optional[float] = None
+    sync_status: SyncStatusEnum
+    synced_at: Optional[datetime] = None
+    external_id: Optional[str] = None  # Server record_id after sync
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class PolygonSubmitResponse(BaseModel):
+    """Response after polygon submission (URS: returns record_id)"""
+    success: bool
+    message: str
+    capture_id: int
+    record_id: Optional[str] = None  # URS: record_id from API
+    external_id: Optional[str] = None
+
+
+class BatchSyncRequest(BaseModel):
+    """URS: POST /api/v1/sync/batch — multiple captures"""
+    captures: List[PolygonCaptureCreate]
+
+
+class BatchSyncResponse(BaseModel):
+    """URS batch sync response"""
+    synced: int
+    failed: int
+    errors: List[str]
+    message: str
+
+
+class FarmDetailsResponse(BaseModel):
+    """URS: GET /api/v1/farms/{farm_id} response"""
+    id: int
+    farm_id: str  # Original input (code)
+    farm_name: Optional[str] = None
+    cooperative_name: Optional[str] = None
+    total_area_hectares: Optional[float] = None
+
+
 # ============== Utility Schemas ==============
 
 class MessageResponse(BaseModel):

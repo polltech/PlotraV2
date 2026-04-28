@@ -2,6 +2,8 @@
 from .base import Base
 from .user import User, UserRole, Cooperative, CooperativeMember
 from .farm import Farm, FarmParcel, LandDocument
+from .gps import GpsCapture
+from .polygon import PolygonCapture
 from .traceability import Delivery, Batch, Warehouse, QualityGrade
 from .compliance import EUDRCompliance, Certificate, DueDiligenceStatement
 from .satellite import SatelliteAnalysis, NDVIRecord, DeforestationRisk
@@ -33,8 +35,11 @@ __all__ = [
     "Cooperative",
     "CooperativeMember",
     "Farm",
-    "FarmParcel", 
+    "FarmParcel",
     "LandDocument",
+    "GpsCapture",
+    "PolygonCapture",
+    "GpsCapture",
     "Delivery",
     "Batch",
     "Warehouse",
