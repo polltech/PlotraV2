@@ -7704,8 +7704,10 @@ class PlotraDashboard {
             }
 
             // Prepare API payload
+            const farmCodeRaw = document.getElementById('farmCode')?.value?.trim();
             const apiPayload = {
                 farm_name: farmData.farm_name,
+                farm_code: farmCodeRaw ? farmCodeRaw : undefined,
                 total_area_hectares: farmData.calculated_area_ha || farmData.approximate_size_ha,
                 coffee_varieties: coffeeVarieties,
                 years_farming: farmData.farm_established_year ? new Date().getFullYear() - farmData.farm_established_year : null,
@@ -9641,7 +9643,7 @@ class PlotraDashboard {
             <form id="editFarmForm" data-farm-id="${farm.id}" class="p-3 p-md-4">
 
               <!-- Status banner -->
-              <div class="alert alert-${statusColor} d-flex align-items-center gap-2 py-2 mb-4">
+              <div class="alert alert-${statusColor} d-flex align-items-center gap-2 py-2 mb-3">
                 <i class="bi bi-info-circle-fill"></i>
                 <span>Status: <strong class="text-capitalize">${farm.verification_status || 'draft'}</strong>
                   ${farm.verification_status === 'draft' ? ' — Boundary not yet captured.' :
@@ -9649,6 +9651,23 @@ class PlotraDashboard {
                     farm.verification_status === 'verified' ? ' — Verified &amp; compliant.' :
                     farm.verification_status === 'rejected' ? ` — Rejected. ${farm.notes ? farm.notes : ''}` : ''}
                 </span>
+              </div>
+
+              <!-- Farm ID — share with field agent for mobile app access -->
+              <div class="card border-0 mb-4" style="background:linear-gradient(135deg,#2c1a0e,#6f4e37);color:#fff;border-radius:10px;">
+                <div class="card-body py-3 px-4 d-flex align-items-center justify-content-between flex-wrap gap-3">
+                  <div>
+                    <div class="small text-white-50 mb-1"><i class="bi bi-hash me-1"></i>Farm ID — for field agent mobile app</div>
+                    <div class="d-flex align-items-center gap-2 flex-wrap">
+                      <span class="badge bg-white text-dark fs-5 px-3 py-2 font-monospace fw-bold">${farm.id}</span>
+                      ${farm.farm_code ? `<span class="badge border border-white text-white px-3 py-2 font-monospace">${farm.farm_code}</span>` : ''}
+                    </div>
+                  </div>
+                  <button type="button" class="btn btn-sm btn-outline-light"
+                    onclick="navigator.clipboard.writeText('${farm.id}').then(()=>this.innerHTML='<i class=\\'bi bi-check-lg me-1\\'></i>Copied!').catch(()=>{})">
+                    <i class="bi bi-clipboard me-1"></i>Copy ID
+                  </button>
+                </div>
               </div>
 
               <!-- Map -->

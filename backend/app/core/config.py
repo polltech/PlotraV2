@@ -104,7 +104,11 @@ class CeleryConfig(BaseModel):
 
 
 class CORSConfig(BaseModel):
-    allowed_origins: list = ["http://localhost:3000", "http://localhost:8080", "http://127.0.0.1:8080"]
+    allowed_origins: list = [
+        "https://dev.plotra.eu",
+        "https://plotra.eu",
+        "https://www.plotra.eu",
+    ]
 
 
 class AuthConfig(BaseModel):

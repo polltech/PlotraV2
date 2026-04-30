@@ -29,7 +29,10 @@ services:
       PLOTRA_DATABASE__PASSWORD: postgres
       PLOTRA_DATABASE__NAME: plotra_db
       PLOTRA_APP__DEBUG: "false"
+      PLOTRA_APP__ENV: "production"
+      PLOTRA_APP__FRONTEND_BASE_URL: "https://dev.plotra.eu"
       PLOTRA_APP__SECRET_KEY: your-super-secret-key-change-this-in-production
+      PLOTRA_CORS__ALLOWED_ORIGINS: '["https://dev.plotra.eu","https://plotra.eu","https://www.plotra.eu"]'
       UVICORN_WORKERS: 2
     ports:
       - "8000:8000"

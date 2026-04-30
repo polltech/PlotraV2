@@ -16,7 +16,7 @@ class AppConfig(BaseModel):
     secret_key: str = "change-me-in-production"
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 30
-    frontend_base_url: str = "http://localhost:8080"
+    frontend_base_url: str = "https://dev.plotra.eu"
 
 
 class DatabaseConfig(BaseModel):
@@ -92,28 +92,10 @@ class StorageConfig(BaseModel):
 
 class CORSConfig(BaseModel):
     allowed_origins: list = [
-        # Development
-        "http://localhost:3000",          # Web frontend dev
-        "http://localhost:8080",          # API docs dev
-        "http://localhost:8081",          # React dev
-        "http://localhost:8000",          # Backend direct
-        "http://localhost:19006",         # Expo dev web
-        "http://127.0.0.1:19006",
-        "exp://localhost:19000",          # Expo tunnel
-        "exp://127.0.0.1:19000",
-        # LAN IP for testing
-        "http://192.168.100.5:19006",     # Your LAN IP (adjust if needed)
-        "http://192.168.100.5:8000",
-        # Production domains
-        "https://dev.plotra.eu",          # Production mobile app
-        "http://dev.plotra.eu",           # HTTP fallback
-        "https://plotra.eu",              # Main domain
-        "http://plotra.eu",
-        # Nginx proxy origins
+        # Production domains (HTTPS only)
         "https://dev.plotra.eu",
-        "http://dev.plotra.eu",
-        # Allow all for development stage (remove in strict production)
-        "*"
+        "https://plotra.eu",
+        "https://www.plotra.eu",
     ]
 
 
