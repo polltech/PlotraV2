@@ -683,10 +683,30 @@ class BatchSyncResponse(BaseModel):
 class FarmDetailsResponse(BaseModel):
     """URS: GET /api/v1/farms/{farm_id} response"""
     id: int
-    farm_id: str  # Original input (code)
+    farm_id: str                           # Original input (numeric ID as string)
     farm_name: Optional[str] = None
     cooperative_name: Optional[str] = None
     total_area_hectares: Optional[float] = None
+    # Full farm profile
+    compliance_status: Optional[str] = None
+    deforestation_risk_score: Optional[float] = None
+    coffee_varieties: Optional[List[str]] = None
+    land_use_type: Optional[str] = None
+    years_farming: Optional[int] = None
+    average_annual_production_kg: Optional[float] = None
+    soil_type: Optional[str] = None
+    terrain: Optional[str] = None
+    centroid_lat: Optional[float] = None
+    centroid_lon: Optional[float] = None
+    farm_type: Optional[str] = None
+    irrigation_used: Optional[bool] = None
+    year_coffee_planted: Optional[int] = None
+    coffee_tree_count: Optional[int] = None
+    certifications: Optional[List[str]] = None
+    farm_status: Optional[str] = None
+    mixed_farming: Optional[bool] = None
+    coffee_percent: Optional[float] = None
+    profile_submitted: Optional[bool] = None
 
 
 # ============== Utility Schemas ==============

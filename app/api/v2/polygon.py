@@ -14,7 +14,8 @@ from app.core.config import settings
 from app.models.farm import Farm, LandParcel
 from app.models.polygon import PolygonCapture, SyncStatus
 from app.api.schemas import (
-    PolygonCaptureCreate, PolygonCaptureResponse, PolygonSubmitResponse
+    PolygonCaptureCreate, PolygonCaptureResponse, PolygonSubmitResponse,
+    FarmDetailsResponse, BatchSyncResponse,
 )
 
 router = APIRouter(tags=["Polygon Capture v1"])
@@ -157,24 +158,56 @@ async def get_farm_details(
     """
     await verify_api_key(request)
 
-    # Try numeric ID first, then code string
+    # Numeric ID lookup first; fall back to farm_name search
+    farm = None
     try:
         farm_id_int = int(farm_id)
         result = await db.execute(select(Farm).where(Farm.id == farm_id_int))
+        farm = result.scalar_one_or_none()
     except ValueError:
-        # Search by farm_name or other code field
-        result = await db.execute(select(Farm).where(Farm.farm_name.ilike(f"%{farm_id}%")))
-    
-    farm = result.scalar_one_or_none()
+        pass
+
+    if farm is None:
+        result = await db.execute(
+            select(Farm).where(Farm.farm_name.ilike(f"%{farm_id}%"))
+        )
+        farm = result.scalar_one_or_none()
+
     if not farm:
         raise HTTPException(status_code=404, detail="Farm not found")
 
+    def _list_or_none(val):
+        if val is None:
+            return None
+        if isinstance(val, list):
+            return val
+        return list(val)
+
     return {
         "id": farm.id,
-        "farm_id": farm_id,  # Original input string
+        "farm_id": farm_id,
         "farm_name": farm.farm_name,
-        "cooperative_name": None,  # TODO: join cooperative if needed
+        "cooperative_name": None,
         "total_area_hectares": farm.total_area_hectares,
+        "compliance_status": farm.compliance_status,
+        "deforestation_risk_score": farm.deforestation_risk_score,
+        "coffee_varieties": _list_or_none(farm.coffee_varieties),
+        "land_use_type": farm.land_use_type.value if farm.land_use_type else None,
+        "years_farming": farm.years_farming,
+        "average_annual_production_kg": farm.average_annual_production_kg,
+        "soil_type": farm.soil_type,
+        "terrain": farm.terrain,
+        "centroid_lat": farm.centroid_lat,
+        "centroid_lon": farm.centroid_lon,
+        "farm_type": farm.farm_type,
+        "irrigation_used": farm.irrigation_used,
+        "year_coffee_planted": farm.year_coffee_planted,
+        "coffee_tree_count": farm.coffee_tree_count,
+        "certifications": _list_or_none(farm.certifications),
+        "farm_status": farm.farm_status,
+        "mixed_farming": farm.mixed_farming,
+        "coffee_percent": farm.coffee_percent,
+        "profile_submitted": farm.profile_submitted,
     }
 
 
