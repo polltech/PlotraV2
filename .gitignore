@@ -29,3 +29,4 @@ docker-compose.override.yml
 # OS
 .DS_Store
 Thumbs.db
+plotra_polygon_app/
