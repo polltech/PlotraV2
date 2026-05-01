@@ -10491,131 +10491,150 @@ class PlotraDashboard {
                 return;
             }
 
-            let html = '<div class="row g-3">';
-
-            // Display yearly summaries
+            // Flatten all records across all years, newest first
+            const allRecords = [];
             Object.keys(historicalData.historical_data).sort().reverse().forEach(year => {
-                const yearData = historicalData.historical_data[year];
-                const latest = yearData[0];
-                const avgNdvi = yearData.filter(d => d.ndvi_mean).reduce((sum, d) => sum + d.ndvi_mean, 0) / (yearData.filter(d => d.ndvi_mean).length || 1);
-                const deforestationEvents = yearData.filter(d => d.deforestation_detected).length;
-                const riskLevel = latest.risk_level || 'low';
-                const riskColor = riskLevel === 'high' ? 'danger' : riskLevel === 'medium' ? 'warning' : 'success';
-                const eudrOk = latest.analysis_metadata?.eudr_compliant !== false;
-                const agroScore = latest.analysis_metadata?.agroforestry_score || 0;
+                historicalData.historical_data[year].forEach(r => allRecords.push({ ...r, year }));
+            });
 
-                html += `
-                    <div class="col-md-6 col-lg-4">
-                        <div class="card border-0 shadow-sm h-100">
-                            <div class="card-header d-flex justify-content-between align-items-center" style="background:linear-gradient(135deg,#2c1a0e,#6f4e37);color:#fff;">
-                                <h6 class="mb-0"><i class="bi bi-satellite me-2"></i>${year}</h6>
-                                <div class="d-flex gap-1">
-                                    <span class="badge bg-${riskColor}">${riskLevel} risk</span>
-                                    <span class="badge bg-${eudrOk ? 'success' : 'danger'}">${eudrOk ? 'EUDR ✓' : 'EUDR ✗'}</span>
-                                </div>
+            // Compute aggregate summary across ALL records
+            const totalAnalyses = allRecords.length;
+            const ndviVals = allRecords.filter(r => r.ndvi_mean).map(r => r.ndvi_mean);
+            const avgNdvi = ndviVals.length ? ndviVals.reduce((s, v) => s + v, 0) / ndviVals.length : 0;
+            const deforestationEvents = allRecords.filter(r => r.deforestation_detected).length;
+            const treeVals = allRecords.filter(r => r.tree_cover_percentage).map(r => r.tree_cover_percentage);
+            const avgTreeCover = treeVals.length ? treeVals.reduce((s, v) => s + v, 0) / treeVals.length : 0;
+            const biomassVals = allRecords.filter(r => r.biomass_tons_hectare).map(r => r.biomass_tons_hectare);
+            const avgBiomass = biomassVals.length ? biomassVals.reduce((s, v) => s + v, 0) / biomassVals.length : 0;
+            const years = Object.keys(historicalData.historical_data).sort().reverse();
+
+            let html = `
+                <div class="card border-0 shadow-sm mb-4" style="background:linear-gradient(135deg,#2c1a0e,#6f4e37);color:#fff;">
+                    <div class="card-body py-3">
+                        <div class="row text-center g-2">
+                            <div class="col">
+                                <div class="h4 mb-0 fw-bold">${totalAnalyses}</div>
+                                <small class="opacity-75">Total Analyses</small>
                             </div>
-                            <div class="card-body p-3">
-                                <div class="row text-center g-2 mb-3">
-                                    <div class="col-4">
-                                        <div class="fw-bold text-success">${avgNdvi.toFixed(3)}</div>
-                                        <small class="text-muted">NDVI</small>
-                                    </div>
-                                    <div class="col-4">
-                                        <div class="fw-bold" style="color:#6f4e37;">${(latest.canopy_cover_percentage || 0).toFixed(1)}%</div>
-                                        <small class="text-muted">Canopy</small>
-                                    </div>
-                                    <div class="col-4">
-                                        <div class="fw-bold text-info">${(latest.biomass_tons_hectare || 0).toFixed(2)}</div>
-                                        <small class="text-muted">t/ha Biomass</small>
-                                    </div>
-                                </div>
-                                <div class="small border-top pt-2">
-                                    <div class="d-flex justify-content-between py-1 border-bottom">
-                                        <span class="text-muted"><i class="bi bi-tree me-1"></i>Tree Cover</span>
-                                        <strong>${(latest.tree_cover_percentage || 0).toFixed(1)}%</strong>
-                                    </div>
-                                    <div class="d-flex justify-content-between py-1 border-bottom">
-                                        <span class="text-muted"><i class="bi bi-seedling me-1"></i>Crop Cover</span>
-                                        <strong>${(latest.crop_cover_percentage || 0).toFixed(1)}%</strong>
-                                    </div>
-                                    <div class="d-flex justify-content-between py-1 border-bottom">
-                                        <span class="text-muted"><i class="bi bi-cloud me-1"></i>Carbon Stored</span>
-                                        <strong>${(latest.carbon_stored_tons || 0).toFixed(2)} t</strong>
-                                    </div>
-                                    <div class="d-flex justify-content-between py-1 border-bottom">
-                                        <span class="text-muted"><i class="bi bi-arrow-repeat me-1"></i>Carbon/yr</span>
-                                        <strong>${(latest.carbon_sequestered_kg_year || 0).toFixed(0)} kg</strong>
-                                    </div>
-                                    <div class="d-flex justify-content-between py-1 border-bottom">
-                                        <span class="text-muted"><i class="bi bi-heart-pulse me-1"></i>Tree Health</span>
-                                        <strong>${(latest.tree_health_score || 0).toFixed(1)}/10</strong>
-                                    </div>
-                                    <div class="d-flex justify-content-between py-1 border-bottom">
-                                        <span class="text-muted"><i class="bi bi-heart-pulse me-1"></i>Crop Health</span>
-                                        <strong>${(latest.crop_health_score || 0).toFixed(1)}/10</strong>
-                                    </div>
-                                    <div class="d-flex justify-content-between py-1 border-bottom">
-                                        <span class="text-muted"><i class="bi bi-cloud-sun me-1"></i>Cloud Cover</span>
-                                        <strong>${(latest.cloud_cover_percentage || 0).toFixed(1)}%</strong>
-                                    </div>
-                                    <div class="d-flex justify-content-between py-1 border-bottom">
-                                        <span class="text-muted"><i class="bi bi-graph-up me-1"></i>Agroforestry</span>
-                                        <strong>${agroScore.toFixed(1)}/10</strong>
-                                    </div>
-                                    <div class="d-flex justify-content-between py-1">
-                                        <span class="text-muted"><i class="bi bi-exclamation-triangle me-1"></i>Deforestation</span>
-                                        <strong class="${deforestationEvents > 0 ? 'text-danger' : 'text-success'}">${deforestationEvents === 0 ? 'None detected' : deforestationEvents + ' event(s)'}</strong>
-                                    </div>
-                                </div>
-                                <div class="mt-2 text-center">
-                                    <small class="text-muted">${yearData.length} analysis run(s) · ${new Date(latest.analysis_date).toLocaleDateString()}</small>
-                                </div>
+                            <div class="col">
+                                <div class="h4 mb-0 fw-bold text-success">${avgNdvi.toFixed(3)}</div>
+                                <small class="opacity-75">Avg NDVI</small>
+                            </div>
+                            <div class="col">
+                                <div class="h4 mb-0 fw-bold ${deforestationEvents > 0 ? 'text-danger' : 'text-success'}">${deforestationEvents}</div>
+                                <small class="opacity-75">Deforestation Events</small>
+                            </div>
+                            <div class="col">
+                                <div class="h4 mb-0 fw-bold">${avgTreeCover.toFixed(1)}%</div>
+                                <small class="opacity-75">Avg Tree Cover</small>
+                            </div>
+                            <div class="col">
+                                <div class="h4 mb-0 fw-bold text-info">${avgBiomass.toFixed(2)} t/ha</div>
+                                <small class="opacity-75">Avg Biomass</small>
                             </div>
                         </div>
                     </div>
-                `;
-            });
+                </div>
+            `;
 
-            html += '</div>';
+            // Year sections — each year shows every individual run
+            years.forEach(year => {
+                const yearRecords = historicalData.historical_data[year];
+                const yearNdvi = yearRecords.filter(r => r.ndvi_mean).reduce((s, r) => s + r.ndvi_mean, 0) / (yearRecords.filter(r => r.ndvi_mean).length || 1);
+                const yearDefo = yearRecords.filter(r => r.deforestation_detected).length;
 
-            // Add trends section
-            if (historicalData.yearly_trends && Object.keys(historicalData.yearly_trends).length > 0) {
                 html += `
-                    <div class="mt-4">
-                        <h6>Year-over-Year Trends</h6>
-                        <div class="table-responsive">
-                            <table class="table table-sm">
-                                <thead>
-                                    <tr>
-                                        <th>Year</th>
-                                        <th>NDVI Change</th>
-                                        <th>Canopy Trend</th>
-                                        <th>Biomass Trend</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
+                    <div class="mb-4">
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <h6 class="mb-0 fw-bold"><i class="bi bi-calendar3 me-2" style="color:#6f4e37;"></i>${year}</h6>
+                            <span class="text-muted small">${yearRecords.length} analyses &nbsp;·&nbsp; Avg NDVI ${yearNdvi.toFixed(3)} &nbsp;·&nbsp; ${yearDefo === 0 ? '<span class="text-success">No deforestation</span>' : '<span class="text-danger">' + yearDefo + ' deforestation event(s)</span>'}</span>
+                        </div>
+                        <div class="row g-2">
                 `;
 
-                Object.keys(historicalData.yearly_trends).sort().reverse().forEach(year => {
-                    const trend = historicalData.yearly_trends[year];
+                yearRecords.forEach((rec, idx) => {
+                    const riskLevel = rec.risk_level || 'low';
+                    const riskColor = riskLevel === 'high' ? 'danger' : riskLevel === 'medium' ? 'warning' : 'success';
+                    const eudrOk = rec.analysis_metadata?.eudr_compliant !== false;
+                    const agroScore = rec.analysis_metadata?.agroforestry_score || 0;
+                    const runDate = new Date(rec.analysis_date);
+                    const runLabel = runDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+
                     html += `
-                        <tr>
-                            <td>${year}</td>
-                            <td class="${trend.ndvi_change >= 0 ? 'text-success' : 'text-danger'}">
-                                ${trend.ndvi_change >= 0 ? '+' : ''}${trend.ndvi_change}
-                            </td>
-                            <td class="${trend.canopy_trend === 'increasing' ? 'text-success' : 'text-warning'}">
-                                ${trend.canopy_trend}
-                            </td>
-                            <td class="${trend.biomass_trend === 'increasing' ? 'text-success' : 'text-warning'}">
-                                ${trend.biomass_trend}
-                            </td>
-                        </tr>
+                        <div class="col-md-6 col-lg-4">
+                            <div class="card border-0 shadow-sm h-100">
+                                <div class="card-header d-flex justify-content-between align-items-center py-2" style="background:#f8f4f0;">
+                                    <span class="small fw-bold text-dark"><i class="bi bi-satellite me-1" style="color:#6f4e37;"></i>Run #${idx + 1} &mdash; ${runLabel}</span>
+                                    <div class="d-flex gap-1">
+                                        <span class="badge bg-${riskColor} py-1">${riskLevel}</span>
+                                        <span class="badge bg-${eudrOk ? 'success' : 'danger'} py-1">${eudrOk ? 'EUDR ✓' : 'EUDR ✗'}</span>
+                                    </div>
+                                </div>
+                                <div class="card-body p-3">
+                                    <div class="row text-center g-1 mb-3">
+                                        <div class="col-4">
+                                            <div class="fw-bold text-success">${(rec.ndvi_mean || 0).toFixed(3)}</div>
+                                            <small class="text-muted" style="font-size:0.7rem;">NDVI</small>
+                                        </div>
+                                        <div class="col-4">
+                                            <div class="fw-bold" style="color:#6f4e37;">${(rec.canopy_cover_percentage || 0).toFixed(1)}%</div>
+                                            <small class="text-muted" style="font-size:0.7rem;">Canopy</small>
+                                        </div>
+                                        <div class="col-4">
+                                            <div class="fw-bold text-info">${(rec.biomass_tons_hectare || 0).toFixed(2)}</div>
+                                            <small class="text-muted" style="font-size:0.7rem;">t/ha</small>
+                                        </div>
+                                    </div>
+                                    <div class="small">
+                                        <div class="d-flex justify-content-between py-1 border-bottom">
+                                            <span class="text-muted"><i class="bi bi-tree me-1"></i>Tree Cover</span>
+                                            <strong>${(rec.tree_cover_percentage || 0).toFixed(1)}%</strong>
+                                        </div>
+                                        <div class="d-flex justify-content-between py-1 border-bottom">
+                                            <span class="text-muted"><i class="bi bi-seedling me-1"></i>Crop Cover</span>
+                                            <strong>${(rec.crop_cover_percentage || 0).toFixed(1)}%</strong>
+                                        </div>
+                                        <div class="d-flex justify-content-between py-1 border-bottom">
+                                            <span class="text-muted"><i class="bi bi-bar-chart me-1"></i>NDVI Range</span>
+                                            <strong>${(rec.ndvi_min || 0).toFixed(3)} – ${(rec.ndvi_max || 0).toFixed(3)}</strong>
+                                        </div>
+                                        <div class="d-flex justify-content-between py-1 border-bottom">
+                                            <span class="text-muted"><i class="bi bi-cloud me-1"></i>Carbon Stored</span>
+                                            <strong>${(rec.carbon_stored_tons || 0).toFixed(2)} t</strong>
+                                        </div>
+                                        <div class="d-flex justify-content-between py-1 border-bottom">
+                                            <span class="text-muted"><i class="bi bi-arrow-repeat me-1"></i>Carbon/yr</span>
+                                            <strong>${(rec.carbon_sequestered_kg_year || 0).toFixed(0)} kg</strong>
+                                        </div>
+                                        <div class="d-flex justify-content-between py-1 border-bottom">
+                                            <span class="text-muted"><i class="bi bi-heart-pulse me-1"></i>Tree Health</span>
+                                            <strong>${(rec.tree_health_score || 0).toFixed(1)}/10</strong>
+                                        </div>
+                                        <div class="d-flex justify-content-between py-1 border-bottom">
+                                            <span class="text-muted"><i class="bi bi-heart-pulse me-1"></i>Crop Health</span>
+                                            <strong>${(rec.crop_health_score || 0).toFixed(1)}/10</strong>
+                                        </div>
+                                        <div class="d-flex justify-content-between py-1 border-bottom">
+                                            <span class="text-muted"><i class="bi bi-cloud-sun me-1"></i>Cloud Cover</span>
+                                            <strong>${(rec.cloud_cover_percentage || 0).toFixed(1)}%</strong>
+                                        </div>
+                                        <div class="d-flex justify-content-between py-1 border-bottom">
+                                            <span class="text-muted"><i class="bi bi-graph-up me-1"></i>Agroforestry</span>
+                                            <strong>${agroScore.toFixed(1)}/10</strong>
+                                        </div>
+                                        <div class="d-flex justify-content-between py-1">
+                                            <span class="text-muted"><i class="bi bi-exclamation-triangle me-1"></i>Deforestation</span>
+                                            <strong class="${rec.deforestation_detected ? 'text-danger' : 'text-success'}">${rec.deforestation_detected ? 'Detected' : 'None'}</strong>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     `;
                 });
 
-                html += '</tbody></table></div>';
-            }
+                html += '</div></div>';
+            });
 
             container.innerHTML = html;
 
