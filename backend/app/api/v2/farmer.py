@@ -615,6 +615,42 @@ async def request_satellite_analysis(
             parcel.canopy_density = result.get('canopy_cover_percentage')
             parcel.biomass_tons = result.get('biomass_tons_hectare')
 
+            # Also write to historical_analysis so the dashboard history section is populated
+            from app.models.farm import HistoricalAnalysis
+            now = datetime.utcnow()
+            historical = HistoricalAnalysis(
+                entity_type="farm",
+                entity_id=str(farm_id),
+                analysis_date=now,
+                analysis_year=now.year,
+                analysis_period="quarterly",
+                satellite_source=result.get('satellite_source', 'SIMULATION'),
+                acquisition_date=(acquisition_date or now).replace(tzinfo=None),
+                cloud_cover_percentage=result.get('cloud_cover_percentage'),
+                ndvi_mean=result.get('ndvi_mean'),
+                ndvi_min=result.get('ndvi_min'),
+                ndvi_max=result.get('ndvi_max'),
+                evi_mean=result.get('evi'),
+                savi_mean=result.get('savi'),
+                lai_mean=result.get('lai'),
+                canopy_cover_percentage=result.get('canopy_cover_percentage'),
+                tree_cover_percentage=result.get('tree_cover_percentage'),
+                crop_cover_percentage=result.get('crop_cover_percentage'),
+                bare_soil_percentage=result.get('bare_soil_percentage'),
+                biomass_tons_hectare=result.get('biomass_tons_hectare'),
+                carbon_stored_tons=result.get('carbon_stored_tons'),
+                carbon_sequestered_kg_year=result.get('carbon_sequestered_kg_year'),
+                deforestation_detected=1 if result.get('deforestation_detected') else 0,
+                deforestation_area_ha=result.get('deforestation_area_ha', 0),
+                risk_level=result.get('risk_level'),
+                risk_score=result.get('risk_score'),
+                tree_count=result.get('tree_count'),
+                tree_health_score=result.get('tree_health_score'),
+                crop_health_score=result.get('crop_health_score'),
+                analysis_metadata={"analysis_type": result.get('analysis_type', 'standard')}
+            )
+            db.add(historical)
+
     # Update farm's last analysis timestamp
     farm.last_satellite_analysis = datetime.utcnow()
 
