@@ -588,7 +588,7 @@ async def request_satellite_analysis(
             observation = SatelliteObservation(
                 parcel_id=parcel.id,
                 observation_id=result['analysis_id'],
-                satellite_source=result.get('satellite_source', 'Sentinel-2'),
+                satellite_source=result.get('satellite_source', 'SENTINEL_2'),
                 acquisition_date=(acquisition_date or datetime.utcnow()).replace(tzinfo=None),
                 processing_date=datetime.utcnow(),
                 status=AnalysisStatus.COMPLETED,
@@ -624,7 +624,7 @@ async def request_satellite_analysis(
                 analysis_date=now,
                 analysis_year=now.year,
                 analysis_period="quarterly",
-                satellite_source=result.get('satellite_source', 'Sentinel-2'),
+                satellite_source=result.get('satellite_source', 'SENTINEL_2'),
                 acquisition_date=(acquisition_date or now).replace(tzinfo=None),
                 cloud_cover_percentage=result.get('cloud_cover_percentage'),
                 ndvi_mean=result.get('ndvi_mean'),

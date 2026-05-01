@@ -9052,7 +9052,7 @@ class PlotraDashboard {
                         analysis_date: new Date().toISOString(),
                         analysis_year: currentYear,
                         analysis_period: 'quarterly', // Could be dynamic based on frequency
-                        satellite_source: result.satellite_source || 'Sentinel-2',
+                        satellite_source: result.satellite_source || 'SENTINEL_2',
                         acquisition_date: result.acquisition_date,
                         cloud_cover_percentage: result.cloud_cover_percentage || 0,
                         ndvi_mean: result.ndvi_mean,
@@ -10451,7 +10451,7 @@ class PlotraDashboard {
                         <td>${(s.canopy_cover_percentage || 0).toFixed(1)}%</td>
                         <td>${(s.biomass_tons_hectare || 0).toFixed(2)}</td>
                         <td><span class="badge bg-secondary">${s.land_cover_type || '—'}</span></td>
-                        <td><small class="text-muted">${s.satellite_source || 'Sentinel-2'}</small></td>
+                        <td><small class="text-muted">${(s.satellite_source || 'SENTINEL_2').replace('SENTINEL_2','Sentinel-2').replace('LANDSAT_8','Landsat-8').replace('LANDSAT_9','Landsat-9')}</small></td>
                     </tr>`;
                 });
                 html += '</tbody></table></div></div>';

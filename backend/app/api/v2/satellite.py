@@ -278,7 +278,7 @@ async def get_parcel_indices(
             analysis_id=observation.id,
             parcel_id=parcel_id,
             status="completed",
-            satellite_source=observation.satellite_source or "Sentinel-2",
+            satellite_source=observation.satellite_source or "SENTINEL_2",
             acquisition_date=observation.acquisition_date.isoformat() if observation.acquisition_date else "",
             ndvi_mean=observation.ndvi_mean,
             ndvi_min=observation.ndvi_min,
