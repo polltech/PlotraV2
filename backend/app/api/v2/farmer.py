@@ -1905,11 +1905,11 @@ async def store_historical_analysis(
     historical = HistoricalAnalysis(
         entity_type="farm",
         entity_id=str(farm_id),
-        analysis_date=datetime.fromisoformat(analysis_data['analysis_date']) if analysis_data.get('analysis_date') else datetime.utcnow(),
+        analysis_date=(datetime.fromisoformat(analysis_data['analysis_date']) if analysis_data.get('analysis_date') else datetime.utcnow()).replace(tzinfo=None),
         analysis_year=analysis_data.get('analysis_year', datetime.utcnow().year),
         analysis_period=analysis_data.get('analysis_period', 'annual'),
         satellite_source=analysis_data.get('satellite_source'),
-        acquisition_date=datetime.fromisoformat(analysis_data['acquisition_date']) if analysis_data.get('acquisition_date') else None,
+        acquisition_date=datetime.fromisoformat(analysis_data['acquisition_date']).replace(tzinfo=None) if analysis_data.get('acquisition_date') else None,
         cloud_cover_percentage=analysis_data.get('cloud_cover_percentage'),
         ndvi_mean=analysis_data.get('ndvi_mean'),
         ndvi_min=analysis_data.get('ndvi_min'),
