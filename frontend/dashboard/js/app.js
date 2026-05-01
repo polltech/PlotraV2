@@ -9014,56 +9014,126 @@ class PlotraDashboard {
         }
     }
 
-    async requestSatelliteAnalysis(farmId, parcelIds = null) {
-        // Disable the button to prevent double-clicks
+    async requestSatelliteAnalysis(farmId) {
         const btn = document.querySelector(`[onclick*="requestSatelliteAnalysis('${farmId}')"]`);
         if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Analysing…'; }
 
         try {
-            // Verify farm has a captured polygon before requesting analysis
             const farm = await api.getFarmById(farmId);
-            const hasPolygon = farm?.parcels?.length > 0 && farm.parcels[0].boundary_geojson;
-            if (!hasPolygon) {
+            const parcels = (farm?.parcels || []).filter(p => p.boundary_geojson);
+            if (!parcels.length) {
                 this.showToast('Please capture the farm polygon first before running satellite analysis.', 'warning');
                 return;
             }
-            this.showToast('Running satellite analysis…', 'info');
 
-            // Build query string — backend takes parcel_ids as query params, not body
-            let url = `/farmer/farm/${farmId}/satellite-analysis`;
-            const params = new URLSearchParams();
-            params.set('acquisition_date', new Date().toISOString());
-            if (parcelIds && parcelIds.length > 0) {
-                parcelIds.forEach(id => params.append('parcel_ids', id));
+            // Show a progress modal so the user sees parcel-by-parcel progress
+            this._showAnalysisProgressModal(farm.farm_name || 'Farm', parcels.length);
+
+            let completed = 0;
+            let failed = 0;
+            const acquisitionDate = new Date().toISOString();
+
+            for (let i = 0; i < parcels.length; i++) {
+                const parcel = parcels[i];
+                const label = parcel.parcel_name || `Parcel ${i + 1}`;
+                this._updateAnalysisProgress(i + 1, parcels.length, label, 'running');
+
+                try {
+                    const params = new URLSearchParams();
+                    params.set('acquisition_date', acquisitionDate);
+                    params.append('parcel_ids', parcel.id);
+                    const result = await api.request(
+                        `/farmer/farm/${farmId}/satellite-analysis?${params.toString()}`,
+                        { method: 'POST' }
+                    );
+                    const ok = result.results?.some(r => r.status === 'completed');
+                    if (ok) {
+                        completed++;
+                        this._updateAnalysisProgress(i + 1, parcels.length, label, 'done');
+                    } else {
+                        const err = result.results?.[0]?.error || 'No imagery found';
+                        failed++;
+                        this._updateAnalysisProgress(i + 1, parcels.length, label, 'failed', err);
+                    }
+                } catch (e) {
+                    failed++;
+                    this._updateAnalysisProgress(i + 1, parcels.length, label, 'failed', e.message);
+                }
             }
-            url += '?' + params.toString();
 
-            const result = await api.request(url, { method: 'POST' });
+            this._finaliseAnalysisProgress(completed, failed);
 
-            const parcelsProcessed = result.results?.filter(r => r.status === 'completed').length || 0;
-            const failed = result.results?.filter(r => r.status === 'failed').length || 0;
-
-            if (parcelsProcessed === 0) {
-                this.showToast(`Analysis failed — no parcels could be processed.${failed ? ` (${failed} error(s))` : ''}`, 'error');
-                return;
+            if (completed > 0) {
+                // Update selector to this farm and reload only this farm's analysis
+                const selector = document.getElementById('analysisFarmSelector');
+                if (selector) selector.value = farmId;
+                this.switchAnalysisFarm(farmId);
             }
-
-            this.showToast(`Analysis complete — ${parcelsProcessed} parcel(s) processed.`, 'success');
-
-            // Reload farm cards then refresh all analysis sections for this farm
-            await this.loadFarmerFarms();
-            const selector = document.getElementById('analysisFarmSelector');
-            if (selector) {
-                selector.value = farmId;
-            }
-            // Always refresh analysis sections regardless of selector state
-            this.switchAnalysisFarm(farmId);
 
         } catch (error) {
             this.showToast(`Satellite analysis failed: ${error.message}`, 'error');
+            this._closeAnalysisProgressModal();
         } finally {
             if (btn) { btn.disabled = false; btn.innerHTML = '<i class="bi bi-satellite-fill me-1"></i>Analyse'; }
         }
+    }
+
+    _showAnalysisProgressModal(farmName, totalParcels) {
+        let modal = document.getElementById('analysisProgressModal');
+        if (!modal) {
+            modal = document.createElement('div');
+            modal.id = 'analysisProgressModal';
+            modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;';
+            document.body.appendChild(modal);
+        }
+        modal.innerHTML = `
+            <div class="card shadow-lg" style="min-width:360px;max-width:500px;width:90%;">
+                <div class="card-header fw-semibold d-flex align-items-center gap-2">
+                    <i class="bi bi-satellite-fill text-info"></i>
+                    Satellite Analysis — ${farmName}
+                </div>
+                <div class="card-body">
+                    <p class="text-muted small mb-3">Analysing ${totalParcels} parcel(s) one by one…</p>
+                    <div id="analysisParcelList" class="d-flex flex-column gap-2"></div>
+                </div>
+                <div class="card-footer text-muted small" id="analysisProgressFooter">Starting…</div>
+            </div>`;
+        modal.style.display = 'flex';
+    }
+
+    _updateAnalysisProgress(index, total, label, state, errorMsg = '') {
+        const list = document.getElementById('analysisParcelList');
+        if (!list) return;
+        let row = document.getElementById(`aprow-${index}`);
+        if (!row) {
+            row = document.createElement('div');
+            row.id = `aprow-${index}`;
+            row.className = 'd-flex align-items-center gap-2 p-2 rounded border';
+            list.appendChild(row);
+        }
+        const icons = { running: '<span class="spinner-border spinner-border-sm text-info"></span>', done: '<i class="bi bi-check-circle-fill text-success"></i>', failed: '<i class="bi bi-x-circle-fill text-danger"></i>' };
+        const colors = { running: 'border-info', done: 'border-success', failed: 'border-danger' };
+        row.className = `d-flex align-items-start gap-2 p-2 rounded border ${colors[state] || ''}`;
+        row.innerHTML = `
+            <div style="min-width:20px;margin-top:1px">${icons[state] || ''}</div>
+            <div>
+                <div class="fw-semibold small">Parcel ${index} of ${total}: ${label}</div>
+                ${errorMsg ? `<div class="text-danger" style="font-size:.75rem">${errorMsg}</div>` : ''}
+            </div>`;
+        const footer = document.getElementById('analysisProgressFooter');
+        if (footer) footer.textContent = state === 'running' ? `Analysing parcel ${index} of ${total}…` : `Parcel ${index} of ${total} ${state}.`;
+    }
+
+    _finaliseAnalysisProgress(completed, failed) {
+        const footer = document.getElementById('analysisProgressFooter');
+        if (footer) footer.innerHTML = `<span class="text-success fw-semibold">${completed} completed</span>${failed ? `, <span class="text-danger">${failed} failed</span>` : ''} — <a href="#" onclick="document.getElementById('analysisProgressModal').style.display='none';return false;">Close</a>`;
+        if (completed > 0) this.showToast(`Analysis complete — ${completed} parcel(s) processed.`, 'success');
+        else this.showToast('No parcels could be analysed. Check parcel boundaries.', 'error');
+    }
+
+    _closeAnalysisProgressModal() {
+        const modal = document.getElementById('analysisProgressModal');
+        if (modal) modal.style.display = 'none';
     }
 
     async storeHistoricalAnalysis(farmId, analysisResults) {
@@ -9608,13 +9678,18 @@ class PlotraDashboard {
             const mappedFarms = farms?.filter(f => f.parcels?.length > 0 && f.parcels[0].boundary_geojson) || [];
             const selector = document.getElementById('analysisFarmSelector');
             if (selector) {
+                const previouslySelected = selector.value;
                 selector.innerHTML = '<option value="">— select a mapped farm —</option>' +
                     mappedFarms.map(f => `<option value="${f.id}">${f.farm_name || 'Unnamed Farm'}</option>`).join('');
-                if (mappedFarms.length > 0) {
-                    selector.value = mappedFarms[0].id;
-                    this.loadHistoricalAnalysis(mappedFarms[0].id);
-                    this.loadTreeManagement(mappedFarms[0].id);
-                    this.loadCropAnalysis(mappedFarms[0].id);
+                // Restore previously selected farm; only default to first farm on initial load
+                const targetId = previouslySelected && mappedFarms.find(f => f.id === previouslySelected)
+                    ? previouslySelected
+                    : (mappedFarms.length > 0 ? mappedFarms[0].id : '');
+                if (targetId) {
+                    selector.value = targetId;
+                    this.loadHistoricalAnalysis(targetId);
+                    this.loadTreeManagement(targetId);
+                    this.loadCropAnalysis(targetId);
                 }
             }
         } catch (error) {
