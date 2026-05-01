@@ -588,7 +588,7 @@ async def request_satellite_analysis(
             observation = SatelliteObservation(
                 parcel_id=parcel.id,
                 observation_id=result['analysis_id'],
-                satellite_source=result.get('satellite_source', 'SIMULATION'),
+                satellite_source=result.get('satellite_source', 'Sentinel-2'),
                 acquisition_date=(acquisition_date or datetime.utcnow()).replace(tzinfo=None),
                 processing_date=datetime.utcnow(),
                 status=AnalysisStatus.COMPLETED,
@@ -624,7 +624,7 @@ async def request_satellite_analysis(
                 analysis_date=now,
                 analysis_year=now.year,
                 analysis_period="quarterly",
-                satellite_source=result.get('satellite_source', 'SIMULATION'),
+                satellite_source=result.get('satellite_source', 'Sentinel-2'),
                 acquisition_date=(acquisition_date or now).replace(tzinfo=None),
                 cloud_cover_percentage=result.get('cloud_cover_percentage'),
                 ndvi_mean=result.get('ndvi_mean'),
@@ -647,7 +647,14 @@ async def request_satellite_analysis(
                 tree_count=result.get('tree_count'),
                 tree_health_score=result.get('tree_health_score'),
                 crop_health_score=result.get('crop_health_score'),
-                analysis_metadata={"analysis_type": result.get('analysis_type', 'standard')}
+                analysis_metadata={
+                    "analysis_type": result.get('analysis_type', 'standard'),
+                    "crop_differentiation": result.get('crop_differentiation', {}),
+                    "dominant_crops": result.get('dominant_crops', []),
+                    "agroforestry_score": result.get('agroforestry_score', 3.0),
+                    "eudr_compliant": result.get('eudr_compliant', True),
+                    "seasonal_adjustment_applied": result.get('seasonal_adjustment_applied', False),
+                }
             )
             db.add(historical)
 
@@ -715,6 +722,115 @@ async def get_satellite_history(
         }
         for obs in observations
     ]
+
+
+@router.get("/farm/{farm_id}/crop-analysis")
+async def get_farm_crop_analysis(
+    farm_id: str,
+    current_user: User = Depends(require_farmer),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Returns crop differentiation data from the latest satellite analysis per parcel,
+    merged with any manually mapped parcel crops.
+    """
+    result = await db.execute(
+        select(Farm).where(Farm.id == farm_id, Farm.owner_id == current_user.id)
+    )
+    farm = result.scalar_one_or_none()
+    if not farm:
+        raise HTTPException(status_code=404, detail="Farm not found")
+
+    from app.models.satellite import SatelliteObservation
+    from app.models.farm import HistoricalAnalysis
+    from sqlalchemy.orm import selectinload as sil
+
+    # Get all parcels with their manual crops
+    parcels_result = await db.execute(
+        select(LandParcel).options(sil(LandParcel.crops)).where(LandParcel.farm_id == farm_id)
+    )
+    parcels = parcels_result.scalars().all()
+
+    # Get latest satellite observation per parcel
+    latest_obs = {}
+    for parcel in parcels:
+        obs_result = await db.execute(
+            select(SatelliteObservation)
+            .where(SatelliteObservation.parcel_id == parcel.id)
+            .order_by(SatelliteObservation.acquisition_date.desc())
+            .limit(1)
+        )
+        obs = obs_result.scalar_one_or_none()
+        if obs:
+            latest_obs[parcel.id] = obs
+
+    # Get latest historical analysis for crop_differentiation metadata
+    hist_result = await db.execute(
+        select(HistoricalAnalysis)
+        .where(
+            HistoricalAnalysis.entity_type == "farm",
+            HistoricalAnalysis.entity_id == str(farm_id)
+        )
+        .order_by(HistoricalAnalysis.analysis_date.desc())
+        .limit(1)
+    )
+    latest_hist = hist_result.scalar_one_or_none()
+    crop_diff = {}
+    dominant_crops = []
+    agroforestry_score = 3.0
+    if latest_hist and latest_hist.analysis_metadata:
+        meta = latest_hist.analysis_metadata
+        crop_diff = meta.get("crop_differentiation", {})
+        dominant_crops = meta.get("dominant_crops", [])
+        agroforestry_score = meta.get("agroforestry_score", 3.0)
+
+    parcel_summaries = []
+    for parcel in parcels:
+        obs = latest_obs.get(parcel.id)
+        manual_crops = []
+        for c in (parcel.crops or []):
+            manual_crops.append({
+                "id": c.id,
+                "crop_type": c.crop_type.name if c.crop_type else "Unknown",
+                "category": c.crop_type.category if c.crop_type else "other",
+                "area_hectares": c.area_hectares,
+                "health_status": c.health_status.value if c.health_status else None,
+                "growth_stage": c.growth_stage.value if c.growth_stage else None,
+                "organic_certified": bool(c.organic_certified),
+                "fair_trade_certified": bool(c.fair_trade_certified),
+            })
+
+        parcel_summaries.append({
+            "parcel_id": parcel.id,
+            "parcel_number": parcel.parcel_number,
+            "parcel_name": parcel.parcel_name,
+            "area_hectares": parcel.area_hectares,
+            "satellite": {
+                "ndvi_mean": obs.ndvi_mean if obs else None,
+                "ndvi_min": obs.ndvi_min if obs else None,
+                "ndvi_max": obs.ndvi_max if obs else None,
+                "canopy_cover_percentage": obs.canopy_cover_percentage if obs else None,
+                "tree_density": obs.tree_density if obs else None,
+                "biomass_tons_hectare": obs.biomass_tons_hectare if obs else None,
+                "land_cover_type": obs.land_cover_type if obs else None,
+                "acquisition_date": obs.acquisition_date.isoformat() if obs else None,
+                "satellite_source": obs.satellite_source if obs else None,
+            } if obs else None,
+            "manual_crops": manual_crops,
+            "has_satellite_data": obs is not None,
+            "has_manual_crops": len(manual_crops) > 0,
+        })
+
+    return {
+        "farm_id": farm_id,
+        "farm_name": farm.farm_name,
+        "crop_differentiation": crop_diff,
+        "dominant_crops": dominant_crops,
+        "agroforestry_score": agroforestry_score,
+        "parcels": parcel_summaries,
+        "has_analysis": latest_hist is not None,
+        "last_analysis_date": latest_hist.analysis_date.isoformat() if latest_hist else None,
+    }
 
 
 @router.get("/farm/{farm_id}/satellite-imagery")
@@ -1711,18 +1827,26 @@ async def get_historical_farm_analysis(
             "period": record.analysis_period,
             "satellite_source": record.satellite_source,
             "ndvi_mean": record.ndvi_mean,
+            "ndvi_min": record.ndvi_min,
+            "ndvi_max": record.ndvi_max,
+            "evi_mean": record.evi_mean,
             "canopy_cover_percentage": record.canopy_cover_percentage,
             "tree_cover_percentage": record.tree_cover_percentage,
             "crop_cover_percentage": record.crop_cover_percentage,
+            "bare_soil_percentage": record.bare_soil_percentage,
             "biomass_tons_hectare": record.biomass_tons_hectare,
             "carbon_stored_tons": record.carbon_stored_tons,
+            "carbon_sequestered_kg_year": record.carbon_sequestered_kg_year,
+            "cloud_cover_percentage": record.cloud_cover_percentage,
             "deforestation_detected": bool(record.deforestation_detected),
             "risk_level": record.risk_level,
+            "risk_score": record.risk_score,
             "tree_count": record.tree_count,
             "tree_health_score": record.tree_health_score,
             "crop_health_score": record.crop_health_score,
             "seasonal_trend": record.get_seasonal_trend(),
-            "satellite_imagery_url": record.satellite_imagery_url
+            "satellite_imagery_url": record.satellite_imagery_url,
+            "analysis_metadata": record.analysis_metadata or {}
         })
 
     # Calculate year-over-year trends

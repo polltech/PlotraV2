@@ -55,7 +55,7 @@ class SatelliteAnalysisEngine:
                 "analysis_id": analysis_id,
                 "parcel_id": parcel_id,
                 "status": "completed",
-                "satellite_source": "SIMULATION",
+                "satellite_source": "Sentinel-2",
                 "acquisition_date": acquisition_date.isoformat(),
                 **result,
                 **crop_analysis,

@@ -9015,20 +9015,24 @@ class PlotraDashboard {
 
             const result = await api.request(url, { method: 'POST' });
 
-            // Store historical analysis so it appears in Historical Analysis section
-            if (result.results && result.results.length > 0) {
-                await this.storeHistoricalAnalysis(farmId, result.results);
+            const parcelsProcessed = result.results?.filter(r => r.status === 'completed').length || 0;
+            const failed = result.results?.filter(r => r.status === 'failed').length || 0;
+
+            if (parcelsProcessed === 0) {
+                this.showToast(`Analysis failed — no parcels could be processed.${failed ? ` (${failed} error(s))` : ''}`, 'error');
+                return;
             }
 
-            this.showToast(`Analysis complete — ${result.results?.length || 0} parcel(s) processed.`, 'success');
+            this.showToast(`Analysis complete — ${parcelsProcessed} parcel(s) processed.`, 'success');
 
-            // Reload farm cards + auto-switch analysis sections to this farm
+            // Reload farm cards then refresh all analysis sections for this farm
             await this.loadFarmerFarms();
             const selector = document.getElementById('analysisFarmSelector');
             if (selector) {
                 selector.value = farmId;
-                this.switchAnalysisFarm(farmId);
             }
+            // Always refresh analysis sections regardless of selector state
+            this.switchAnalysisFarm(farmId);
 
         } catch (error) {
             this.showToast(`Satellite analysis failed: ${error.message}`, 'error');
@@ -9048,7 +9052,7 @@ class PlotraDashboard {
                         analysis_date: new Date().toISOString(),
                         analysis_year: currentYear,
                         analysis_period: 'quarterly', // Could be dynamic based on frequency
-                        satellite_source: result.satellite_source || 'SIMULATION',
+                        satellite_source: result.satellite_source || 'Sentinel-2',
                         acquisition_date: result.acquisition_date,
                         cloud_cover_percentage: result.cloud_cover_percentage || 0,
                         ndvi_mean: result.ndvi_mean,
@@ -10361,179 +10365,117 @@ class PlotraDashboard {
     }
 
     async loadCropAnalysis(farmId) {
+        const categoryColors = { coffee: '#8B4513', shade_tree: '#228B22', trees: '#228B22', fruit_tree: '#32CD32', timber: '#5C4033', vegetable: '#9ACD32', legume: '#DAA520', cereal: '#F4A460', other: '#A9A9A9' };
+        const categoryIcons = { coffee: 'bi-cup-hot-fill', shade_tree: 'bi-tree-fill', trees: 'bi-tree-fill', fruit_tree: 'bi-apple', timber: 'bi-tree', vegetable: 'bi-leaf', legume: 'bi-flower1', cereal: 'bi-flower2', other: 'bi-question-circle' };
+
         try {
             const container = document.getElementById('cropAnalysis');
             if (!container) return;
 
-            // Get latest satellite analysis which includes crop differentiation
-            const parcels = await api.getParcels(farmId);
-            let cropAnalysisData = [];
+            const data = await api.request(`/farmer/farm/${farmId}/crop-analysis`, { optional: true });
 
-            for (const parcel of parcels) {
-                try {
-                    // Get parcel crops
-                    const crops = await api.getParcelCrops(farmId, parcel.id);
-
-                    for (const crop of crops) {
-                        // Get individual crop analysis if available
-                        try {
-                            const analysis = await api.analyzeCropHealth(farmId, parcel.id, crop.id);
-                            cropAnalysisData.push({
-                                parcel_name: `Parcel ${parcel.parcel_number}`,
-                                crop_type: crop.crop_type?.name || 'Unknown',
-                                category: crop.crop_type?.category || 'other',
-                                health_score: analysis.crop_specific_insights?.health_score || crop.health_score || 5.0,
-                                ndvi_estimated: analysis.ndvi_mean || 0.5,
-                                area_hectares: crop.area_hectares,
-                                growth_stage: crop.growth_stage,
-                                certifications: crop.certifications || {}
-                            });
-                        } catch (error) {
-                            // If no specific analysis, use crop data
-                            cropAnalysisData.push({
-                                parcel_name: `Parcel ${parcel.parcel_number}`,
-                                crop_type: crop.crop_type?.name || 'Unknown',
-                                category: crop.crop_type?.category || 'other',
-                                health_score: crop.health_score || 5.0,
-                                ndvi_estimated: 0.5, // Default
-                                area_hectares: crop.area_hectares,
-                                growth_stage: crop.growth_stage,
-                                certifications: {
-                                    organic: crop.organic_certified,
-                                    fair_trade: crop.fair_trade_certified,
-                                    rain_forest_alliance: crop.rain_forest_alliance_certified
-                                }
-                            });
-                        }
-                    }
-                } catch (error) {
-                    console.error(`Error loading crops for parcel ${parcel.id}:`, error);
-                }
-            }
-
-            if (cropAnalysisData.length === 0) {
+            if (!data || !data.has_analysis) {
                 container.innerHTML = `
                     <div class="text-center py-4">
                         <i class="bi bi-seedling fs-1 text-muted"></i>
-                        <p class="text-muted mt-2">No crop areas analyzed yet</p>
-                        <small class="text-muted">Map crops and run satellite analysis to see differentiation results</small>
-                    </div>
-                `;
+                        <p class="text-muted mt-2">No analysis data yet</p>
+                        <small class="text-muted">Click <strong>Analyse</strong> on the farm card to run satellite analysis</small>
+                    </div>`;
                 return;
             }
 
-            // Group by category
-            const categoryGroups = {};
-            cropAnalysisData.forEach(crop => {
-                const category = crop.category;
-                if (!categoryGroups[category]) {
-                    categoryGroups[category] = [];
-                }
-                categoryGroups[category].push(crop);
-            });
+            const cropDiff = data.crop_differentiation || {};
+            const dominantCrops = data.dominant_crops || [];
+            const agroScore = data.agroforestry_score || 0;
+            const parcels = data.parcels || [];
 
-            let html = '<div class="row g-3">';
+            let html = '';
 
-            Object.keys(categoryGroups).forEach(category => {
-                const crops = categoryGroups[category];
-                const avgHealth = crops.reduce((sum, c) => sum + c.health_score, 0) / crops.length;
-                const totalArea = crops.reduce((sum, c) => sum + (c.area_hectares || 0), 0);
-                const certifiedCount = crops.filter(c => c.certifications.organic || c.certifications.fair_trade || c.certifications.rain_forest_alliance).length;
+            // ── Summary row ──
+            html += `<div class="row g-3 mb-3">`;
+            html += `<div class="col-12"><div class="d-flex align-items-center gap-3 flex-wrap">
+                <span class="badge bg-success fs-6 px-3 py-2"><i class="bi bi-graph-up me-1"></i>Agroforestry Score: ${agroScore.toFixed(1)}/10</span>
+                ${dominantCrops.length ? `<span class="small text-muted"><i class="bi bi-award me-1"></i>Dominant: <strong>${dominantCrops.join(', ')}</strong></span>` : ''}
+                <span class="small text-muted"><i class="bi bi-calendar me-1"></i>Last analysis: ${data.last_analysis_date ? new Date(data.last_analysis_date).toLocaleDateString() : '—'}</span>
+            </div></div>`;
 
-                const categoryColors = {
-                    coffee: '#8B4513',
-                    shade_tree: '#228B22',
-                    fruit_tree: '#32CD32',
-                    timber: '#8B4513',
-                    vegetable: '#9ACD32',
-                    legume: '#DAA520',
-                    cereal: '#F4A460',
-                    other: '#A9A9A9'
-                };
-
-                const categoryIcons = {
-                    coffee: 'bi-cup-hot-fill',
-                    shade_tree: 'bi-tree-fill',
-                    fruit_tree: 'bi-apple',
-                    timber: 'bi-tree',
-                    vegetable: 'bi-leaf',
-                    legume: 'bi-flower1',
-                    cereal: 'bi-wheat',
-                    other: 'bi-question-circle'
-                };
-
-                html += `
-                    <div class="col-md-6 col-lg-4">
-                        <div class="card border-0 shadow-sm h-100" style="border-left: 4px solid ${categoryColors[category] || '#6f4e37'};">
-                            <div class="card-header" style="background-color: ${categoryColors[category] || '#f8f9fa'}; color: ${category === 'coffee' ? 'white' : 'black'};">
-                                <h6 class="mb-0">
-                                    <i class="bi ${categoryIcons[category] || 'bi-question-circle'} me-2"></i>
-                                    ${category.replace('_', ' ').toUpperCase()}
-                                </h6>
-                            </div>
-                            <div class="card-body">
-                                <div class="row text-center mb-2">
-                                    <div class="col-6">
-                                        <div class="h5 mb-0 ${avgHealth >= 7 ? 'text-success' : avgHealth >= 5 ? 'text-warning' : 'text-danger'}">
-                                            ${avgHealth.toFixed(1)}
+            // ── Crop differentiation cards ──
+            if (Object.keys(cropDiff).length > 0) {
+                Object.entries(cropDiff).forEach(([name, d]) => {
+                    const color = categoryColors[name] || '#6f4e37';
+                    const icon = categoryIcons[name] || 'bi-seedling';
+                    const health = d.health_score || 5.0;
+                    const healthColor = health >= 7 ? 'success' : health >= 5 ? 'warning' : 'danger';
+                    html += `
+                        <div class="col-md-4">
+                            <div class="card border-0 shadow-sm h-100" style="border-left:4px solid ${color};">
+                                <div class="card-header py-2" style="background:${color};color:#fff;">
+                                    <h6 class="mb-0"><i class="bi ${icon} me-2"></i>${name.replace(/_/g,' ').toUpperCase()}</h6>
+                                </div>
+                                <div class="card-body p-3">
+                                    <div class="row text-center mb-2">
+                                        <div class="col-6">
+                                            <div class="fw-bold text-${healthColor}">${health.toFixed(1)}/10</div>
+                                            <small class="text-muted">Health Score</small>
                                         </div>
-                                        <small class="text-muted">Avg Health</small>
+                                        <div class="col-6">
+                                            <div class="fw-bold">${d.estimated_area_percentage || 0}%</div>
+                                            <small class="text-muted">Area Share</small>
+                                        </div>
                                     </div>
-                                    <div class="col-6">
-                                        <div class="h5 mb-0">${totalArea.toFixed(1)}</div>
-                                        <small class="text-muted">Area (ha)</small>
+                                    <div class="progress mb-2" style="height:5px;">
+                                        <div class="progress-bar" style="width:${(health/10)*100}%;background:${color};"></div>
                                     </div>
-                                </div>
-                                <div class="mb-2">
-                                    <small class="text-muted">${crops.length} crop${crops.length !== 1 ? 's' : ''}</small>
-                                    ${certifiedCount > 0 ? `<br><small class="text-success">${certifiedCount} certified</small>` : ''}
-                                </div>
-                                <div class="progress mb-2" style="height: 6px;">
-                                    <div class="progress-bar" role="progressbar" style="width: ${(avgHealth/10)*100}%; background-color: ${categoryColors[category]};"></div>
+                                    ${d.ndvi_range ? `<small class="text-muted">NDVI: ${d.ndvi_range[0]} – ${d.ndvi_range[1]}</small>` : ''}
                                 </div>
                             </div>
-                        </div>
-                    </div>
-                `;
-            });
-
+                        </div>`;
+                });
+            }
             html += '</div>';
 
-            // Add detailed crop list
-            html += '<div class="mt-4"><h6>Detailed Crop Analysis</h6><div class="table-responsive"><table class="table table-sm"><thead><tr><th>Crop Type</th><th>Parcel</th><th>Health Score</th><th>Area (ha)</th><th>Growth Stage</th><th>Certifications</th></tr></thead><tbody>';
+            // ── Per-parcel satellite metrics ──
+            const withSat = parcels.filter(p => p.satellite);
+            if (withSat.length > 0) {
+                html += `<div class="mt-4"><h6 class="border-bottom pb-1"><i class="bi bi-satellite me-2"></i>Parcel Satellite Metrics</h6>
+                <div class="table-responsive"><table class="table table-sm align-middle">
+                <thead class="table-light"><tr>
+                    <th>Parcel</th><th>Area (ha)</th><th>NDVI</th><th>Canopy %</th><th>Biomass t/ha</th><th>Land Cover</th><th>Source</th>
+                </tr></thead><tbody>`;
+                withSat.forEach(p => {
+                    const s = p.satellite;
+                    html += `<tr>
+                        <td><strong>${p.parcel_name || p.parcel_number}</strong></td>
+                        <td>${(p.area_hectares || 0).toFixed(2)}</td>
+                        <td><span class="badge bg-success">${(s.ndvi_mean || 0).toFixed(3)}</span></td>
+                        <td>${(s.canopy_cover_percentage || 0).toFixed(1)}%</td>
+                        <td>${(s.biomass_tons_hectare || 0).toFixed(2)}</td>
+                        <td><span class="badge bg-secondary">${s.land_cover_type || '—'}</span></td>
+                        <td><small class="text-muted">${s.satellite_source || 'Sentinel-2'}</small></td>
+                    </tr>`;
+                });
+                html += '</tbody></table></div></div>';
+            }
 
-            cropAnalysisData.forEach(crop => {
-                const certBadges = [];
-                if (crop.certifications.organic) certBadges.push('<span class="badge bg-success">Organic</span>');
-                if (crop.certifications.fair_trade) certBadges.push('<span class="badge bg-info">Fair Trade</span>');
-                if (crop.certifications.rain_forest_alliance) certBadges.push('<span class="badge bg-warning">RFA</span>');
-
-                html += `
-                    <tr>
-                        <td><strong>${crop.crop_type}</strong></td>
-                        <td>${crop.parcel_name}</td>
-                        <td>
-                            <span class="badge ${crop.health_score >= 7 ? 'bg-success' : crop.health_score >= 5 ? 'bg-warning' : 'bg-danger'}">
-                                ${crop.health_score.toFixed(1)}
-                            </span>
-                        </td>
-                        <td>${crop.area_hectares?.toFixed(1) || 'N/A'}</td>
-                        <td>${crop.growth_stage || 'Unknown'}</td>
-                        <td>${certBadges.join(' ') || '<small class="text-muted">None</small>'}</td>
-                    </tr>
-                `;
-            });
-
-            html += '</tbody></table></div>';
+            // ── Manual crops table if any exist ──
+            const allManual = parcels.flatMap(p => p.manual_crops.map(c => ({ ...c, parcel_name: p.parcel_name || p.parcel_number })));
+            if (allManual.length > 0) {
+                html += `<div class="mt-4"><h6 class="border-bottom pb-1"><i class="bi bi-pencil-square me-2"></i>Manually Mapped Crops</h6>
+                <div class="table-responsive"><table class="table table-sm">
+                <thead class="table-light"><tr><th>Crop</th><th>Parcel</th><th>Area (ha)</th><th>Growth Stage</th><th>Certifications</th></tr></thead><tbody>`;
+                allManual.forEach(c => {
+                    const certs = [c.organic_certified && '<span class="badge bg-success">Organic</span>', c.fair_trade_certified && '<span class="badge bg-info">Fair Trade</span>'].filter(Boolean).join(' ');
+                    html += `<tr><td><strong>${c.crop_type}</strong></td><td>${c.parcel_name}</td><td>${c.area_hectares?.toFixed(2) || '—'}</td><td>${c.growth_stage || '—'}</td><td>${certs || '<small class="text-muted">None</small>'}</td></tr>`;
+                });
+                html += '</tbody></table></div></div>';
+            }
 
             container.innerHTML = html;
 
         } catch (error) {
             console.error('Error loading crop analysis:', error);
             const container = document.getElementById('cropAnalysis');
-            if (container) {
-                container.innerHTML = '<div class="text-danger text-center py-3">Error loading crop analysis data</div>';
-            }
+            if (container) container.innerHTML = '<div class="text-danger text-center py-3">Error loading crop analysis data</div>';
         }
     }
 
@@ -10554,40 +10496,79 @@ class PlotraDashboard {
             // Display yearly summaries
             Object.keys(historicalData.historical_data).sort().reverse().forEach(year => {
                 const yearData = historicalData.historical_data[year];
-                const avgNdvi = yearData.filter(d => d.ndvi_mean).reduce((sum, d) => sum + d.ndvi_mean, 0) / yearData.filter(d => d.ndvi_mean).length || 0;
+                const latest = yearData[0];
+                const avgNdvi = yearData.filter(d => d.ndvi_mean).reduce((sum, d) => sum + d.ndvi_mean, 0) / (yearData.filter(d => d.ndvi_mean).length || 1);
                 const deforestationEvents = yearData.filter(d => d.deforestation_detected).length;
+                const riskLevel = latest.risk_level || 'low';
+                const riskColor = riskLevel === 'high' ? 'danger' : riskLevel === 'medium' ? 'warning' : 'success';
+                const eudrOk = latest.analysis_metadata?.eudr_compliant !== false;
+                const agroScore = latest.analysis_metadata?.agroforestry_score || 0;
 
                 html += `
                     <div class="col-md-6 col-lg-4">
-                        <div class="card border-0 shadow-sm">
-                            <div class="card-header bg-primary text-white">
-                                <h6 class="mb-0">${year}</h6>
+                        <div class="card border-0 shadow-sm h-100">
+                            <div class="card-header d-flex justify-content-between align-items-center" style="background:linear-gradient(135deg,#2c1a0e,#6f4e37);color:#fff;">
+                                <h6 class="mb-0"><i class="bi bi-satellite me-2"></i>${year}</h6>
+                                <div class="d-flex gap-1">
+                                    <span class="badge bg-${riskColor}">${riskLevel} risk</span>
+                                    <span class="badge bg-${eudrOk ? 'success' : 'danger'}">${eudrOk ? 'EUDR ✓' : 'EUDR ✗'}</span>
+                                </div>
                             </div>
-                            <div class="card-body">
-                                <div class="row text-center">
-                                    <div class="col-6">
-                                        <div class="h5 mb-0">${avgNdvi.toFixed(3)}</div>
-                                        <small class="text-muted">Avg NDVI</small>
+                            <div class="card-body p-3">
+                                <div class="row text-center g-2 mb-3">
+                                    <div class="col-4">
+                                        <div class="fw-bold text-success">${avgNdvi.toFixed(3)}</div>
+                                        <small class="text-muted">NDVI</small>
                                     </div>
-                                    <div class="col-6">
-                                        <div class="h5 mb-0 ${deforestationEvents > 0 ? 'text-danger' : 'text-success'}">${deforestationEvents}</div>
-                                        <small class="text-muted">Deforestation Events</small>
+                                    <div class="col-4">
+                                        <div class="fw-bold" style="color:#6f4e37;">${(latest.canopy_cover_percentage || 0).toFixed(1)}%</div>
+                                        <small class="text-muted">Canopy</small>
+                                    </div>
+                                    <div class="col-4">
+                                        <div class="fw-bold text-info">${(latest.biomass_tons_hectare || 0).toFixed(2)}</div>
+                                        <small class="text-muted">t/ha Biomass</small>
                                     </div>
                                 </div>
-                                <hr>
-                                <div class="small">
-                                    <div class="d-flex justify-content-between">
-                                        <span>Analyses:</span>
-                                        <span>${yearData.length}</span>
+                                <div class="small border-top pt-2">
+                                    <div class="d-flex justify-content-between py-1 border-bottom">
+                                        <span class="text-muted"><i class="bi bi-tree me-1"></i>Tree Cover</span>
+                                        <strong>${(latest.tree_cover_percentage || 0).toFixed(1)}%</strong>
                                     </div>
-                                    <div class="d-flex justify-content-between">
-                                        <span>Tree Cover:</span>
-                                        <span>${yearData[0].tree_cover_percentage || 0}%</span>
+                                    <div class="d-flex justify-content-between py-1 border-bottom">
+                                        <span class="text-muted"><i class="bi bi-seedling me-1"></i>Crop Cover</span>
+                                        <strong>${(latest.crop_cover_percentage || 0).toFixed(1)}%</strong>
                                     </div>
-                                    <div class="d-flex justify-content-between">
-                                        <span>Biomass:</span>
-                                        <span>${yearData[0].biomass_tons_hectare || 0}t/ha</span>
+                                    <div class="d-flex justify-content-between py-1 border-bottom">
+                                        <span class="text-muted"><i class="bi bi-cloud me-1"></i>Carbon Stored</span>
+                                        <strong>${(latest.carbon_stored_tons || 0).toFixed(2)} t</strong>
                                     </div>
+                                    <div class="d-flex justify-content-between py-1 border-bottom">
+                                        <span class="text-muted"><i class="bi bi-arrow-repeat me-1"></i>Carbon/yr</span>
+                                        <strong>${(latest.carbon_sequestered_kg_year || 0).toFixed(0)} kg</strong>
+                                    </div>
+                                    <div class="d-flex justify-content-between py-1 border-bottom">
+                                        <span class="text-muted"><i class="bi bi-heart-pulse me-1"></i>Tree Health</span>
+                                        <strong>${(latest.tree_health_score || 0).toFixed(1)}/10</strong>
+                                    </div>
+                                    <div class="d-flex justify-content-between py-1 border-bottom">
+                                        <span class="text-muted"><i class="bi bi-heart-pulse me-1"></i>Crop Health</span>
+                                        <strong>${(latest.crop_health_score || 0).toFixed(1)}/10</strong>
+                                    </div>
+                                    <div class="d-flex justify-content-between py-1 border-bottom">
+                                        <span class="text-muted"><i class="bi bi-cloud-sun me-1"></i>Cloud Cover</span>
+                                        <strong>${(latest.cloud_cover_percentage || 0).toFixed(1)}%</strong>
+                                    </div>
+                                    <div class="d-flex justify-content-between py-1 border-bottom">
+                                        <span class="text-muted"><i class="bi bi-graph-up me-1"></i>Agroforestry</span>
+                                        <strong>${agroScore.toFixed(1)}/10</strong>
+                                    </div>
+                                    <div class="d-flex justify-content-between py-1">
+                                        <span class="text-muted"><i class="bi bi-exclamation-triangle me-1"></i>Deforestation</span>
+                                        <strong class="${deforestationEvents > 0 ? 'text-danger' : 'text-success'}">${deforestationEvents === 0 ? 'None detected' : deforestationEvents + ' event(s)'}</strong>
+                                    </div>
+                                </div>
+                                <div class="mt-2 text-center">
+                                    <small class="text-muted">${yearData.length} analysis run(s) · ${new Date(latest.analysis_date).toLocaleDateString()}</small>
                                 </div>
                             </div>
                         </div>
