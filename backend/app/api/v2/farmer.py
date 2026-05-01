@@ -160,6 +160,7 @@ async def create_farm(
     farm = Farm(
         owner_id=current_user.id,
         farm_name=farm_data.farm_name,
+        farm_code=farm_data.farm_code or None,
         total_area_hectares=farm_data.total_area_hectares,
         coffee_area_hectares=farm_data.coffee_area_hectares,
         coffee_varieties=farm_data.coffee_varieties,
@@ -288,7 +289,7 @@ async def update_farm(
 
     # Update simple farm fields
     editable_fields = [
-        "farm_name", "total_area_hectares", "coffee_area_hectares",
+        "farm_name", "farm_code", "total_area_hectares", "coffee_area_hectares",
         "coffee_varieties", "years_farming", "average_annual_production_kg",
         "land_use_type", "compliance_status", "notes",
     ]

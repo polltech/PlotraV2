@@ -405,6 +405,7 @@ class ParcelResponse(BaseModel):
 class FarmCreate(BaseModel):
     """Schema for creating a farm - EUDR Compliant with Phase 2 fields"""
     farm_name: Optional[str] = None
+    farm_code: Optional[str] = None
     total_area_hectares: Optional[float] = None
     coffee_area_hectares: Optional[float] = None
     coffee_varieties: List[str] = []
