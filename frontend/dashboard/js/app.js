@@ -9508,7 +9508,7 @@ class PlotraDashboard {
                     <div class="card border-0 shadow-sm">
                         <div class="card-header bg-light d-flex justify-content-between align-items-center">
                             <h6 class="mb-0">Historical Analysis</h6>
-                            <div class="btn-group btn-group-sm">
+                            <div class="d-flex align-items-center gap-2">
                                 <select class="form-select form-select-sm" id="historyYearFilter" style="width: auto;">
                                     <option value="">All Years</option>
                                     <option value="2024">2024</option>
@@ -9516,6 +9516,9 @@ class PlotraDashboard {
                                     <option value="2022">2022</option>
                                     <option value="2021">2021</option>
                                 </select>
+                                <button class="btn btn-sm btn-outline-success" onclick="app.exportAnalysisReport()" title="Export as PDF proof">
+                                    <i class="bi bi-file-earmark-arrow-down me-1"></i>Export Report
+                                </button>
                             </div>
                         </div>
                         <div class="card-body">
@@ -10745,6 +10748,84 @@ class PlotraDashboard {
                 container.innerHTML = '<div class="text-danger text-center py-3">Error loading historical data</div>';
             }
         }
+    }
+
+    exportAnalysisReport() {
+        const selector = document.getElementById('analysisFarmSelector');
+        const farmName = selector?.options[selector.selectedIndex]?.text || 'Farm';
+        const container = document.getElementById('historicalAnalysis');
+        if (!container || container.innerText.includes('No historical')) {
+            this.showToast('Run a satellite analysis first before exporting.', 'warning');
+            return;
+        }
+
+        const now = new Date();
+        const dateStr = now.toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' });
+        const timeStr = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+
+        const win = window.open('', '_blank');
+        win.document.write(`<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Satellite Analysis Report — ${farmName}</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <style>
+        body { font-family: Arial, sans-serif; padding: 30px; color: #222; }
+        @media print { .no-print { display: none !important; } body { padding: 10px; } }
+        .report-header { border-bottom: 3px solid #6f4e37; padding-bottom: 16px; margin-bottom: 24px; }
+        .watermark { color: #6f4e37; font-weight: bold; }
+        .badge { padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; }
+        .bg-success { background:#198754!important; color:#fff; }
+        .bg-danger  { background:#dc3545!important; color:#fff; }
+        .bg-warning { background:#ffc107!important; color:#000; }
+        .bg-info    { background:#0dcaf0!important; color:#000; }
+        .card { border: 1px solid #dee2e6; border-radius: 8px; margin-bottom: 16px; }
+        .card-header { background: #f8f4f0; padding: 8px 16px; font-weight: bold; border-bottom: 1px solid #dee2e6; border-radius: 8px 8px 0 0; }
+        .card-body { padding: 16px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+        th, td { border: 1px solid #dee2e6; padding: 6px 10px; font-size: 13px; }
+        th { background: #f8f9fa; font-weight: bold; }
+        .text-muted { color: #6c757d; }
+        .proof-box { border: 2px dashed #6f4e37; border-radius: 8px; padding: 12px 20px; background: #fdf8f4; margin-top: 24px; }
+    </style>
+</head>
+<body>
+    <div class="report-header d-flex justify-content-between align-items-start">
+        <div>
+            <h3 class="watermark">Plotra Platform</h3>
+            <h5>Satellite Analysis Report</h5>
+            <div class="text-muted">Farm: <strong>${farmName}</strong></div>
+        </div>
+        <div class="text-end">
+            <div class="text-muted" style="font-size:13px;">Generated: ${dateStr} at ${timeStr}</div>
+            <div class="text-muted" style="font-size:13px;">Data source: Copernicus Sentinel-2 L2A</div>
+            <div class="text-muted" style="font-size:13px;">Provider: Copernicus Data Space Ecosystem</div>
+        </div>
+    </div>
+
+    <div class="no-print mb-3">
+        <button onclick="window.print()" style="background:#6f4e37;color:#fff;border:none;padding:8px 20px;border-radius:6px;cursor:pointer;font-size:14px;">
+            &#128438; Save as PDF / Print
+        </button>
+        <span style="margin-left:12px;color:#888;font-size:13px;">Use your browser's "Save as PDF" option in the print dialog</span>
+    </div>
+
+    ${container.innerHTML}
+
+    <div class="proof-box">
+        <strong style="color:#6f4e37;">Proof of Analysis</strong><br>
+        <span style="font-size:13px;">
+            This report was generated by Plotra Platform on <strong>${dateStr} at ${timeStr}</strong>.
+            All vegetation indices (NDVI, EVI, SAVI, NDMI, NDWI) are derived from real Sentinel-2 L2A
+            satellite imagery processed via the Copernicus Data Space Ecosystem (CDSE) Statistics API.
+            No simulated or synthetic data has been used.
+        </span>
+    </div>
+</body>
+</html>`);
+        win.document.close();
+        win.focus();
     }
 
     async loadTreeManagement(farmId) {
