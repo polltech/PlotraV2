@@ -589,7 +589,7 @@ async def request_satellite_analysis(
                 parcel_id=parcel.id,
                 observation_id=result['analysis_id'],
                 satellite_source=result.get('satellite_source', 'SIMULATION'),
-                acquisition_date=acquisition_date or datetime.utcnow(),
+                acquisition_date=(acquisition_date or datetime.utcnow()).replace(tzinfo=None),
                 processing_date=datetime.utcnow(),
                 status=AnalysisStatus.COMPLETED,
                 ndvi_mean=result.get('ndvi_mean'),
