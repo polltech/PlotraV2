@@ -114,8 +114,9 @@ async def submit_polygon_capture(
     except Exception:
         boundary_geometry = None
 
-    # Auto-generate parcel number
-    parcel_number = f"{farm.farm_code or farm.id[:8]}-{datetime.utcnow().strftime('%Y%m%d%H%M%S')}"
+    # Auto-generate parcel number (keep under varchar(50))
+    code_prefix = (farm.farm_code or farm.id)[:12]
+    parcel_number = f"{code_prefix}-{datetime.utcnow().strftime('%Y%m%d%H%M%S')}"
 
     parcel = LandParcel(
         id=str(uuid.uuid4()),
@@ -185,7 +186,8 @@ async def batch_sync(
             except Exception:
                 boundary_geometry = None
 
-            parcel_number = f"{farm.farm_code or farm.id[:8]}-{datetime.utcnow().strftime('%Y%m%d%H%M%S')}-{synced}"
+            code_prefix = (farm.farm_code or farm.id)[:12]
+            parcel_number = f"{code_prefix}-{datetime.utcnow().strftime('%Y%m%d%H%M%S')}-{synced}"
             parcel = LandParcel(
                 id=str(uuid.uuid4()),
                 farm_id=farm.id,
