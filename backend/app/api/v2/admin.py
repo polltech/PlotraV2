@@ -2215,6 +2215,9 @@ async def get_system_settings(
             "api_key": db_or("cfg_satellite_api_key", mask(settings.satellite.api_key)),
             "base_url": db_or("cfg_satellite_base_url", settings.satellite.base_url),
             "simulation_mode": db_or("cfg_satellite_simulation_mode", settings.satellite.simulation_mode),
+            "oauth_client_id": db_or("cfg_satellite_oauth_client_id", ""),
+            "oauth_client_secret": db_or("cfg_satellite_oauth_client_secret", mask("")),
+            "account_id": db_or("cfg_satellite_account_id", ""),
         },
         "email": {
             "resend_api_key": db_or("cfg_email_resend_api_key", mask(settings.email.resend_api_key)),

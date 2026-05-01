@@ -451,3 +451,34 @@ async def import_configuration(
         "errors": errors,
         "total": len(settings_data)
     }
+
+
+@router.get("/satellite-test")
+async def test_satellite_connection(
+    current_user: User = Depends(require_platform_admin),
+    db: AsyncSession = Depends(get_db)
+):
+    """Test Sentinel Hub connection using saved OAuth credentials."""
+    from sqlalchemy import select
+
+    result = await db.execute(
+        select(SystemConfig).where(SystemConfig.config_key.like("cfg_satellite_%"))
+    )
+    rows = result.scalars().all()
+    creds = {r.config_key.replace("cfg_satellite_", ""): r.config_value for r in rows}
+
+    client_id = creds.get("oauth_client_id", "")
+    client_secret = creds.get("oauth_client_secret", "")
+    simulation = creds.get("simulation_mode", True)
+
+    if simulation is True or simulation == "true" or simulation is None:
+        return {"success": False, "message": "Simulation mode is ON — disable it to use real API"}
+
+    if not client_id or not client_secret or client_secret == "***":
+        return {"success": False, "message": "OAuth Client ID and Client Secret are required"}
+
+    from app.services.satellite_analysis import _get_sentinel_hub_token
+    token = await _get_sentinel_hub_token(client_id, client_secret)
+    if token:
+        return {"success": True, "message": "Sentinel Hub connected successfully — token obtained"}
+    return {"success": False, "message": "Authentication failed — check your OAuth Client ID and Secret"}

@@ -6753,14 +6753,26 @@ class PlotraDashboard {
                             <!-- Satellite -->
                             <div class="tab-pane fade" id="tabSatellite">
                                 <div class="d-flex justify-content-between align-items-center mb-3">
-                                    <h5 class="mb-0">Satellite / NDVI Settings</h5>
+                                    <h5 class="mb-0">Satellite API Configuration</h5>
                                     <button class="btn btn-primary btn-sm" onclick="app.saveSystemSection('satellite')"><i class="bi bi-save me-1"></i>Save</button>
                                 </div>
+                                <div class="alert alert-info py-2 mb-3" style="font-size:0.85rem;">
+                                    <i class="bi bi-info-circle me-1"></i>
+                                    Fill in your <strong>Sentinel Hub</strong> OAuth credentials, turn off Simulation Mode, then click Save.
+                                    Get OAuth Client credentials from <strong>Sentinel Hub Dashboard → User Settings → OAuth Clients → Create Client</strong>.
+                                </div>
                                 <div class="row">
-                                    ${fieldRow('Provider', 'sat_provider', sat.provider)}
-                                    ${fieldRow('API Key', 'sat_api_key', sat.api_key, 'password', 'Leave *** to keep existing key')}
-                                    ${fieldRow('Base URL', 'sat_base_url', sat.base_url)}
-                                    ${checkRow('Simulation Mode', 'sat_simulation_mode', sat.simulation_mode)}
+                                    ${fieldRow('Provider', 'sat_provider', sat.provider || 'sentinel_hub', 'text', 'e.g. sentinel_hub')}
+                                    ${fieldRow('Base URL', 'sat_base_url', sat.base_url || 'https://services.sentinel-hub.com')}
+                                    ${fieldRow('Account ID', 'sat_account_id', sat.account_id, 'text', 'From Sentinel Hub Account Settings')}
+                                    ${fieldRow('API Key', 'sat_api_key', sat.api_key, 'password', 'Personal API key — leave *** to keep existing')}
+                                    ${fieldRow('OAuth Client ID', 'sat_oauth_client_id', sat.oauth_client_id, 'text', 'Required for Process / Statistics API')}
+                                    ${fieldRow('OAuth Client Secret', 'sat_oauth_client_secret', sat.oauth_client_secret, 'password', 'Leave *** to keep existing')}
+                                    ${checkRow('Simulation Mode (disable to use real API)', 'sat_simulation_mode', sat.simulation_mode !== false)}
+                                </div>
+                                <div class="mt-3">
+                                    <button class="btn btn-outline-secondary btn-sm" onclick="app.testSatelliteConnection()"><i class="bi bi-wifi me-1"></i>Test Connection</button>
+                                    <span id="satTestResult" class="ms-3 small"></span>
                                 </div>
                             </div>
                             <!-- Email -->
@@ -6845,7 +6857,7 @@ class PlotraDashboard {
 
     async saveSystemSection(section) {
         const fieldMap = {
-            satellite: { sat_provider: 'provider', sat_api_key: 'api_key', sat_base_url: 'base_url', sat_simulation_mode: 'simulation_mode' },
+            satellite: { sat_provider: 'provider', sat_api_key: 'api_key', sat_base_url: 'base_url', sat_account_id: 'account_id', sat_oauth_client_id: 'oauth_client_id', sat_oauth_client_secret: 'oauth_client_secret', sat_simulation_mode: 'simulation_mode' },
             email: { email_resend_api_key: 'resend_api_key', email_from_email: 'from_email', email_from_name: 'from_name' },
             storage: { s3_bucket: 'bucket', s3_endpoint: 'endpoint', s3_access_key: 'access_key', s3_secret_key: 'secret_key', s3_region: 'region' },
             payments: { pay_enabled: 'enabled', pay_mpesa_consumer_key: 'mpesa_consumer_key', pay_mpesa_consumer_secret: 'mpesa_consumer_secret', pay_mpesa_shortcode: 'mpesa_shortcode' },
@@ -6864,6 +6876,21 @@ class PlotraDashboard {
             this.showToast(`${section} settings saved`, 'success');
         } catch (e) {
             this.showToast(e.message, 'error');
+        }
+    }
+
+    async testSatelliteConnection() {
+        const el = document.getElementById('satTestResult');
+        if (el) el.innerHTML = '<span class="text-muted">Testing...</span>';
+        try {
+            const res = await api.request('/admin/config/satellite-test', { optional: true });
+            if (res && res.success) {
+                if (el) el.innerHTML = `<span class="text-success"><i class="bi bi-check-circle me-1"></i>${res.message}</span>`;
+            } else {
+                if (el) el.innerHTML = `<span class="text-danger"><i class="bi bi-x-circle me-1"></i>${res?.message || 'Connection failed'}</span>`;
+            }
+        } catch (e) {
+            if (el) el.innerHTML = `<span class="text-danger"><i class="bi bi-x-circle me-1"></i>${e.message}</span>`;
         }
     }
 

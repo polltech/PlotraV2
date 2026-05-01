@@ -1,15 +1,22 @@
 """
 Plotra Platform - Satellite Analysis Engine
-Satellite data analysis with fallback to simulation for development
+Satellite data analysis with Sentinel Hub API integration and simulation fallback.
 """
 import uuid
 import asyncio
 import random
 import math
+import json
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
 from app.core.config import settings
+
+try:
+    import httpx
+    _HAS_HTTPX = True
+except ImportError:
+    _HAS_HTTPX = False
 
 # Mock logger if not available
 try:
@@ -19,14 +26,152 @@ except ImportError:
     logger = logging.getLogger(__name__)
 
 
+async def _load_satellite_credentials() -> Dict[str, Any]:
+    """Load satellite credentials from DB (cfg_satellite_* keys)."""
+    try:
+        from app.core.database import async_session_factory
+        from app.models.system import SystemConfig
+        from sqlalchemy import select
+        async with async_session_factory() as session:
+            result = await session.execute(
+                select(SystemConfig).where(SystemConfig.config_key.like("cfg_satellite_%"))
+            )
+            rows = result.scalars().all()
+            return {r.config_key.replace("cfg_satellite_", ""): r.config_value for r in rows}
+    except Exception:
+        return {}
+
+
+async def _get_sentinel_hub_token(client_id: str, client_secret: str) -> Optional[str]:
+    """Exchange OAuth2 credentials for a Sentinel Hub access token."""
+    if not _HAS_HTTPX or not client_id or not client_secret:
+        return None
+    try:
+        async with httpx.AsyncClient(timeout=30) as client:
+            resp = await client.post(
+                "https://services.sentinel-hub.com/auth/realms/main/protocol/openid-connect/token",
+                data={
+                    "grant_type": "client_credentials",
+                    "client_id": client_id,
+                    "client_secret": client_secret,
+                }
+            )
+            if resp.status_code == 200:
+                return resp.json().get("access_token")
+            logger.warning(f"Sentinel Hub auth failed: {resp.status_code} {resp.text[:200]}")
+    except Exception as e:
+        logger.warning(f"Sentinel Hub token error: {e}")
+    return None
+
+
+async def _fetch_sentinel_hub_ndvi(token: str, coords: List, acquisition_date: datetime) -> Optional[Dict]:
+    """Call Sentinel Hub Process API to compute real NDVI/EVI/NDMI for a polygon."""
+    if not _HAS_HTTPX or not token or not coords:
+        return None
+
+    date_str = acquisition_date.strftime("%Y-%m-%d")
+    # Use a ±15 day window around the acquisition date
+    from_date = (acquisition_date - timedelta(days=15)).strftime("%Y-%m-%d")
+
+    evalscript = """
+//VERSION=3
+function setup() {
+  return {
+    input: [{ bands: ["B02", "B03", "B04", "B08", "B8A", "B11", "B12", "CLM"] }],
+    output: [{ id: "default", bands: 8, sampleType: "FLOAT32" }]
+  };
+}
+function evaluatePixel(sample) {
+  let ndvi = (sample.B08 - sample.B04) / (sample.B08 + sample.B04 + 0.0001);
+  let evi  = 2.5 * (sample.B08 - sample.B04) / (sample.B08 + 6*sample.B04 - 7.5*sample.B02 + 1 + 0.0001);
+  let savi = 1.5 * (sample.B08 - sample.B04) / (sample.B08 + sample.B04 + 0.5 + 0.0001);
+  let ndmi = (sample.B08 - sample.B11) / (sample.B08 + sample.B11 + 0.0001);
+  let ndwi = (sample.B03 - sample.B08) / (sample.B03 + sample.B08 + 0.0001);
+  let lai  = 3.618 * evi - 0.118;
+  let cloud = sample.CLM;
+  return [ndvi, evi, savi, ndmi, ndwi, lai, cloud, 1];
+}
+"""
+
+    payload = {
+        "input": {
+            "bounds": {
+                "geometry": {"type": "Polygon", "coordinates": [coords]}
+            },
+            "data": [{
+                "type": "sentinel-2-l2a",
+                "dataFilter": {
+                    "timeRange": {"from": f"{from_date}T00:00:00Z", "to": f"{date_str}T23:59:59Z"},
+                    "maxCloudCoverage": 80
+                }
+            }]
+        },
+        "output": {
+            "width": 64, "height": 64,
+            "responses": [{"identifier": "default", "format": {"type": "application/json"}}]
+        },
+        "evalscript": evalscript
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=60) as client:
+            resp = await client.post(
+                "https://services.sentinel-hub.com/api/v1/statistics",
+                headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+                json={
+                    "input": payload["input"],
+                    "aggregation": {
+                        "timeRange": {"from": f"{from_date}T00:00:00Z", "to": f"{date_str}T23:59:59Z"},
+                        "aggregationInterval": {"of": "P30D"},
+                        "evalscript": evalscript,
+                        "resx": 10, "resy": 10
+                    },
+                    "calculations": {}
+                }
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                # Parse statistics response
+                intervals = data.get("data", [])
+                if intervals:
+                    stats = intervals[-1].get("outputs", {}).get("default", {}).get("bands", {})
+                    b0 = stats.get("B0", {}).get("stats", {})  # ndvi
+                    b1 = stats.get("B1", {}).get("stats", {})  # evi
+                    b2 = stats.get("B2", {}).get("stats", {})  # savi
+                    b3 = stats.get("B3", {}).get("stats", {})  # ndmi
+                    b4 = stats.get("B4", {}).get("stats", {})  # ndwi
+                    b5 = stats.get("B5", {}).get("stats", {})  # lai
+                    b6 = stats.get("B6", {}).get("stats", {})  # cloud mask
+                    ndvi_mean = b0.get("mean", 0)
+                    cloud_pct = b6.get("mean", 0) * 100
+                    return {
+                        "ndvi_mean": round(float(ndvi_mean), 3),
+                        "ndvi_min": round(float(b0.get("min", ndvi_mean - 0.1)), 3),
+                        "ndvi_max": round(float(b0.get("max", ndvi_mean + 0.1)), 3),
+                        "ndvi_std_dev": round(float(b0.get("stDev", 0.05)), 3),
+                        "evi": round(float(b1.get("mean", 0)), 3),
+                        "savi": round(float(b2.get("mean", 0)), 3),
+                        "ndmi": round(float(b3.get("mean", 0)), 3),
+                        "ndwi": round(float(b4.get("mean", 0)), 3),
+                        "lai": round(float(b5.get("mean", 0)), 2),
+                        "cloud_cover_percentage": round(float(cloud_pct), 1),
+                        "satellite_source": "SENTINEL_2",
+                        "real_data": True,
+                    }
+            logger.warning(f"Sentinel Hub stats API: {resp.status_code} {resp.text[:300]}")
+    except Exception as e:
+        logger.warning(f"Sentinel Hub stats call failed: {e}")
+    return None
+
+
 class SatelliteAnalysisEngine:
     """
-    Satellite analysis engine with simulation fallback.
-    Ready for real API integration when keys are configured.
+    Satellite analysis engine — uses Sentinel Hub when credentials are configured,
+    falls back to simulation otherwise.
     """
 
     def __init__(self, simulation_mode: Optional[bool] = None):
-        self.simulation_mode = simulation_mode if simulation_mode is not None else True  # Always use simulation for now
+        self.simulation_mode = simulation_mode if simulation_mode is not None else True
         self.ndvi_threshold = 0.3
         self.baseline_year = 2020
 
@@ -42,14 +187,65 @@ class SatelliteAnalysisEngine:
         analysis_id = f"SAT-{uuid.uuid4().hex[:12].upper()}"
 
         try:
-            # Use simulation for development/testing
+            # Try real Sentinel Hub API if credentials are saved in DB
+            real_data = None
+            creds = await _load_satellite_credentials()
+            use_simulation = creds.get("simulation_mode", True)
+            if use_simulation is False or use_simulation == "false":
+                use_simulation = False
+            else:
+                use_simulation = True
+
+            if not use_simulation:
+                client_id = creds.get("oauth_client_id", "")
+                client_secret = creds.get("oauth_client_secret", "")
+                if client_id and client_secret and client_secret != "***":
+                    token = await _get_sentinel_hub_token(client_id, client_secret)
+                    if token:
+                        coords = []
+                        if getattr(parcel, 'boundary_geojson', None):
+                            coords = parcel.boundary_geojson.get('coordinates', [[]])[0]
+                        real_data = await _fetch_sentinel_hub_ndvi(token, coords, acquisition_date)
+                        if real_data:
+                            logger.info(f"Real Sentinel Hub data for parcel {parcel_id}: NDVI={real_data.get('ndvi_mean')}")
+
+            # Build base result — real data if available, simulation otherwise
             result = self._simulate_analysis(parcel, acquisition_date)
+            if real_data:
+                result.update(real_data)  # overwrite with real values
 
             # Get crop-specific analysis
             crop_analysis = await self._analyze_crop_types(parcel, result)
 
             # Calculate risk assessment
             risk_assessment = self._calculate_risk_score(result)
+
+            # Derive canopy/biomass from real NDVI when available
+            if real_data:
+                ndvi = result["ndvi_mean"]
+                canopy = min(95, max(10, ndvi * 80))
+                tree_cover = canopy * 0.6
+                crop_cover = canopy * 0.4
+                bare_soil = max(0, 100 - canopy)
+                biomass = tree_cover * 0.2 + crop_cover * 0.05
+                carbon = tree_cover * 0.2 * 0.45 + crop_cover * 0.05 * 0.25
+                result.update({
+                    "canopy_cover_percentage": round(canopy, 1),
+                    "tree_cover_percentage": round(tree_cover, 1),
+                    "crop_cover_percentage": round(crop_cover, 1),
+                    "bare_soil_percentage": round(bare_soil, 1),
+                    "tree_density": round(tree_cover * 0.8, 1),
+                    "biomass_tons_hectare": round(max(0, biomass), 2),
+                    "tree_biomass_tons_hectare": round(tree_cover * 0.2, 2),
+                    "crop_biomass_tons_hectare": round(crop_cover * 0.05, 2),
+                    "carbon_stored_tons": round(carbon, 2),
+                    "carbon_sequestered_kg_year": round(carbon * 1000 * 0.02, 0),
+                    "tree_health_score": round(min(10, max(1, ndvi * 8 + canopy / 10)), 1),
+                    "crop_health_score": round(min(10, max(1, ndvi * 7 + crop_cover / 10)), 1),
+                    "land_cover_type": "dense_vegetation" if ndvi > 0.7 else "moderate_vegetation" if ndvi > 0.5 else "sparse_vegetation" if ndvi > 0.3 else "bare_soil",
+                    "land_cover_confidence": 0.95,
+                    "data_source": "SENTINEL_HUB_REAL",
+                })
 
             return {
                 "analysis_id": analysis_id,
