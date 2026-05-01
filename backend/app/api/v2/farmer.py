@@ -312,12 +312,22 @@ async def update_farm(
         boundary_geojson = {"type": "Polygon", "coordinates": [coords]}
 
     if boundary_geojson:
+        from sqlalchemy.orm.attributes import flag_modified
         if farm.parcels:
+            # Replace the polygon on the first (primary) parcel
             parcel = farm.parcels[0]
             parcel.boundary_geojson = boundary_geojson
+            flag_modified(parcel, "boundary_geojson")
             if area_ha:
                 parcel.area_hectares = area_ha
             parcel.verification_status = "pending"
+            # Compute centroid for quick access
+            try:
+                coords = boundary_geojson["coordinates"][0]
+                farm.centroid_lon = sum(c[0] for c in coords) / len(coords)
+                farm.centroid_lat = sum(c[1] for c in coords) / len(coords)
+            except Exception:
+                pass
         else:
             parcel = LandParcel(
                 farm_id=farm.id,
@@ -327,6 +337,12 @@ async def update_farm(
                 verification_status="pending"
             )
             db.add(parcel)
+            try:
+                coords = boundary_geojson["coordinates"][0]
+                farm.centroid_lon = sum(c[0] for c in coords) / len(coords)
+                farm.centroid_lat = sum(c[1] for c in coords) / len(coords)
+            except Exception:
+                pass
         farm.verification_status = "pending"
         if area_ha:
             farm.total_area_hectares = area_ha
