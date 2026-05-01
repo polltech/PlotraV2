@@ -146,8 +146,8 @@ async def _fetch_sentinel_hub_indices(token: str, coords: List, acquisition_date
     to_date   = acquisition_date.strftime("%Y-%m-%dT23:59:59Z")
     from_date = (acquisition_date - timedelta(days=90)).strftime("%Y-%m-%dT00:00:00Z")
 
-    logger.info(f"CDSE Stats request — coords[0]={coords[0] if coords else 'EMPTY'}, "
-                f"coord_count={len(coords)}, window={from_date[:10]}–{to_date[:10]}")
+    print(f"[SAT-DEBUG] CDSE Stats request — coords[0]={coords[0] if coords else 'EMPTY'}, "
+          f"coord_count={len(coords)}, window={from_date[:10]}–{to_date[:10]}", flush=True)
 
     payload = {
         "input": {
@@ -211,7 +211,7 @@ async def _fetch_sentinel_hub_indices(token: str, coords: List, acquisition_date
         )
 
     body = resp.json()
-    logger.info(f"CDSE Stats raw response (truncated): {str(body)[:800]}")
+    print(f"[SAT-DEBUG] CDSE Stats raw response (truncated): {str(body)[:800]}", flush=True)
     intervals = body.get("data", [])
     if not intervals:
         raise HTTPException(
@@ -231,7 +231,7 @@ async def _fetch_sentinel_hub_indices(token: str, coords: List, acquisition_date
 
     best_sample_count = (best.get("outputs", {}).get("ndvi", {}).get("bands", {})
                              .get("B0", {}).get("stats", {}).get("sampleCount", 0))
-    logger.info(f"CDSE best interval sampleCount={best_sample_count}, interval={best.get('interval', {})}")
+    print(f"[SAT-DEBUG] CDSE best interval sampleCount={best_sample_count}, interval={best.get('interval', {})}", flush=True)
 
     if best_sample_count == 0:
         raise HTTPException(
@@ -263,7 +263,7 @@ async def _fetch_sentinel_hub_indices(token: str, coords: List, acquisition_date
     ndwi_mean = _stat("ndwi", "mean")
 
     raw_sample_count = _stat("ndvi", "sampleCount", 0)
-    logger.info(f"CDSE ndvi stats — mean={ndvi_mean} sampleCount={raw_sample_count} min={ndvi_min} max={ndvi_max}")
+    print(f"[SAT-DEBUG] CDSE ndvi stats — mean={ndvi_mean} sampleCount={raw_sample_count} min={ndvi_min} max={ndvi_max}", flush=True)
 
     if raw_sample_count == 0:
         raise HTTPException(
@@ -280,9 +280,10 @@ async def _fetch_sentinel_hub_indices(token: str, coords: List, acquisition_date
     cloud_pct    = round(nodata_count / (sample_count + nodata_count) * 100, 1)
     lai          = max(0.0, 3.618 * evi_mean - 0.118)
 
-    logger.info(
-        f"Sentinel Hub real data — NDVI={ndvi_mean:.3f} EVI={evi_mean:.3f} "
-        f"cloud={cloud_pct}% window={from_date[:10]}–{to_date[:10]}"
+    print(
+        f"[SAT-DEBUG] Sentinel Hub real data — NDVI={ndvi_mean:.3f} EVI={evi_mean:.3f} "
+        f"cloud={cloud_pct}% sampleCount={raw_sample_count} window={from_date[:10]}–{to_date[:10]}",
+        flush=True
     )
 
     return {
@@ -333,11 +334,12 @@ class SatelliteAnalysisEngine:
         if getattr(parcel, "boundary_geojson", None):
             coords = parcel.boundary_geojson.get("coordinates", [[]])[0]
 
-        logger.info(
-            f"analyze_parcel parcel_id={parcel_id} "
+        print(
+            f"[SAT-DEBUG] analyze_parcel parcel_id={parcel_id} "
             f"coord_points={len(coords)} "
             f"first_coord={coords[0] if coords else 'NONE'} "
-            f"boundary_geojson_keys={list(parcel.boundary_geojson.keys()) if getattr(parcel, 'boundary_geojson', None) else 'NONE'}"
+            f"boundary_geojson_keys={list(parcel.boundary_geojson.keys()) if getattr(parcel, 'boundary_geojson', None) else 'NONE'}",
+            flush=True
         )
 
         indices = await _fetch_sentinel_hub_indices(token, coords, acquisition_date)
