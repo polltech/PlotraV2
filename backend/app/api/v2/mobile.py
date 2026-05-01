@@ -52,7 +52,7 @@ async def get_farm_by_code(
         "id": farm.id,
         "farm_code": farm.farm_code,
         "farm_name": farm.farm_name,
-        "area_hectares": farm.area_hectares,
+        "area_hectares": farm.total_area_hectares,
         "status": farm.status,
         "compliance_status": getattr(farm, "compliance_status", None),
         "coffee_varieties": getattr(farm, "coffee_varieties", None),
