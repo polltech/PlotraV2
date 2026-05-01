@@ -116,7 +116,8 @@ function setup() {
   };
 }
 function evaluatePixel(s) {
-  let valid = (s.SCL == 4 || s.SCL == 5 || s.SCL == 6) ? 1 : 0;
+  // SCL: 4=vegetation, 5=bare_soil, 6=water, 7=unclassified — accept all non-cloud/shadow pixels
+  let valid = (s.SCL == 4 || s.SCL == 5 || s.SCL == 6 || s.SCL == 7 || s.SCL == 11) ? 1 : 0;
   let ndvi = (s.B08 - s.B04) / (s.B08 + s.B04 + 1e-6);
   let evi  = 2.5 * (s.B08 - s.B04) / (s.B08 + 6*s.B04 - 7.5*s.B02 + 1 + 1e-6);
   let savi = 1.5 * (s.B08 - s.B04) / (s.B08 + s.B04 + 0.5 + 1e-6);
@@ -133,8 +134,7 @@ function evaluatePixel(s) {
 async def _fetch_sentinel_hub_indices(token: str, coords: List, acquisition_date: datetime) -> Dict:
     """
     Call Sentinel Hub Statistical API for a polygon.
-    Uses a 30-day window ending on acquisition_date.
-    Tries Bearer auth first; on 401 raises a clear error with instructions.
+    Uses a 90-day window ending on acquisition_date.
     """
     if not coords:
         raise HTTPException(
@@ -143,7 +143,10 @@ async def _fetch_sentinel_hub_indices(token: str, coords: List, acquisition_date
         )
 
     to_date   = acquisition_date.strftime("%Y-%m-%dT23:59:59Z")
-    from_date = (acquisition_date - timedelta(days=30)).strftime("%Y-%m-%dT00:00:00Z")
+    from_date = (acquisition_date - timedelta(days=90)).strftime("%Y-%m-%dT00:00:00Z")
+
+    logger.info(f"CDSE Stats request — coords[0]={coords[0] if coords else 'EMPTY'}, "
+                f"coord_count={len(coords)}, window={from_date[:10]}–{to_date[:10]}")
 
     payload = {
         "input": {
@@ -154,7 +157,7 @@ async def _fetch_sentinel_hub_indices(token: str, coords: List, acquisition_date
                 "type": "sentinel-2-l2a",
                 "dataFilter": {
                     "timeRange": {"from": from_date, "to": to_date},
-                    "maxCloudCoverage": 80
+                    "maxCloudCoverage": 90
                 }
             }]
         },
@@ -207,6 +210,7 @@ async def _fetch_sentinel_hub_indices(token: str, coords: List, acquisition_date
         )
 
     body = resp.json()
+    logger.info(f"CDSE Stats raw response (truncated): {str(body)[:800]}")
     intervals = body.get("data", [])
     if not intervals:
         raise HTTPException(
@@ -223,6 +227,21 @@ async def _fetch_sentinel_hub_indices(token: str, coords: List, acquisition_date
         key=lambda iv: iv.get("outputs", {}).get("ndvi", {}).get("bands", {})
                          .get("B0", {}).get("stats", {}).get("sampleCount", 0)
     )
+
+    best_sample_count = (best.get("outputs", {}).get("ndvi", {}).get("bands", {})
+                             .get("B0", {}).get("stats", {}).get("sampleCount", 0))
+    logger.info(f"CDSE best interval sampleCount={best_sample_count}, interval={best.get('interval', {})}")
+
+    if best_sample_count == 0:
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                f"Sentinel-2 imagery exists for this window ({from_date[:10]}–{to_date[:10]}) "
+                "but all pixels were masked (clouds, shadows, or SCL filter). "
+                "Try a later date when cloud cover is lower, or check that the parcel "
+                "coordinates are correct (GeoJSON uses [longitude, latitude] order)."
+            )
+        )
     outputs = best.get("outputs", {})
 
     def _stat(name: str, key: str, default: float = 0.0) -> float:
@@ -297,6 +316,13 @@ class SatelliteAnalysisEngine:
         coords = []
         if getattr(parcel, "boundary_geojson", None):
             coords = parcel.boundary_geojson.get("coordinates", [[]])[0]
+
+        logger.info(
+            f"analyze_parcel parcel_id={parcel_id} "
+            f"coord_points={len(coords)} "
+            f"first_coord={coords[0] if coords else 'NONE'} "
+            f"boundary_geojson_keys={list(parcel.boundary_geojson.keys()) if getattr(parcel, 'boundary_geojson', None) else 'NONE'}"
+        )
 
         indices = await _fetch_sentinel_hub_indices(token, coords, acquisition_date)
 
