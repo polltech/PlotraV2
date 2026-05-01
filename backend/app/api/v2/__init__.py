@@ -3,7 +3,7 @@ Plotra Platform - API v2 Router
 Main API router combining all v2 endpoints
 """
 from fastapi import APIRouter, Depends
-from app.api.v2 import auth, farmer, coop, admin, sustainability, debug, sync, gis, satellite, eudr, system_config
+from app.api.v2 import auth, farmer, coop, admin, sustainability, debug, sync, gis, satellite, eudr, system_config, mobile
 
 api_router = APIRouter()
 
@@ -19,3 +19,4 @@ api_router.include_router(gis.router, prefix="", tags=["Geospatial & Polygon Val
 api_router.include_router(satellite.router, prefix="", tags=["Satellite Analysis"])
 api_router.include_router(eudr.router, prefix="", tags=["EUDR & DDS"])
 api_router.include_router(system_config.router, prefix="/admin/config", tags=["System Configuration"])
+api_router.include_router(mobile.router, prefix="", tags=["Mobile App"])
