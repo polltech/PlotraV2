@@ -2461,36 +2461,31 @@ async def test_satellite_connection(
     rows = result.scalars().all()
     creds = {r.config_key.replace("cfg_satellite_", ""): r.config_value for r in rows}
 
-    account_id = creds.get("account_id", "")
-    api_key    = creds.get("api_key", "")
+    client_id     = creds.get("oauth_client_id", "")
+    client_secret = creds.get("oauth_client_secret", "")
 
-    if not account_id:
-        return {"success": False, "message": "Account ID not saved — enter it in the Satellite tab (8dcd9852-...)"}
-    if not api_key or api_key == "***":
-        return {"success": False, "message": "Planet API key not saved — reveal and paste it from planet.com → Account Settings → API Key"}
-
-    sh_client_id = account_id if account_id.startswith("sh-") else f"sh-{account_id}"
+    if not client_id:
+        return {"success": False, "message": "OAuth Client ID not saved — enter sh-145d33f4-... in the Satellite tab"}
+    if not client_secret or client_secret == "***":
+        return {"success": False, "message": "OAuth Client Secret not saved — copy it from Copernicus Dashboard → OAuth clients → poll"}
 
     try:
         async with httpx.AsyncClient(timeout=20) as client:
             resp = await client.post(
-                "https://services.sentinel-hub.com/auth/realms/main/protocol/openid-connect/token",
+                "https://identity.dataspace.copernicus.eu/auth/realms/CDSE/protocol/openid-connect/token",
                 data={
                     "grant_type": "client_credentials",
-                    "client_id": sh_client_id,
-                    "client_secret": api_key,
+                    "client_id": client_id,
+                    "client_secret": client_secret,
                 }
             )
         if resp.status_code == 200 and resp.json().get("access_token"):
-            return {"success": True, "message": f"Connected — token obtained for {sh_client_id}"}
+            return {"success": True, "message": f"Copernicus Data Space connected — token obtained for {client_id}"}
         return {
             "success": False,
-            "message": (
-                f"Auth failed (HTTP {resp.status_code}) for client_id={sh_client_id}. "
-                "Check that Account ID and Planet API key are correct."
-            )
+            "message": f"Auth failed (HTTP {resp.status_code}): {resp.text[:200]}"
         }
     except httpx.ConnectError:
-        return {"success": False, "message": "Cannot reach Sentinel Hub — check server network"}
+        return {"success": False, "message": "Cannot reach Copernicus Data Space — check server network"}
     except Exception as e:
         return {"success": False, "message": f"Error: {str(e)}"}

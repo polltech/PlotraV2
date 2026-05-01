@@ -6758,14 +6758,14 @@ class PlotraDashboard {
                                 </div>
                                 <div class="alert alert-info py-2 mb-3" style="font-size:0.85rem;">
                                     <i class="bi bi-info-circle me-1"></i>
-                                    <strong>How to authenticate (Planet/Sentinel Hub):</strong><br>
-                                    1. <strong>Account ID</strong> → planet.com → Account Settings → <em>Account ID</em> (e.g. <code>8dcd9852-...</code>)<br>
-                                    2. <strong>Planet API Key</strong> → same page → User Settings → click the eye icon to reveal <code>PLAK...</code><br>
-                                    The system uses: <code>sh-{AccountID}</code> as OAuth client_id + your API key as client_secret.
+                                    <strong>Copernicus Data Space credentials:</strong><br>
+                                    Go to <strong>dataspace.copernicus.eu → Dashboard → OAuth clients</strong>.<br>
+                                    Your OAuth Client ID is: <code>sh-145d33f4-e992-4ada-a77e-0d9c94aebc5f</code><br>
+                                    Click on the client named <strong>poll</strong> to reveal and copy the Client Secret.
                                 </div>
                                 <div class="row">
-                                    ${fieldRow('Account ID', 'sat_account_id', sat.account_id || '', 'text', 'From planet.com → Account Settings (8dcd9852-8d69-...)')}
-                                    ${fieldRow('Planet API Key (PLAK...)', 'sat_api_key', sat.api_key || '', 'password', 'Reveal from planet.com → User Settings → API Key')}
+                                    ${fieldRow('OAuth Client ID', 'sat_oauth_client_id', sat.oauth_client_id || '', 'text', 'e.g. sh-145d33f4-e992-4ada-a77e-0d9c94aebc5f')}
+                                    ${fieldRow('OAuth Client Secret', 'sat_oauth_client_secret', sat.oauth_client_secret || '', 'password', 'From Copernicus Dashboard → OAuth clients → poll')}
                                 </div>
                                 <div class="mt-3 d-flex align-items-center gap-3">
                                     <button class="btn btn-success btn-sm" onclick="app.saveSystemSection('satellite')"><i class="bi bi-save me-1"></i>Save Credentials</button>

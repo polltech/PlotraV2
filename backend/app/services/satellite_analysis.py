@@ -38,62 +38,61 @@ async def _load_satellite_credentials() -> Dict[str, Any]:
         return {}
 
 
-async def _get_sentinel_hub_token(client_id: str, api_key: str) -> str:
-    """
-    Get a Sentinel Hub bearer token via OAuth2 client_credentials.
+_CDSE_TOKEN_URL = "https://identity.dataspace.copernicus.eu/auth/realms/CDSE/protocol/openid-connect/token"
+_CDSE_STATS_URL = "https://sh.dataspace.copernicus.eu/api/v1/statistics"
 
-    After the Sentinel Hub → Planet migration, the correct credentials are:
-      client_id     = "sh-" + Account ID  (e.g. sh-8dcd9852-8d69-44d9-9dc1-c87135795584)
-      client_secret = Planet API key      (PLAK...)
 
-    The Account ID is shown on planet.com → Account Settings (NOT the User ID).
+async def _get_sentinel_hub_token(client_id: str, client_secret: str) -> str:
     """
-    if not client_id or not api_key or api_key == "***":
+    Get a Copernicus Data Space (CDSE) bearer token via OAuth2 client_credentials.
+
+    Credentials from dataspace.copernicus.eu → Dashboard → OAuth clients:
+      client_id     = sh-145d33f4-...  (shown in OAuth Clients list)
+      client_secret = (copy from OAuth client detail page)
+    """
+    if not client_id or not client_secret or client_secret == "***":
         raise HTTPException(
             status_code=503,
             detail=(
-                "Sentinel Hub credentials not configured. "
-                "Go to Admin → System → Satellite and enter your Account ID and Planet API key, then click Save."
+                "Copernicus OAuth credentials not configured. "
+                "Go to Admin → System → Satellite and enter your OAuth Client ID and Secret, then click Save. "
+                "Get them from dataspace.copernicus.eu → Dashboard → OAuth clients."
             )
         )
-
-    # Build the sh- prefixed client_id if not already prefixed
-    sh_client_id = client_id if client_id.startswith("sh-") else f"sh-{client_id}"
 
     try:
         async with httpx.AsyncClient(timeout=30) as client:
             resp = await client.post(
-                "https://services.sentinel-hub.com/auth/realms/main/protocol/openid-connect/token",
+                _CDSE_TOKEN_URL,
                 data={
                     "grant_type": "client_credentials",
-                    "client_id": sh_client_id,
-                    "client_secret": api_key,
+                    "client_id": client_id,
+                    "client_secret": client_secret,
                 }
             )
     except httpx.ConnectError:
-        raise HTTPException(status_code=503, detail="Cannot reach Sentinel Hub auth endpoint.")
+        raise HTTPException(status_code=503, detail="Cannot reach Copernicus Data Space auth endpoint.")
     except httpx.TimeoutException:
-        raise HTTPException(status_code=504, detail="Sentinel Hub auth request timed out.")
+        raise HTTPException(status_code=504, detail="Copernicus auth request timed out.")
 
     if resp.status_code == 401:
         raise HTTPException(
             status_code=503,
             detail=(
-                f"Sentinel Hub auth failed (401) with client_id={sh_client_id}. "
-                "Verify your Account ID (8dcd9852-...) and Planet API key are correct "
-                "in Admin → System → Satellite."
+                f"Copernicus auth failed (401) for client_id={client_id}. "
+                "Check your OAuth Client ID and Secret in Admin → System → Satellite."
             )
         )
     if resp.status_code != 200:
         raise HTTPException(
             status_code=503,
-            detail=f"Sentinel Hub auth returned {resp.status_code}: {resp.text[:200]}"
+            detail=f"Copernicus auth returned {resp.status_code}: {resp.text[:200]}"
         )
 
     token = resp.json().get("access_token")
     if not token:
-        raise HTTPException(status_code=503, detail="Sentinel Hub returned no access token.")
-    logger.info(f"Sentinel Hub token obtained for client_id={sh_client_id}")
+        raise HTTPException(status_code=503, detail="Copernicus returned no access token.")
+    logger.info(f"CDSE token obtained for client_id={client_id}")
     return token
 
 
@@ -168,44 +167,29 @@ async def _fetch_sentinel_hub_indices(token: str, coords: List, acquisition_date
         }
     }
 
-    # Try Bearer token auth (Planet API key used directly)
-    headers_bearer = {
+    headers = {
         "Authorization": f"Bearer {token}",
-        "Content-Type": "application/json"
-    }
-    # Also try api-key header style (Planet Insights Platform style)
-    headers_apikey = {
-        "Authorization": f"api-key {token}",
         "Content-Type": "application/json"
     }
 
     try:
         async with httpx.AsyncClient(timeout=90) as client:
             resp = await client.post(
-                "https://services.sentinel-hub.com/api/v1/statistics",
-                headers=headers_bearer,
+                _CDSE_STATS_URL,
+                headers=headers,
                 json=payload
             )
-            # If Bearer fails try api-key style
-            if resp.status_code == 401:
-                resp = await client.post(
-                    "https://services.sentinel-hub.com/api/v1/statistics",
-                    headers=headers_apikey,
-                    json=payload
-                )
     except httpx.TimeoutException:
-        raise HTTPException(status_code=504, detail="Sentinel Hub Statistics API timed out.")
+        raise HTTPException(status_code=504, detail="Copernicus Statistics API timed out.")
     except httpx.ConnectError:
-        raise HTTPException(status_code=503, detail="Cannot reach Sentinel Hub Statistics API.")
+        raise HTTPException(status_code=503, detail="Cannot reach Copernicus Data Space Statistics API.")
 
     if resp.status_code == 401:
         raise HTTPException(
             status_code=503,
             detail=(
-                "Sentinel Hub returned 401 Unauthorized. Your Planet API key is invalid or "
-                "does not have access to the Sentinel Hub Statistics API. "
-                "Reveal your API key at planet.com → Account Settings → User Settings → API Key "
-                "and re-enter it in Admin → System → Satellite."
+                "Copernicus returned 401 Unauthorized. Check your OAuth Client ID and Secret "
+                "in Admin → System → Satellite."
             )
         )
     if resp.status_code == 403:
@@ -303,12 +287,12 @@ class SatelliteAnalysisEngine:
         parcel_id   = getattr(parcel, "id", None)
         analysis_id = f"SAT-{uuid.uuid4().hex[:12].upper()}"
 
-        creds      = await _load_satellite_credentials()
-        account_id = creds.get("account_id", "")
-        api_key    = creds.get("api_key", "")
+        creds         = await _load_satellite_credentials()
+        client_id     = creds.get("oauth_client_id", "")
+        client_secret = creds.get("oauth_client_secret", "")
 
-        # Authenticate: client_id = sh-{account_id}, client_secret = Planet API key
-        token = await _get_sentinel_hub_token(account_id, api_key)
+        # Authenticate with Copernicus Data Space OAuth2
+        token = await _get_sentinel_hub_token(client_id, client_secret)
 
         coords = []
         if getattr(parcel, "boundary_geojson", None):
