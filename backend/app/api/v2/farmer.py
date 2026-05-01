@@ -551,17 +551,18 @@ async def request_satellite_analysis(
     if not farm:
         raise HTTPException(status_code=404, detail="Farm not found")
 
-    # Get parcels to analyze
+    # Get parcels to analyze (eagerly load crops to avoid async lazy-load error)
+    from sqlalchemy.orm import selectinload as sil
     if parcel_ids:
         parcels_result = await db.execute(
-            select(LandParcel).where(
+            select(LandParcel).options(sil(LandParcel.crops)).where(
                 LandParcel.farm_id == farm_id,
                 LandParcel.id.in_(parcel_ids)
             )
         )
     else:
         parcels_result = await db.execute(
-            select(LandParcel).where(LandParcel.farm_id == farm_id)
+            select(LandParcel).options(sil(LandParcel.crops)).where(LandParcel.farm_id == farm_id)
         )
 
     parcels = parcels_result.scalars().all()
