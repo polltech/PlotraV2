@@ -114,36 +114,68 @@ async def submit_polygon_capture(
     except Exception:
         boundary_geometry = None
 
-    # Auto-generate parcel number (keep under varchar(50))
-    code_prefix = (farm.farm_code or farm.id)[:12]
-    parcel_number = f"{code_prefix}-{datetime.utcnow().strftime('%Y%m%d%H%M%S')}"
+    # Compute centroid from coords
+    lons = [p[0] for p in coords]
+    lats = [p[1] for p in coords]
+    centroid_lon = sum(lons) / len(lons)
+    centroid_lat = sum(lats) / len(lats)
 
-    parcel = LandParcel(
-        id=str(uuid.uuid4()),
-        farm_id=farm.id,
-        parcel_number=parcel_number,
-        parcel_name=payload.parcel_name or parcel_number,
-        boundary_geojson=boundary_geojson,
-        boundary_geometry=boundary_geometry,
-        area_hectares=payload.area_ha,
-        perimeter_meters=payload.perimeter_meters,
-        gps_accuracy_meters=payload.accuracy_m,
-        mapping_method="gps",
-        mapping_device=payload.device_id,
-        mapping_date=datetime.utcnow(),
-        consent_satellite_monitoring=1,
+    # Check for existing parcel — replace if found, create if not
+    existing_result = await db.execute(
+        select(LandParcel).where(LandParcel.farm_id == farm.id)
+        .order_by(LandParcel.created_at)
+        .limit(1)
     )
+    existing_parcel = existing_result.scalar_one_or_none()
 
-    db.add(parcel)
+    from sqlalchemy.orm.attributes import flag_modified
+
+    if existing_parcel:
+        existing_parcel.boundary_geojson = boundary_geojson
+        flag_modified(existing_parcel, "boundary_geojson")
+        existing_parcel.boundary_geometry = boundary_geometry
+        existing_parcel.area_hectares = payload.area_ha
+        existing_parcel.perimeter_meters = payload.perimeter_meters
+        existing_parcel.gps_accuracy_meters = payload.accuracy_m
+        existing_parcel.mapping_method = "gps"
+        existing_parcel.mapping_device = payload.device_id
+        existing_parcel.mapping_date = datetime.utcnow()
+        existing_parcel.verification_status = "pending"
+        parcel = existing_parcel
+    else:
+        code_prefix = (farm.farm_code or farm.id)[:12]
+        parcel_number = f"{code_prefix}-{datetime.utcnow().strftime('%Y%m%d%H%M%S')}"
+        parcel = LandParcel(
+            id=str(uuid.uuid4()),
+            farm_id=farm.id,
+            parcel_number=parcel_number,
+            parcel_name=payload.parcel_name or parcel_number,
+            boundary_geojson=boundary_geojson,
+            boundary_geometry=boundary_geometry,
+            area_hectares=payload.area_ha,
+            perimeter_meters=payload.perimeter_meters,
+            gps_accuracy_meters=payload.accuracy_m,
+            mapping_method="gps",
+            mapping_device=payload.device_id,
+            mapping_date=datetime.utcnow(),
+            consent_satellite_monitoring=1,
+        )
+        db.add(parcel)
+
+    # Update farm centroid so the Analyse button activates
+    farm.centroid_lat = centroid_lat
+    farm.centroid_lon = centroid_lon
+    farm.verification_status = "pending"
+
     await db.commit()
     await db.refresh(parcel)
 
     return {
         "record_id": parcel.id,
         "farm_id": farm.id,
-        "parcel_number": parcel_number,
+        "parcel_number": getattr(parcel, "parcel_number", ""),
         "area_ha": payload.area_ha,
-        "status": "saved",
+        "status": "updated" if existing_parcel else "created",
     }
 
 
@@ -186,24 +218,50 @@ async def batch_sync(
             except Exception:
                 boundary_geometry = None
 
-            code_prefix = (farm.farm_code or farm.id)[:12]
-            parcel_number = f"{code_prefix}-{datetime.utcnow().strftime('%Y%m%d%H%M%S')}-{synced}"
-            parcel = LandParcel(
-                id=str(uuid.uuid4()),
-                farm_id=farm.id,
-                parcel_number=parcel_number,
-                parcel_name=capture.parcel_name or parcel_number,
-                boundary_geojson=boundary_geojson,
-                boundary_geometry=boundary_geometry,
-                area_hectares=capture.area_ha,
-                perimeter_meters=capture.perimeter_meters,
-                gps_accuracy_meters=capture.accuracy_m,
-                mapping_method="gps",
-                mapping_device=capture.device_id,
-                mapping_date=datetime.utcnow(),
-                consent_satellite_monitoring=1,
+            lons = [p[0] for p in coords]
+            lats = [p[1] for p in coords]
+            farm.centroid_lon = sum(lons) / len(lons)
+            farm.centroid_lat = sum(lats) / len(lats)
+            farm.verification_status = "pending"
+
+            from sqlalchemy.orm.attributes import flag_modified
+
+            ex_result = await db.execute(
+                select(LandParcel).where(LandParcel.farm_id == farm.id)
+                .order_by(LandParcel.created_at).limit(1)
             )
-            db.add(parcel)
+            existing = ex_result.scalar_one_or_none()
+
+            if existing:
+                existing.boundary_geojson = boundary_geojson
+                flag_modified(existing, "boundary_geojson")
+                existing.boundary_geometry = boundary_geometry
+                existing.area_hectares = capture.area_ha
+                existing.perimeter_meters = capture.perimeter_meters
+                existing.gps_accuracy_meters = capture.accuracy_m
+                existing.mapping_method = "gps"
+                existing.mapping_device = capture.device_id
+                existing.mapping_date = datetime.utcnow()
+                existing.verification_status = "pending"
+            else:
+                code_prefix = (farm.farm_code or farm.id)[:12]
+                parcel_number = f"{code_prefix}-{datetime.utcnow().strftime('%Y%m%d%H%M%S')}-{synced}"
+                parcel = LandParcel(
+                    id=str(uuid.uuid4()),
+                    farm_id=farm.id,
+                    parcel_number=parcel_number,
+                    parcel_name=capture.parcel_name or parcel_number,
+                    boundary_geojson=boundary_geojson,
+                    boundary_geometry=boundary_geometry,
+                    area_hectares=capture.area_ha,
+                    perimeter_meters=capture.perimeter_meters,
+                    gps_accuracy_meters=capture.accuracy_m,
+                    mapping_method="gps",
+                    mapping_device=capture.device_id,
+                    mapping_date=datetime.utcnow(),
+                    consent_satellite_monitoring=1,
+                )
+                db.add(parcel)
             synced += 1
         except Exception as e:
             failed.append({"farm_id": capture.farm_id, "error": str(e)})
