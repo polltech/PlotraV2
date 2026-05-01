@@ -9522,8 +9522,22 @@ class PlotraDashboard {
                             </div>
                         </div>
                         <div class="card-body">
-                            <div id="historicalAnalysis">
-                                <div class="text-muted text-center py-3"><i class="bi bi-clock-history me-2"></i>No farm selected</div>
+                            <div class="row g-3 mb-3">
+                                <div class="col-md-5">
+                                    <div class="card border-0 shadow-sm h-100">
+                                        <div class="card-header py-2 fw-semibold small d-flex align-items-center gap-2" style="background:#f8f4f0;">
+                                            <i class="bi bi-image text-success"></i> Satellite Image
+                                        </div>
+                                        <div class="card-body p-2" id="satelliteImagePanel">
+                                            <div class="text-muted text-center py-3 small"><i class="bi bi-clock-history me-2"></i>No farm selected</div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-7">
+                                    <div id="historicalAnalysis">
+                                        <div class="text-muted text-center py-3"><i class="bi bi-clock-history me-2"></i>No farm selected</div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -9716,11 +9730,40 @@ class PlotraDashboard {
             if (el) el.innerHTML = `<div class="text-center py-3"><div class="spinner-border spinner-border-sm" role="status"></div><span class="ms-2">${msg}</span></div>`;
         };
         setLoading('historicalAnalysis', 'Loading historical data...');
+        setLoading('satelliteImagePanel', 'Loading satellite image...');
         setLoading('treeManagement', 'Loading agroforestry data...');
         setLoading('cropAnalysis', 'Loading crop analysis...');
         this.loadHistoricalAnalysis(farmId);
+        this.loadSatelliteImage(farmId);
         this.loadTreeManagement(farmId);
         this.loadCropAnalysis(farmId);
+    }
+
+    async loadSatelliteImage(farmId) {
+        const panel = document.getElementById('satelliteImagePanel');
+        if (!panel) return;
+        try {
+            const data = await api.request(`/farmer/farm/${farmId}/satellite-image`, { optional: true });
+            if (!data || !data.image_base64) {
+                panel.innerHTML = '<div class="text-muted text-center py-3 small">No satellite image available</div>';
+                return;
+            }
+            panel.innerHTML = `
+                <div class="position-relative">
+                    <img src="data:image/png;base64,${data.image_base64}"
+                         alt="Sentinel-2 true-colour image"
+                         class="img-fluid rounded w-100"
+                         style="max-height:340px;object-fit:cover;border:1px solid #dee2e6;">
+                    <div class="position-absolute bottom-0 start-0 end-0 p-2 text-white small"
+                         style="background:linear-gradient(transparent,rgba(0,0,0,.65));border-radius:0 0 6px 6px;">
+                        <i class="bi bi-satellite me-1"></i>Sentinel-2 L2A &nbsp;·&nbsp;
+                        ${data.from_date} – ${data.to_date} &nbsp;·&nbsp;
+                        True colour (B4/B3/B2) &nbsp;·&nbsp; Copernicus Data Space
+                    </div>
+                </div>`;
+        } catch (e) {
+            panel.innerHTML = `<div class="text-muted text-center py-3 small"><i class="bi bi-exclamation-circle me-1"></i>${e.message || 'Image unavailable'}</div>`;
+        }
     }
 
     async viewFarmDetails(farmId) {

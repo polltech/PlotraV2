@@ -670,6 +670,118 @@ async def request_satellite_analysis(
     }
 
 
+@router.get("/farm/{farm_id}/satellite-image")
+async def get_farm_satellite_image(
+    farm_id: str,
+    current_user: User = Depends(require_farmer),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Fetch a real true-colour Sentinel-2 image for the farm from CDSE Process API.
+    Returns a base64-encoded PNG.
+    """
+    import base64
+    from app.services.satellite_analysis import _load_satellite_credentials, _get_sentinel_hub_token
+
+    # Load farm + first parcel boundary
+    result = await db.execute(
+        select(Farm).where(Farm.id == farm_id, Farm.owner_id == current_user.id)
+    )
+    farm = result.scalar_one_or_none()
+    if not farm:
+        raise HTTPException(status_code=404, detail="Farm not found")
+
+    from sqlalchemy.orm import selectinload
+    parcel_result = await db.execute(
+        select(LandParcel).where(LandParcel.farm_id == farm_id)
+    )
+    parcels = parcel_result.scalars().all()
+    coords = None
+    for p in parcels:
+        if p.boundary_geojson:
+            coords = p.boundary_geojson.get("coordinates", [[]])[0]
+            if coords:
+                break
+
+    if not coords:
+        raise HTTPException(status_code=404, detail="No parcel boundary found for this farm")
+
+    # Compute bounding box and expand by ~0.005° (~500m) for context
+    lons = [c[0] for c in coords]
+    lats = [c[1] for c in coords]
+    buf = 0.005
+    bbox = [min(lons) - buf, min(lats) - buf, max(lons) + buf, max(lats) + buf]
+
+    # Get CDSE token
+    creds = await _load_satellite_credentials()
+    client_id = creds.get("oauth_client_id", "")
+    client_secret = creds.get("oauth_client_secret", "")
+    token = await _get_sentinel_hub_token(client_id, client_secret)
+
+    # Use the most recent 90 days
+    from datetime import timedelta
+    to_dt = datetime.utcnow()
+    from_dt = to_dt - timedelta(days=90)
+    to_str = to_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+    from_str = from_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    evalscript = """
+//VERSION=3
+function setup() {
+  return { input: [{bands: ["B04","B03","B02"]}], output: {bands:3, sampleType:"AUTO"} };
+}
+function evaluatePixel(s) {
+  return [3.5*s.B04, 3.5*s.B03, 3.5*s.B02];
+}
+"""
+
+    payload = {
+        "input": {
+            "bounds": {
+                "bbox": bbox,
+                "properties": {"crs": "http://www.opengis.net/def/crs/OGC/1.3/CRS84"}
+            },
+            "data": [{
+                "type": "sentinel-2-l2a",
+                "dataFilter": {
+                    "timeRange": {"from": from_str, "to": to_str},
+                    "maxCloudCoverage": 50,
+                    "mosaickingOrder": "leastCC"
+                }
+            }]
+        },
+        "output": {
+            "width": 512, "height": 512,
+            "responses": [{"identifier": "default", "format": {"type": "image/png"}}]
+        },
+        "evalscript": evalscript
+    }
+
+    import httpx
+    try:
+        async with httpx.AsyncClient(timeout=60) as client:
+            resp = await client.post(
+                "https://sh.dataspace.copernicus.eu/api/v1/process",
+                headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+                json=payload
+            )
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"Satellite image fetch failed: {e}")
+
+    if resp.status_code != 200:
+        raise HTTPException(status_code=503, detail=f"CDSE Process API returned {resp.status_code}: {resp.text[:200]}")
+
+    img_b64 = base64.b64encode(resp.content).decode()
+    return {
+        "image_base64": img_b64,
+        "format": "image/png",
+        "bbox": bbox,
+        "from_date": from_str[:10],
+        "to_date": to_str[:10],
+        "source": "Sentinel-2 L2A via Copernicus Data Space"
+    }
+
+
 @router.get("/farm/{farm_id}/satellite-history")
 async def get_satellite_history(
     farm_id: str,
