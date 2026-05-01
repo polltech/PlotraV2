@@ -166,8 +166,8 @@ async def _fetch_sentinel_hub_indices(token: str, coords: List, acquisition_date
             "timeRange": {"from": from_date, "to": to_date},
             "aggregationInterval": {"of": "P30D"},
             "evalscript": _EVALSCRIPT,
-            "resx": 10,
-            "resy": 10
+            "resx": 20,
+            "resy": 20
         }
     }
 
@@ -263,21 +263,23 @@ async def _fetch_sentinel_hub_indices(token: str, coords: List, acquisition_date
     ndwi_mean = _stat("ndwi", "mean")
 
     raw_sample_count = _stat("ndvi", "sampleCount", 0)
-    print(f"[SAT-DEBUG] CDSE ndvi stats — mean={ndvi_mean} sampleCount={raw_sample_count} min={ndvi_min} max={ndvi_max}", flush=True)
+    raw_nodata_count = _stat("ndvi", "noDataCount", 0)
+    valid_pixels = int(raw_sample_count - raw_nodata_count)
+    print(f"[SAT-DEBUG] CDSE ndvi stats — mean={ndvi_mean} sampleCount={raw_sample_count} noDataCount={raw_nodata_count} validPixels={valid_pixels} min={ndvi_min} max={ndvi_max}", flush=True)
 
-    if raw_sample_count == 0:
+    if valid_pixels <= 0:
         raise HTTPException(
             status_code=404,
             detail=(
-                f"Sentinel-2 imagery found for {from_date[:10]}–{to_date[:10]} but all pixels "
-                "were cloud/shadow masked. Try a later date when cloud cover is lower, "
-                "or verify the parcel boundary coordinates are in [longitude, latitude] GeoJSON order."
+                f"Sentinel-2 imagery found for {from_date[:10]}–{to_date[:10]} but 0 valid pixels "
+                "after cloud/shadow masking. The parcel boundary may be too small (covers < 1 pixel "
+                "at 20m resolution) or all pixels are under clouds. Ensure the parcel GPS boundary "
+                "covers at least 400 m² and try a clearer date."
             )
         )
 
-    sample_count = max(1, raw_sample_count)
-    nodata_count = _stat("ndvi", "noDataCount", 0)
-    cloud_pct    = round(nodata_count / (sample_count + nodata_count) * 100, 1)
+    total_pixels = max(1, int(raw_sample_count))
+    cloud_pct    = round(raw_nodata_count / total_pixels * 100, 1)
     lai          = max(0.0, 3.618 * evi_mean - 0.118)
 
     print(
