@@ -38,47 +38,63 @@ async def _load_satellite_credentials() -> Dict[str, Any]:
         return {}
 
 
-async def _get_auth_token(api_key: str) -> str:
+async def _get_sentinel_hub_token(client_id: str, api_key: str) -> str:
     """
-    Get a bearer token for Sentinel Hub Statistics API.
-    Planet API key is used directly via OAuth2 client_credentials grant.
-    After the Sentinel Hub dashboard deprecation, the Planet API key is the credential.
+    Get a Sentinel Hub bearer token via OAuth2 client_credentials.
 
-    Auth endpoint: services.sentinel-hub.com/auth/...
-    client_id  = 'sh-' prefix + your API key for new Planet accounts
-    OR the API key IS the token directly (Bearer auth).
+    After the Sentinel Hub → Planet migration, the correct credentials are:
+      client_id     = "sh-" + Account ID  (e.g. sh-8dcd9852-8d69-44d9-9dc1-c87135795584)
+      client_secret = Planet API key      (PLAK...)
 
-    We try the direct Bearer approach first (simplest).
+    The Account ID is shown on planet.com → Account Settings (NOT the User ID).
     """
-    if not api_key or api_key == "***":
+    if not client_id or not api_key or api_key == "***":
         raise HTTPException(
             status_code=503,
             detail=(
-                "Planet API key not configured. "
-                "Go to Admin → System → Satellite, paste your API key from "
-                "planet.com → Account Settings → User Settings → API Key, then click Save."
+                "Sentinel Hub credentials not configured. "
+                "Go to Admin → System → Satellite and enter your Account ID and Planet API key, then click Save."
             )
         )
-    return api_key  # used directly as Bearer token
 
+    # Build the sh- prefixed client_id if not already prefixed
+    sh_client_id = client_id if client_id.startswith("sh-") else f"sh-{client_id}"
 
-async def _get_sentinel_hub_token(client_id: str, client_secret: str) -> str:
-    """Legacy OAuth2 flow — kept for backwards compatibility if OAuth client exists."""
     try:
         async with httpx.AsyncClient(timeout=30) as client:
             resp = await client.post(
                 "https://services.sentinel-hub.com/auth/realms/main/protocol/openid-connect/token",
                 data={
                     "grant_type": "client_credentials",
-                    "client_id": client_id,
-                    "client_secret": client_secret,
+                    "client_id": sh_client_id,
+                    "client_secret": api_key,
                 }
             )
-        if resp.status_code == 200:
-            return resp.json().get("access_token", "")
-    except Exception:
-        pass
-    return ""
+    except httpx.ConnectError:
+        raise HTTPException(status_code=503, detail="Cannot reach Sentinel Hub auth endpoint.")
+    except httpx.TimeoutException:
+        raise HTTPException(status_code=504, detail="Sentinel Hub auth request timed out.")
+
+    if resp.status_code == 401:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                f"Sentinel Hub auth failed (401) with client_id={sh_client_id}. "
+                "Verify your Account ID (8dcd9852-...) and Planet API key are correct "
+                "in Admin → System → Satellite."
+            )
+        )
+    if resp.status_code != 200:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Sentinel Hub auth returned {resp.status_code}: {resp.text[:200]}"
+        )
+
+    token = resp.json().get("access_token")
+    if not token:
+        raise HTTPException(status_code=503, detail="Sentinel Hub returned no access token.")
+    logger.info(f"Sentinel Hub token obtained for client_id={sh_client_id}")
+    return token
 
 
 # ---------------------------------------------------------------------------
@@ -287,19 +303,12 @@ class SatelliteAnalysisEngine:
         parcel_id   = getattr(parcel, "id", None)
         analysis_id = f"SAT-{uuid.uuid4().hex[:12].upper()}"
 
-        creds   = await _load_satellite_credentials()
-        api_key = creds.get("api_key", "")
+        creds      = await _load_satellite_credentials()
+        account_id = creds.get("account_id", "")
+        api_key    = creds.get("api_key", "")
 
-        # Try OAuth flow if client credentials are present (legacy / power users)
-        token = ""
-        client_id     = creds.get("oauth_client_id", "")
-        client_secret = creds.get("oauth_client_secret", "")
-        if client_id and client_secret and client_secret != "***":
-            token = await _get_sentinel_hub_token(client_id, client_secret)
-
-        # Fall back to Planet API key as bearer token
-        if not token:
-            token = await _get_auth_token(api_key)
+        # Authenticate: client_id = sh-{account_id}, client_secret = Planet API key
+        token = await _get_sentinel_hub_token(account_id, api_key)
 
         coords = []
         if getattr(parcel, "boundary_geojson", None):

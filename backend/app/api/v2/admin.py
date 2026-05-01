@@ -2448,7 +2448,10 @@ async def test_satellite_connection(
     current_user: User = Depends(require_platform_admin),
     db: AsyncSession = Depends(get_db)
 ):
-    """Test Sentinel Hub connection using saved Planet API key."""
+    """
+    Test Sentinel Hub connection.
+    Auth: client_id = sh-{account_id}, client_secret = Planet API key (PLAK...).
+    """
     import httpx
     from app.models.system import SystemConfig
 
@@ -2458,41 +2461,36 @@ async def test_satellite_connection(
     rows = result.scalars().all()
     creds = {r.config_key.replace("cfg_satellite_", ""): r.config_value for r in rows}
 
-    api_key = creds.get("api_key", "")
+    account_id = creds.get("account_id", "")
+    api_key    = creds.get("api_key", "")
+
+    if not account_id:
+        return {"success": False, "message": "Account ID not saved — enter it in the Satellite tab (8dcd9852-...)"}
     if not api_key or api_key == "***":
+        return {"success": False, "message": "Planet API key not saved — reveal and paste it from planet.com → Account Settings → API Key"}
+
+    sh_client_id = account_id if account_id.startswith("sh-") else f"sh-{account_id}"
+
+    try:
+        async with httpx.AsyncClient(timeout=20) as client:
+            resp = await client.post(
+                "https://services.sentinel-hub.com/auth/realms/main/protocol/openid-connect/token",
+                data={
+                    "grant_type": "client_credentials",
+                    "client_id": sh_client_id,
+                    "client_secret": api_key,
+                }
+            )
+        if resp.status_code == 200 and resp.json().get("access_token"):
+            return {"success": True, "message": f"Connected — token obtained for {sh_client_id}"}
         return {
             "success": False,
-            "message": "Planet API key not saved — enter it in the Satellite tab and click Save"
+            "message": (
+                f"Auth failed (HTTP {resp.status_code}) for client_id={sh_client_id}. "
+                "Check that Account ID and Planet API key are correct."
+            )
         }
-
-    # Verify the key by calling the Sentinel Hub token endpoint
-    try:
-        async with httpx.AsyncClient(timeout=15) as client:
-            # Try Bearer style first
-            resp = await client.get(
-                "https://services.sentinel-hub.com/auth/realms/main/protocol/openid-connect/userinfo",
-                headers={"Authorization": f"Bearer {api_key}"}
-            )
-            if resp.status_code == 200:
-                return {"success": True, "message": "Sentinel Hub connected — Planet API key is valid"}
-
-            # Try api-key header style
-            resp2 = await client.get(
-                "https://services.sentinel-hub.com/auth/realms/main/protocol/openid-connect/userinfo",
-                headers={"Authorization": f"api-key {api_key}"}
-            )
-            if resp2.status_code == 200:
-                return {"success": True, "message": "Sentinel Hub connected — Planet API key is valid"}
-
-            return {
-                "success": False,
-                "message": (
-                    f"API key rejected (HTTP {resp.status_code}). "
-                    "Go to planet.com → Account Settings → User Settings, "
-                    "reveal the API Key and re-paste it in Admin → System → Satellite."
-                )
-            }
     except httpx.ConnectError:
         return {"success": False, "message": "Cannot reach Sentinel Hub — check server network"}
     except Exception as e:
-        return {"success": False, "message": f"Connection error: {str(e)}"}
+        return {"success": False, "message": f"Error: {str(e)}"}

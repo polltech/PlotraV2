@@ -6758,16 +6758,14 @@ class PlotraDashboard {
                                 </div>
                                 <div class="alert alert-info py-2 mb-3" style="font-size:0.85rem;">
                                     <i class="bi bi-info-circle me-1"></i>
-                                    Enter your <strong>Sentinel Hub</strong> OAuth credentials and click Save.
-                                    Get OAuth Client credentials: <strong>Sentinel Hub Dashboard → User Settings → OAuth Clients → Create Client</strong>.
+                                    <strong>How to authenticate (Planet/Sentinel Hub):</strong><br>
+                                    1. <strong>Account ID</strong> → planet.com → Account Settings → <em>Account ID</em> (e.g. <code>8dcd9852-...</code>)<br>
+                                    2. <strong>Planet API Key</strong> → same page → User Settings → click the eye icon to reveal <code>PLAK...</code><br>
+                                    The system uses: <code>sh-{AccountID}</code> as OAuth client_id + your API key as client_secret.
                                 </div>
                                 <div class="row">
-                                    ${fieldRow('Provider', 'sat_provider', sat.provider || 'sentinel_hub', 'text', 'sentinel_hub')}
-                                    ${fieldRow('Base URL', 'sat_base_url', sat.base_url || 'https://services.sentinel-hub.com', 'text')}
-                                    ${fieldRow('Account ID', 'sat_account_id', sat.account_id || '', 'text', 'From Sentinel Hub → Account Settings')}
-                                    ${fieldRow('Personal API Key', 'sat_api_key', sat.api_key || '', 'password', 'From Sentinel Hub → User Settings → API Key')}
-                                    ${fieldRow('OAuth Client ID', 'sat_oauth_client_id', sat.oauth_client_id || '', 'text', 'Required — from OAuth Clients')}
-                                    ${fieldRow('OAuth Client Secret', 'sat_oauth_client_secret', sat.oauth_client_secret || '', 'password', 'Required — leave *** to keep existing')}
+                                    ${fieldRow('Account ID', 'sat_account_id', sat.account_id || '', 'text', 'From planet.com → Account Settings (8dcd9852-8d69-...)')}
+                                    ${fieldRow('Planet API Key (PLAK...)', 'sat_api_key', sat.api_key || '', 'password', 'Reveal from planet.com → User Settings → API Key')}
                                 </div>
                                 <div class="mt-3 d-flex align-items-center gap-3">
                                     <button class="btn btn-success btn-sm" onclick="app.saveSystemSection('satellite')"><i class="bi bi-save me-1"></i>Save Credentials</button>
