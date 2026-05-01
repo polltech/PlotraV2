@@ -411,8 +411,18 @@ class SatelliteAnalysisEngine:
     async def analyze_parcels_batch(self, parcels: List[Any], acquisition_date: Optional[datetime] = None) -> List[Dict[str, Any]]:
         results = []
         for parcel in parcels:
-            result = await self.analyze_parcel(parcel, acquisition_date)
-            results.append(result)
+            try:
+                result = await self.analyze_parcel(parcel, acquisition_date)
+                results.append(result)
+            except HTTPException as e:
+                parcel_id = getattr(parcel, "id", None)
+                print(f"[SAT-DEBUG] Parcel {parcel_id} skipped: {e.detail}", flush=True)
+                results.append({
+                    "parcel_id": parcel_id,
+                    "status": "failed",
+                    "error": e.detail,
+                    "satellite_source": "SENTINEL_2",
+                })
         return results
 
     async def _analyze_crop_types(self, parcel: Any, base_analysis: Dict) -> Dict[str, Any]:
