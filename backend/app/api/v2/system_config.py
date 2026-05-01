@@ -458,8 +458,9 @@ async def test_satellite_connection(
     current_user: User = Depends(require_platform_admin),
     db: AsyncSession = Depends(get_db)
 ):
-    """Test Sentinel Hub connection using saved OAuth credentials."""
+    """Test Sentinel Hub connection using saved Planet API key."""
     from sqlalchemy import select
+    import httpx
 
     result = await db.execute(
         select(SystemConfig).where(SystemConfig.config_key.like("cfg_satellite_%"))
@@ -467,18 +468,34 @@ async def test_satellite_connection(
     rows = result.scalars().all()
     creds = {r.config_key.replace("cfg_satellite_", ""): r.config_value for r in rows}
 
-    client_id = creds.get("oauth_client_id", "")
-    client_secret = creds.get("oauth_client_secret", "")
-    simulation = creds.get("simulation_mode", True)
+    api_key = creds.get("api_key", "")
+    if not api_key or api_key == "***":
+        return {"success": False, "message": "Planet API key not saved — enter it in the Satellite tab and click Save"}
 
-    if simulation is True or simulation == "true" or simulation is None:
-        return {"success": False, "message": "Simulation mode is ON — disable it to use real API"}
+    # Try a lightweight API call to verify the key works
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            # Hit the account info endpoint to verify auth
+            resp = await client.get(
+                "https://services.sentinel-hub.com/auth/realms/main/protocol/openid-connect/userinfo",
+                headers={"Authorization": f"Bearer {api_key}"}
+            )
+            if resp.status_code == 200:
+                return {"success": True, "message": "Sentinel Hub connected — Planet API key is valid"}
 
-    if not client_id or not client_secret or client_secret == "***":
-        return {"success": False, "message": "OAuth Client ID and Client Secret are required"}
+            # Try api-key style
+            resp2 = await client.get(
+                "https://services.sentinel-hub.com/auth/realms/main/protocol/openid-connect/userinfo",
+                headers={"Authorization": f"api-key {api_key}"}
+            )
+            if resp2.status_code == 200:
+                return {"success": True, "message": "Sentinel Hub connected — Planet API key is valid"}
 
-    from app.services.satellite_analysis import _get_sentinel_hub_token
-    token = await _get_sentinel_hub_token(client_id, client_secret)
-    if token:
-        return {"success": True, "message": "Sentinel Hub connected successfully — token obtained"}
-    return {"success": False, "message": "Authentication failed — check your OAuth Client ID and Secret"}
+            return {
+                "success": False,
+                "message": f"API key rejected (HTTP {resp.status_code}). Reveal and re-copy your API key from planet.com → Account Settings → User Settings → API Key"
+            }
+    except httpx.ConnectError:
+        return {"success": False, "message": "Cannot reach Sentinel Hub — check server network"}
+    except Exception as e:
+        return {"success": False, "message": f"Connection error: {str(e)}"}
