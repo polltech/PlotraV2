@@ -3,6 +3,7 @@ Plotra Platform - Satellite Analysis Engine
 Real Sentinel Hub Statistics API. Auth via Planet API key (no OAuth needed).
 The Sentinel Hub dashboard is deprecated — authenticate directly with your Planet API key.
 """
+import math
 import uuid
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
@@ -245,21 +246,36 @@ async def _fetch_sentinel_hub_indices(token: str, coords: List, acquisition_date
     outputs = best.get("outputs", {})
 
     def _stat(name: str, key: str, default: float = 0.0) -> float:
-        return float(
-            outputs.get(name, {}).get("bands", {}).get("B0", {})
-                   .get("stats", {}).get(key, default)
-        )
+        raw = outputs.get(name, {}).get("bands", {}).get("B0", {}).get("stats", {}).get(key, default)
+        try:
+            val = float(raw)
+        except (TypeError, ValueError):
+            return default
+        return default if (math.isnan(val) or math.isinf(val)) else val
 
     ndvi_mean = _stat("ndvi", "mean")
-    ndvi_min  = _stat("ndvi", "min",  ndvi_mean - 0.1)
-    ndvi_max  = _stat("ndvi", "max",  ndvi_mean + 0.1)
+    ndvi_min  = _stat("ndvi", "min",  max(-1.0, ndvi_mean - 0.1))
+    ndvi_max  = _stat("ndvi", "max",  min(1.0, ndvi_mean + 0.1))
     ndvi_std  = _stat("ndvi", "stDev", 0.05)
     evi_mean  = _stat("evi",  "mean")
     savi_mean = _stat("savi", "mean")
     ndmi_mean = _stat("ndmi", "mean")
     ndwi_mean = _stat("ndwi", "mean")
 
-    sample_count = max(1, _stat("ndvi", "sampleCount", 1))
+    raw_sample_count = _stat("ndvi", "sampleCount", 0)
+    logger.info(f"CDSE ndvi stats — mean={ndvi_mean} sampleCount={raw_sample_count} min={ndvi_min} max={ndvi_max}")
+
+    if raw_sample_count == 0:
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                f"Sentinel-2 imagery found for {from_date[:10]}–{to_date[:10]} but all pixels "
+                "were cloud/shadow masked. Try a later date when cloud cover is lower, "
+                "or verify the parcel boundary coordinates are in [longitude, latitude] GeoJSON order."
+            )
+        )
+
+    sample_count = max(1, raw_sample_count)
     nodata_count = _stat("ndvi", "noDataCount", 0)
     cloud_pct    = round(nodata_count / (sample_count + nodata_count) * 100, 1)
     lai          = max(0.0, 3.618 * evi_mean - 0.118)
