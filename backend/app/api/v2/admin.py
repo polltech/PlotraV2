@@ -2441,3 +2441,58 @@ async def delete_env_credential(
     flag_modified(cfg, "config_value")
     await db.commit()
     return {"message": "Credential deleted"}
+
+
+@router.get("/config/satellite-test")
+async def test_satellite_connection(
+    current_user: User = Depends(require_platform_admin),
+    db: AsyncSession = Depends(get_db)
+):
+    """Test Sentinel Hub connection using saved Planet API key."""
+    import httpx
+    from app.models.system import SystemConfig
+
+    result = await db.execute(
+        select(SystemConfig).where(SystemConfig.config_key.like("cfg_satellite_%"))
+    )
+    rows = result.scalars().all()
+    creds = {r.config_key.replace("cfg_satellite_", ""): r.config_value for r in rows}
+
+    api_key = creds.get("api_key", "")
+    if not api_key or api_key == "***":
+        return {
+            "success": False,
+            "message": "Planet API key not saved — enter it in the Satellite tab and click Save"
+        }
+
+    # Verify the key by calling the Sentinel Hub token endpoint
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            # Try Bearer style first
+            resp = await client.get(
+                "https://services.sentinel-hub.com/auth/realms/main/protocol/openid-connect/userinfo",
+                headers={"Authorization": f"Bearer {api_key}"}
+            )
+            if resp.status_code == 200:
+                return {"success": True, "message": "Sentinel Hub connected — Planet API key is valid"}
+
+            # Try api-key header style
+            resp2 = await client.get(
+                "https://services.sentinel-hub.com/auth/realms/main/protocol/openid-connect/userinfo",
+                headers={"Authorization": f"api-key {api_key}"}
+            )
+            if resp2.status_code == 200:
+                return {"success": True, "message": "Sentinel Hub connected — Planet API key is valid"}
+
+            return {
+                "success": False,
+                "message": (
+                    f"API key rejected (HTTP {resp.status_code}). "
+                    "Go to planet.com → Account Settings → User Settings, "
+                    "reveal the API Key and re-paste it in Admin → System → Satellite."
+                )
+            }
+    except httpx.ConnectError:
+        return {"success": False, "message": "Cannot reach Sentinel Hub — check server network"}
+    except Exception as e:
+        return {"success": False, "message": f"Connection error: {str(e)}"}
