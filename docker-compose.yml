@@ -31,7 +31,7 @@ services:
       PLOTRA_APP__FRONTEND_BASE_URL: "https://dev.plotra.eu"
       PLOTRA_APP__SECRET_KEY: your-super-secret-key-change-this-in-production
       PLOTRA_CORS__ALLOWED_ORIGINS: '["https://dev.plotra.eu","https://plotra.eu","https://www.plotra.eu"]'
-      PLOTRA_MOBILE__API_KEY: plotra-prototype-key-2026
+      PLOTRA_MOBILE__API_KEY: 6bc3e8e7894720a5d12412888ffc3725fcb9eded6307a704a5dd7920a10ea90d
       PLOTRA_MOBILE__RATE_LIMIT_PER_MINUTE: 60
       UVICORN_WORKERS: 2
     ports:
