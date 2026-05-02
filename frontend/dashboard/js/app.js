@@ -5417,14 +5417,14 @@ class PlotraDashboard {
 
     showVerificationApproveModal(farmId, isAdmin) {
         this._verificationAction = { farmId, isAdmin, type: 'approve' };
-        document.getElementById('verificationReasonLabel').textContent = isAdmin
-            ? 'Approval Notes (optional)' : 'Approval Notes (optional)';
+        document.getElementById('verificationReasonLabel').textContent = 'Approval Notes (optional)';
         document.getElementById('verificationReasonInput').value = '';
         document.getElementById('verificationModalTitle').textContent = 'Approve Farm';
-        document.getElementById('verificationModalConfirmBtn').className = 'btn btn-success';
-        document.getElementById('verificationModalConfirmBtn').textContent = 'Confirm Approval';
-        const modal = new bootstrap.Modal(document.getElementById('verificationReasonModal'));
-        modal.show();
+        const confirmBtn = document.getElementById('verificationModalConfirmBtn');
+        confirmBtn.className = 'btn btn-success btn-sm';
+        confirmBtn.textContent = 'Confirm Approval';
+        confirmBtn.onclick = () => app.confirmVerificationAction();
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('verificationReasonModal')).show();
     }
 
     showVerificationRejectModal(farmId, isAdmin) {
@@ -5432,10 +5432,11 @@ class PlotraDashboard {
         document.getElementById('verificationReasonLabel').textContent = 'Reason for Rejection (required)';
         document.getElementById('verificationReasonInput').value = '';
         document.getElementById('verificationModalTitle').textContent = 'Reject Farm';
-        document.getElementById('verificationModalConfirmBtn').className = 'btn btn-danger';
-        document.getElementById('verificationModalConfirmBtn').textContent = 'Confirm Rejection';
-        const modal = new bootstrap.Modal(document.getElementById('verificationReasonModal'));
-        modal.show();
+        const confirmBtn = document.getElementById('verificationModalConfirmBtn');
+        confirmBtn.className = 'btn btn-danger btn-sm';
+        confirmBtn.textContent = 'Confirm Rejection';
+        confirmBtn.onclick = () => app.confirmVerificationAction();
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('verificationReasonModal')).show();
     }
 
     async confirmVerificationAction() {
@@ -7729,10 +7730,10 @@ class PlotraDashboard {
             }
 
             // Prepare API payload
-            const farmCodeRaw = document.getElementById('farmCode')?.value?.trim();
+            const farmCodeRaw = (document.getElementById('farmCode')?.value?.trim() || '').toUpperCase();
             const apiPayload = {
                 farm_name: farmData.farm_name,
-                farm_code: farmCodeRaw ? farmCodeRaw : undefined,
+                farm_code: farmCodeRaw || undefined,
                 total_area_hectares: farmData.calculated_area_ha || farmData.approximate_size_ha,
                 coffee_varieties: coffeeVarieties,
                 years_farming: farmData.farm_established_year ? new Date().getFullYear() - farmData.farm_established_year : null,
