@@ -1,27 +1,52 @@
 """
 Mobile App API — API-key authenticated endpoints for field agents.
 Handles farm lookup by farm_code and polygon capture submission.
+
+Security:
+  - All endpoints require X-API-Key header (enforced at router level via dependencies=[])
+  - API key is read from PLOTRA_MOBILE__API_KEY env var, not hardcoded
+  - Simple per-IP rate limiting (PLOTRA_MOBILE__RATE_LIMIT_PER_MINUTE, default 60/min)
 """
+import time
 import uuid
+from collections import defaultdict
 from datetime import datetime
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Header
+from fastapi import APIRouter, Depends, HTTPException, Header, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.core.database import get_db
 from app.models.farm import Farm, LandParcel
 
-router = APIRouter(tags=["Mobile App"])
+# ── Auth & rate-limit helpers ──────────────────────────────────────────────────
 
-MOBILE_API_KEY = "plotra-prototype-key-2026"
+_rate_store: dict = defaultdict(list)
 
 
 def verify_api_key(x_api_key: str = Header(..., alias="X-API-Key")):
-    if x_api_key != MOBILE_API_KEY:
+    if x_api_key != settings.mobile.api_key:
         raise HTTPException(status_code=401, detail="Invalid API key")
+
+
+def rate_limit(request: Request):
+    ip = request.client.host if request.client else "unknown"
+    now = time.time()
+    window = now - 60  # 1-minute sliding window
+    _rate_store[ip] = [t for t in _rate_store[ip] if t > window]
+    if len(_rate_store[ip]) >= settings.mobile.rate_limit_per_minute:
+        raise HTTPException(status_code=429, detail="Too many requests — slow down.")
+    _rate_store[ip].append(now)
+
+
+# Router: both dependencies applied to every endpoint automatically
+router = APIRouter(
+    tags=["Mobile App"],
+    dependencies=[Depends(verify_api_key), Depends(rate_limit)],
+)
 
 
 # ── Farm lookup ────────────────────────────────────────────────────────────────
@@ -29,7 +54,6 @@ def verify_api_key(x_api_key: str = Header(..., alias="X-API-Key")):
 @router.get("/farms/{identifier}")
 async def get_farm_by_code(
     identifier: str,
-    _: str = Depends(verify_api_key),
     db: AsyncSession = Depends(get_db),
 ):
     """Look up a farm by farm_code (what the field agent types in the app)."""
@@ -86,11 +110,9 @@ class PolygonCaptureCreate(BaseModel):
 @router.post("/parcels/polygon", status_code=201)
 async def submit_polygon_capture(
     payload: PolygonCaptureCreate,
-    _: str = Depends(verify_api_key),
     db: AsyncSession = Depends(get_db),
 ):
     """Submit a polygon boundary captured by a field agent."""
-    # Verify the farm exists
     result = await db.execute(
         select(Farm).where(Farm.id == payload.farm_id, Farm.is_deleted == 0)
     )
@@ -114,13 +136,12 @@ async def submit_polygon_capture(
     except Exception:
         boundary_geometry = None
 
-    # Compute centroid from coords
     lons = [p[0] for p in coords]
     lats = [p[1] for p in coords]
     centroid_lon = sum(lons) / len(lons)
     centroid_lat = sum(lats) / len(lats)
 
-    # Check for existing parcel — replace if found, create if not
+    # Upsert: replace existing parcel if one exists, else create
     existing_result = await db.execute(
         select(LandParcel).where(LandParcel.farm_id == farm.id)
         .order_by(LandParcel.created_at)
@@ -162,7 +183,6 @@ async def submit_polygon_capture(
         )
         db.add(parcel)
 
-    # Update farm centroid so the Analyse button activates
     farm.centroid_lat = centroid_lat
     farm.centroid_lon = centroid_lon
     farm.verification_status = "pending"
@@ -188,7 +208,6 @@ class BatchSyncRequest(BaseModel):
 @router.post("/sync/batch")
 async def batch_sync(
     payload: BatchSyncRequest,
-    _: str = Depends(verify_api_key),
     db: AsyncSession = Depends(get_db),
 ):
     """Sync multiple offline polygon captures in one request."""

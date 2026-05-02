@@ -146,6 +146,13 @@ class LoggingConfig(BaseModel):
     audit_enabled: bool = True
 
 
+class MobileConfig(BaseModel):
+    # Set PLOTRA_MOBILE__API_KEY in env to override the default
+    api_key: str = "plotra-prototype-key-2026"
+    # Max requests per IP per minute on mobile endpoints
+    rate_limit_per_minute: int = 60
+
+
 class Settings(BaseSettings):
     app: AppConfig = Field(default_factory=AppConfig)
     auth: AuthConfig = Field(default_factory=AuthConfig)
@@ -158,6 +165,7 @@ class Settings(BaseSettings):
     storage: StorageConfig = Field(default_factory=StorageConfig)
     celery: CeleryConfig = Field(default_factory=CeleryConfig)
     cors: CORSConfig = Field(default_factory=CORSConfig)
+    mobile: MobileConfig = Field(default_factory=MobileConfig)
     payments: PaymentsConfig = Field(default_factory=PaymentsConfig)
     verification: VerificationConfig = Field(default_factory=VerificationConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)

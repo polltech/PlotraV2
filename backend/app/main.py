@@ -149,13 +149,13 @@ async def readiness_check():
         from app.core.database import async_session_factory
         async with async_session_factory() as session:
             await session.execute(text("SELECT 1"))
-        db_status = "connected"
-    except Exception as e:
-        db_status = f"error: {str(e)}"
-    
+        db_ok = True
+    except Exception:
+        db_ok = False
+
     return {
-        "status": "ready" if db_status == "connected" else "degraded",
-        "database": db_status
+        "status": "ready" if db_ok else "degraded",
+        "database": "connected" if db_ok else "unavailable",
     }
 
 

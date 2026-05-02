@@ -6,8 +6,6 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: plotra_db
-    ports:
-      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     restart: unless-stopped
@@ -33,6 +31,8 @@ services:
       PLOTRA_APP__FRONTEND_BASE_URL: "https://dev.plotra.eu"
       PLOTRA_APP__SECRET_KEY: your-super-secret-key-change-this-in-production
       PLOTRA_CORS__ALLOWED_ORIGINS: '["https://dev.plotra.eu","https://plotra.eu","https://www.plotra.eu"]'
+      PLOTRA_MOBILE__API_KEY: plotra-prototype-key-2026
+      PLOTRA_MOBILE__RATE_LIMIT_PER_MINUTE: 60
       UVICORN_WORKERS: 2
     ports:
       - "8000:8000"
