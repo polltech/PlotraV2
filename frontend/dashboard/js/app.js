@@ -3904,34 +3904,39 @@ class PlotraDashboard {
                         </div>
                         <div class="modal-body">
                             ${updateBanner}
-                            <h6 class="text-uppercase text-muted small fw-bold mb-3 border-bottom pb-2">Farm Information</h6>
+                            <h6 class="text-uppercase text-muted small fw-bold mb-3 border-bottom pb-2">Farmer Identity</h6>
+                            <div class="row">
+                                ${row('Full Name', f.farmer_name)}
+                                ${row('Phone', f.farmer_phone)}
+                                ${row('National ID', f.farmer_national_id)}
+                                ${row('Gender', f.farmer_gender)}
+                                ${row('Coop Member No.', f.coop_member_no)}
+                                ${row('Registered', date)}
+                            </div>
+                            <h6 class="text-uppercase text-muted small fw-bold mb-3 border-bottom pb-2 mt-2">Farm Basics</h6>
                             <div class="row">
                                 ${row('Farm Name', f.farm_name || f.name)}
-                                ${row('Crop Type', f.crop_type)}
+                                ${row('Location / Subcounty', f.farmer_location)}
                                 ${row('Total Area', f.total_area_hectares ? f.total_area_hectares + ' ha' : null)}
                                 ${row('Coffee Area', f.coffee_area_hectares ? f.coffee_area_hectares + ' ha' : null)}
-                                ${row('Registered', date)}
-                                ${row('Compliance', f.compliance_status)}
+                                ${row('Land Ownership', ({'owned':'Title Deed (Owned)','leased':'Lease Agreement','inherited':'Family Plot / Inherited','customary':'Customary Tenure','community':'Community Land','tenant':'Tenant'}[(f.parcels||[])[0]?.ownership_type] || (f.parcels||[])[0]?.ownership_type || '—'))}
+                                ${row('Land Use Type', ({'agroforestry':'Agroforestry','monocrop':'Monocrop','mixed_cropping':'Mixed Cropping','forest_reserve':'Forest Reserve','buffer_zone':'Buffer Zone','other':'Other'}[f.land_use_type] || f.land_use_type || '—'))}
                             </div>
-                            <h6 class="text-uppercase text-muted small fw-bold mb-3 border-bottom pb-2 mt-2">Location</h6>
+                            <h6 class="text-uppercase text-muted small fw-bold mb-3 border-bottom pb-2 mt-2">Coffee Production</h6>
                             <div class="row">
-                                ${row('County', f.county)}
-                                ${row('Sub-County', f.sub_county || f.subcounty)}
-                                ${row('Ward', f.ward)}
-                            </div>
-                            <h6 class="text-uppercase text-muted small fw-bold mb-3 border-bottom pb-2 mt-2">Farmer</h6>
-                            <div class="row">
-                                ${row('Farmer Name', f.farmer_name)}
-                                ${row('Phone', f.farmer_phone)}
-                                ${row('Cooperative', f.cooperative_name || f.cooperative_code)}
+                                ${row('Coffee Varieties', Array.isArray(f.coffee_varieties) ? f.coffee_varieties.join(', ') : f.coffee_varieties)}
+                                ${row('Years Farming', f.years_farming != null ? f.years_farming + ' yrs' : null)}
+                                ${row('Est. Annual Yield', f.average_annual_production_kg != null ? f.average_annual_production_kg + ' kg' : null)}
+                                ${row('Shade Trees', f.shade_trees_present ? 'Yes' : (f.shade_trees_present === false ? 'No' : null))}
+                                ${row('Shade Canopy', f.shade_tree_canopy_percent != null ? f.shade_tree_canopy_percent + '%' : null)}
                             </div>
                             <h6 class="text-uppercase text-muted small fw-bold mb-3 border-bottom pb-2 mt-2">Verification Status</h6>
                             <div class="row">
                                 ${row('Coop Status', coopStatusLabel)}
                                 ${row('Admin Status', verificationLabel)}
+                                ${row('Compliance', f.compliance_status)}
                                 ${f.coop_notes ? row('Coop Notes', f.coop_notes) : ''}
                                 ${f.admin_notes ? row('Admin Notes', f.admin_notes) : ''}
-                                ${f.coop_approver ? row('Coop Approver', f.coop_approver) : ''}
                             </div>
                         </div>
                         <div class="modal-footer flex-wrap gap-2">
@@ -4154,36 +4159,41 @@ class PlotraDashboard {
             const bodyEl = document.getElementById('farmDetailsContent');
             if (!modalEl || !bodyEl) { this.showToast('Modal not found', 'error'); return; }
 
+            const ownershipLabel = {'owned':'Title Deed (Owned)','leased':'Lease Agreement','inherited':'Family Plot / Inherited','customary':'Customary Tenure','community':'Community Land','tenant':'Tenant'};
+            const landUseLabel = {'agroforestry':'Agroforestry','monocrop':'Monocrop','mixed_cropping':'Mixed Cropping','forest_reserve':'Forest Reserve','buffer_zone':'Buffer Zone','other':'Other'};
             bodyEl.innerHTML = `
                 <div class="row g-3">
-                    <div class="col-12"><h6 class="text-primary border-bottom pb-1">Farm Info</h6></div>
-                    <div class="col-md-6"><small class="text-muted d-block">Farm Name</small><strong>${f.farm_name || '—'}</strong></div>
-                    <div class="col-md-6"><small class="text-muted d-block">Status</small>${statusBadge(f.verification_status)}</div>
-                    <div class="col-md-6"><small class="text-muted d-block">Area</small><strong>${f.total_area_hectares ? f.total_area_hectares + ' ha' : '—'}</strong></div>
-                    <div class="col-md-6"><small class="text-muted d-block">Coffee Varieties</small><strong>${(f.coffee_varieties||[]).join(', ') || '—'}</strong></div>
-                    <div class="col-md-6"><small class="text-muted d-block">Compliance</small><strong>${f.compliance_status || '—'}</strong></div>
+                    <div class="col-12"><h6 class="text-primary border-bottom pb-1">Farmer Identity</h6></div>
+                    <div class="col-md-6"><small class="text-muted d-block">Full Name</small><strong>${f.owner?.name || f.farmer_name || '—'}</strong></div>
+                    <div class="col-md-6"><small class="text-muted d-block">Phone</small><strong>${f.owner?.phone || f.farmer_phone || '—'}</strong></div>
+                    <div class="col-md-6"><small class="text-muted d-block">National ID</small><strong>${f.owner?.national_id || f.farmer_national_id || '—'}</strong></div>
+                    <div class="col-md-6"><small class="text-muted d-block">Gender</small><strong>${f.owner?.gender || f.farmer_gender || '—'}</strong></div>
+                    <div class="col-md-6"><small class="text-muted d-block">Coop Member No.</small><strong>${f.membership?.membership_number || f.coop_member_no || '—'}</strong></div>
                     <div class="col-md-6"><small class="text-muted d-block">Registered</small><strong>${f.created_at ? new Date(f.created_at).toLocaleDateString() : '—'}</strong></div>
 
-                    <div class="col-12 mt-2"><h6 class="text-primary border-bottom pb-1">Farmer Details</h6></div>
-                    <div class="col-md-6"><small class="text-muted d-block">Full Name</small><strong>${f.owner?.name || '—'}</strong></div>
-                    <div class="col-md-6"><small class="text-muted d-block">Phone</small><strong>${f.owner?.phone || '—'}</strong></div>
-                    <div class="col-md-6"><small class="text-muted d-block">Email</small><strong>${f.owner?.email || '—'}</strong></div>
-                    <div class="col-md-6"><small class="text-muted d-block">National ID</small><strong>${f.owner?.national_id || '—'}</strong></div>
-                    <div class="col-md-6"><small class="text-muted d-block">Gender</small><strong>${f.owner?.gender || '—'}</strong></div>
-                    <div class="col-md-6"><small class="text-muted d-block">Location</small><strong>${[f.owner?.subcounty, f.owner?.county].filter(Boolean).join(', ') || '—'}</strong></div>
+                    <div class="col-12 mt-2"><h6 class="text-primary border-bottom pb-1">Farm Basics</h6></div>
+                    <div class="col-md-6"><small class="text-muted d-block">Farm Name</small><strong>${f.farm_name || '—'}</strong></div>
+                    <div class="col-md-6"><small class="text-muted d-block">Location / Subcounty</small><strong>${f.owner?.subcounty || f.farmer_location || '—'}</strong></div>
+                    <div class="col-md-6"><small class="text-muted d-block">Total Area</small><strong>${f.total_area_hectares ? f.total_area_hectares + ' ha' : '—'}</strong></div>
+                    <div class="col-md-6"><small class="text-muted d-block">Coffee Area</small><strong>${f.coffee_area_hectares ? f.coffee_area_hectares + ' ha' : '—'}</strong></div>
+                    <div class="col-md-6"><small class="text-muted d-block">Land Ownership</small><strong>${ownershipLabel[(f.parcels||[])[0]?.ownership_type] || (f.parcels||[])[0]?.ownership_type || '—'}</strong></div>
+                    <div class="col-md-6"><small class="text-muted d-block">Land Use Type</small><strong>${landUseLabel[f.land_use_type] || f.land_use_type || '—'}</strong></div>
 
-                    ${f.membership ? `
-                    <div class="col-12 mt-2"><h6 class="text-primary border-bottom pb-1">Cooperative Membership</h6></div>
-                    <div class="col-md-6"><small class="text-muted d-block">Membership No.</small><strong>${f.membership.membership_number || '—'}</strong></div>
-                    <div class="col-md-6"><small class="text-muted d-block">Cooperative</small><strong>${f.membership.cooperative_name || '—'} (${f.membership.cooperative_code || ''})</strong></div>
-                    ` : ''}
+                    <div class="col-12 mt-2"><h6 class="text-primary border-bottom pb-1">Coffee Production</h6></div>
+                    <div class="col-md-6"><small class="text-muted d-block">Coffee Varieties</small><strong>${(f.coffee_varieties||[]).join(', ') || '—'}</strong></div>
+                    <div class="col-md-6"><small class="text-muted d-block">Est. Annual Yield</small><strong>${f.average_annual_production_kg != null ? f.average_annual_production_kg + ' kg' : '—'}</strong></div>
+                    <div class="col-md-6"><small class="text-muted d-block">Years Farming</small><strong>${f.years_farming != null ? f.years_farming : '—'}</strong></div>
+                    <div class="col-md-6"><small class="text-muted d-block">Shade Trees</small><strong>${f.shade_trees_present ? 'Yes' : 'No'}</strong></div>
+                    <div class="col-md-6"><small class="text-muted d-block">Shade Canopy</small><strong>${f.shade_tree_canopy_percent != null ? f.shade_tree_canopy_percent + '%' : '—'}</strong></div>
+                    <div class="col-md-6"><small class="text-muted d-block">Status</small>${statusBadge(f.verification_status)}</div>
+                    <div class="col-md-6"><small class="text-muted d-block">Compliance</small><strong>${f.compliance_status || '—'}</strong></div>
 
                     ${f.parcels?.length ? `
                     <div class="col-12 mt-2"><h6 class="text-primary border-bottom pb-1">Parcels (${f.parcels.length})</h6></div>
                     ${f.parcels.map(p => `
                         <div class="col-md-6"><div class="border rounded p-2">
                             <div class="fw-bold">${p.parcel_name || 'Parcel '+p.parcel_number}</div>
-                            <div class="text-muted small">${p.area_hectares ? p.area_hectares+' ha' : ''} · ${p.land_use_type || ''} · ${statusBadge(p.verification_status)}</div>
+                            <div class="text-muted small">${p.area_hectares ? p.area_hectares+' ha' : ''} · ${landUseLabel[p.land_use_type] || p.land_use_type || ''} · ${statusBadge(p.verification_status)}</div>
                             ${p.boundary_geojson ? '<div class="text-success small"><i class="bi bi-check-circle"></i> GPS polygon captured</div>' : '<div class="text-muted small"><i class="bi bi-circle"></i> No polygon</div>'}
                         </div></div>
                     `).join('')}
@@ -7706,14 +7716,17 @@ class PlotraDashboard {
                 farmData.calculated_area_ha = parseFloat((this.calculatePolygonArea(polygonCoords) / 10000).toFixed(4));
             }
 
-            // Map farming_method to valid LandUseTypeEnum values
+            // farming_method values in the form already match LandUseTypeEnum directly
+            // (monocrop, mixed_cropping, agroforestry, forest_reserve, buffer_zone)
             const landUseMap = {
                 'agroforestry': 'agroforestry', 'monocrop': 'monocrop', 'mono crop': 'monocrop',
-                'mono-crop': 'monocrop', 'mixed': 'mixed_cropping', 'mixed cropping': 'mixed_cropping',
-                'mixed_cropping': 'mixed_cropping', 'forest': 'forest_reserve', 'forest_reserve': 'forest_reserve',
-                'buffer': 'buffer_zone', 'buffer_zone': 'buffer_zone'
+                'mono-crop': 'monocrop', 'mixed': 'mixed_cropping', 'mixed crop': 'mixed_cropping',
+                'mixed cropping': 'mixed_cropping', 'mixed_cropping': 'mixed_cropping',
+                'forest': 'forest_reserve', 'forest_reserve': 'forest_reserve',
+                'buffer': 'buffer_zone', 'buffer_zone': 'buffer_zone',
+                'other': 'other',
             };
-            const landUseType = landUseMap[(farmData.farming_method || '').toLowerCase()] || 'agroforestry';
+            const landUseType = landUseMap[(farmData.farming_method || '').toLowerCase()] || farmData.farming_method || 'agroforestry';
 
             // coffee_variety is already an array from the checkboxes
             const coffeeVarieties = Array.isArray(farmData.coffee_variety)
@@ -7736,6 +7749,7 @@ class PlotraDashboard {
                 farm_code: farmCodeRaw || undefined,
                 total_area_hectares: farmData.calculated_area_ha || farmData.approximate_size_ha,
                 coffee_varieties: coffeeVarieties,
+                land_use_type: landUseType,
                 years_farming: farmData.farm_established_year ? new Date().getFullYear() - farmData.farm_established_year : null,
                 average_annual_production_kg: farmData.estimated_annual_yield_kg,
                 centroid_lat: hasPolygon ? this.gpsPoints.reduce((s, p) => s + p.lat, 0) / this.gpsPoints.length : null,
@@ -9890,13 +9904,13 @@ class PlotraDashboard {
                 </div>
                 <div class="col-md-6 col-lg-4">
                   <label class="form-label small fw-semibold">Land Ownership</label>
-                  <input class="form-control form-control-sm" value="${fv((parcel.ownership_type||'').replace(/_/g,' '))}" placeholder="—" readonly style="background:#f8f3ee;">
+                  <input class="form-control form-control-sm" value="${fv(({'owned':'Title Deed (Owned)','leased':'Lease Agreement','inherited':'Family Plot / Inherited','customary':'Customary Tenure','community':'Community Land','tenant':'Tenant'}[parcel.ownership_type] || (parcel.ownership_type||'').replace(/_/g,' ')))" placeholder="—" readonly style="background:#f8f3ee;">
                 </div>
                 <div class="col-md-6 col-lg-4">
                   <label class="form-label small fw-semibold">Land Use Type</label>
                   <select class="form-select form-select-sm" name="land_use_type">
-                    ${['AGROFORESTRY','MONOCULTURE','MIXED_FARMING','FOREST','DEGRADED'].map(o =>
-                      `<option value="${o}" ${(farm.land_use_type||'').toUpperCase()===o?'selected':''}>${o.replace(/_/g,' ')}</option>`
+                    ${[['agroforestry','Agroforestry'],['monocrop','Monocrop'],['mixed_cropping','Mixed Cropping'],['forest_reserve','Forest Reserve'],['buffer_zone','Buffer Zone'],['other','Other']].map(([v,l]) =>
+                      `<option value="${v}" ${(farm.land_use_type||'') === v ? 'selected' : ''}>${l}</option>`
                     ).join('')}
                   </select>
                 </div>
