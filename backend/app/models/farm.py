@@ -212,7 +212,11 @@ class Farm(BaseModel):
     
     # Land use
     land_use_type = Column(Enum(LandUseType), default=LandUseType.AGROFORESTRY)
-    
+
+    # Agroforestry / sustainability snapshot (captured at registration)
+    shade_trees_present = Column(Integer, default=0)       # 0=no, 1=yes
+    shade_tree_canopy_percent = Column(Integer, nullable=True)
+
     # EUDR compliance
     deforestation_risk_score = Column(Float, default=0.0)  # 0-100
     last_satellite_analysis = Column(DateTime, nullable=True)

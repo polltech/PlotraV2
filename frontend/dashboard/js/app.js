@@ -9912,8 +9912,9 @@ class PlotraDashboard {
                 <div class="col-md-6 col-lg-4">
                   <label class="form-label small fw-semibold">Farming Method</label>
                   <select class="form-select form-select-sm" name="farming_method">
+                    <option value="">— Not specified —</option>
                     ${['Organic','Conventional','Agroforestry','Shade-grown','Mixed'].map(o =>
-                      `<option value="${o}" ${(farm.farming_method||''===o)?'selected':''}>${o}</option>`
+                      `<option value="${o}" ${(farm.farming_method||'') === o ? 'selected' : ''}>${o}</option>`
                     ).join('')}
                   </select>
                 </div>
@@ -9928,13 +9929,13 @@ class PlotraDashboard {
                 <div class="col-md-6 col-lg-4">
                   <label class="form-label small fw-semibold">Shade Trees Present</label>
                   <select class="form-select form-select-sm" name="shade_trees">
-                    <option value="yes" ${farm.shade_trees_present?'selected':''}>Yes</option>
-                    <option value="no" ${!farm.shade_trees_present?'selected':''}>No</option>
+                    <option value="yes" ${farm.shade_trees_present === true || farm.shade_trees_present === 1 ? 'selected' : ''}>Yes</option>
+                    <option value="no" ${farm.shade_trees_present !== true && farm.shade_trees_present !== 1 ? 'selected' : ''}>No</option>
                   </select>
                 </div>
                 <div class="col-md-6 col-lg-4">
                   <label class="form-label small fw-semibold">Shade Canopy (%)</label>
-                  <input type="number" class="form-control form-control-sm" name="shade_tree_canopy_percent" value="${fv(farm.shade_tree_canopy_percent)}" min="0" max="100" placeholder="0">
+                  <input type="number" class="form-control form-control-sm" name="shade_tree_canopy_percent" value="${farm.shade_tree_canopy_percent != null ? farm.shade_tree_canopy_percent : ''}" min="0" max="100" placeholder="—">
                 </div>
               </div>
 
@@ -10064,6 +10065,8 @@ class PlotraDashboard {
             });
             // Coffee varieties → array
             if (data.coffee_varieties) data.coffee_varieties = data.coffee_varieties.split(',').map(s => s.trim()).filter(Boolean);
+            // shade_trees select → boolean integer
+            if ('shade_trees' in data) { data.shade_trees_present = data.shade_trees === 'yes' ? 1 : 0; delete data.shade_trees; }
 
             await api.updateFarm(farmId, data);
             this.showToast('Farm saved successfully', 'success');

@@ -69,7 +69,15 @@ def _farm_to_dict(farm: Farm) -> dict:
         farmer_national_id = getattr(owner, 'national_id', None)
         farmer_gender = getattr(owner, 'gender', None)
         farmer_location = getattr(owner, 'subcounty', None) or getattr(owner, 'county', None) or getattr(owner, 'district', None)
-        coop_member_no = getattr(owner, 'cooperative_member_no', None) or getattr(owner, 'membership_number', None)
+        # Pull membership_number from the eager-loaded cooperative_memberships relation
+        try:
+            memberships = owner.cooperative_memberships
+            coop_member_no = next(
+                (m.membership_number for m in memberships if m.is_active and m.membership_number),
+                None
+            )
+        except Exception:
+            coop_member_no = None
 
     parcels = []
     for p in (farm.parcels or []):
@@ -117,6 +125,8 @@ def _farm_to_dict(farm: Farm) -> dict:
         "verification_status": farm.verification_status,
         "centroid_lat": farm.centroid_lat,
         "centroid_lon": farm.centroid_lon,
+        "shade_trees_present": bool(farm.shade_trees_present),
+        "shade_tree_canopy_percent": farm.shade_tree_canopy_percent,
         "parcels": parcels,
         "created_at": farm.created_at.isoformat() if farm.created_at else None,
         "farmer_name": farmer_name,
@@ -190,10 +200,18 @@ async def create_farm(
     sustainability = farm_data.sustainability or {}
     land_parcel_extra = farm_data.land_parcel or {}
 
-    # Update user with any new farmer details
+    # Update user with any new farmer details collected on the add-farm form
     farmer_info = farm_data.farmer or {}
-    if farmer_info.get('cooperative_member_no') and hasattr(current_user, 'cooperative_member_no'):
-        current_user.cooperative_member_no = farmer_info['cooperative_member_no']
+    if farmer_info.get('gender') and hasattr(current_user, 'gender'):
+        current_user.gender = farmer_info['gender']
+    # cooperative_member_no lives on CooperativeMember, not User — update the membership row
+    new_member_no = farmer_info.get('cooperative_member_no')
+    if new_member_no and membership:
+        membership.membership_number = new_member_no
+
+    # Save shade/canopy snapshot on the farm row
+    farm.shade_trees_present = 1 if sustainability.get('shade_trees_present') else 0
+    farm.shade_tree_canopy_percent = sustainability.get('shade_tree_canopy_percent') or sustainability.get('shade_canopy_percent')
 
     for parcel_data in farm_data.parcels:
         geojson_str = json.dumps(parcel_data.boundary_geojson)
@@ -230,7 +248,10 @@ async def create_farm(
 
     from sqlalchemy.orm import selectinload
     result2 = await db.execute(
-        select(Farm).options(selectinload(Farm.parcels), selectinload(Farm.owner)).where(Farm.id == farm.id)
+        select(Farm).options(
+            selectinload(Farm.parcels),
+            selectinload(Farm.owner).selectinload("cooperative_memberships"),
+        ).where(Farm.id == farm.id)
     )
     farm = result2.scalar_one()
     return _farm_to_dict(farm)
@@ -245,7 +266,10 @@ async def get_farms(
     from sqlalchemy.orm import selectinload
     result = await db.execute(
         select(Farm)
-        .options(selectinload(Farm.parcels), selectinload(Farm.owner))
+        .options(
+            selectinload(Farm.parcels),
+            selectinload(Farm.owner).selectinload("cooperative_memberships"),
+        )
         .where(Farm.owner_id == current_user.id, Farm.deleted_at == None)
         .order_by(Farm.created_at.desc())
     )
@@ -261,7 +285,10 @@ async def get_farm_by_id(
 ):
     from sqlalchemy.orm import selectinload
     result = await db.execute(
-        select(Farm).options(selectinload(Farm.parcels), selectinload(Farm.owner))
+        select(Farm).options(
+            selectinload(Farm.parcels),
+            selectinload(Farm.owner).selectinload("cooperative_memberships"),
+        )
         .where(Farm.id == farm_id, Farm.owner_id == current_user.id, Farm.deleted_at == None)
     )
     farm = result.scalar_one_or_none()
@@ -292,6 +319,7 @@ async def update_farm(
         "farm_name", "farm_code", "total_area_hectares", "coffee_area_hectares",
         "coffee_varieties", "years_farming", "average_annual_production_kg",
         "land_use_type", "compliance_status", "notes",
+        "shade_trees_present", "shade_tree_canopy_percent", "farming_method",
     ]
     for field in editable_fields:
         if field in payload and payload[field] is not None:
