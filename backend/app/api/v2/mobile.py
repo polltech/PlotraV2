@@ -185,7 +185,6 @@ class FarmCreateMobile(BaseModel):
     farm_name: str = Field(..., min_length=1)
     county: str = Field(..., min_length=1)
     sub_county: Optional[str] = None
-    village: Optional[str] = None
     coffee_trees: Optional[int] = None
     land_use_type: Optional[str] = "agroforestry"
 
@@ -262,7 +261,6 @@ async def create_farm_mobile(
     farm.admin_notes = (
         f"county={payload.county}"
         + (f"|sub_county={payload.sub_county}" if payload.sub_county else "")
-        + (f"|village={payload.village}" if payload.village else "")
         + (f"|coffee_trees={payload.coffee_trees}" if payload.coffee_trees else "")
     )
 
