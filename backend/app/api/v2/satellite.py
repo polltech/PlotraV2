@@ -464,3 +464,221 @@ async def get_batch_stats(
         "high_cloud_analyses": stats.high_cloud or 0,
         "meets_confidence_kpi": (stats.avg_ndvi or 0) > 0.5
     }
+
+
+# ---------------------------------------------------------------------------
+# Real-data-only endpoint — returns only genuine Sentinel-2 measurements
+# ---------------------------------------------------------------------------
+
+def _interpret_ndvi(v: float) -> tuple[str, str]:
+    if v >= 0.7: return "good", "Dense, healthy vegetation. Canopy is well-established and actively photosynthesising."
+    if v >= 0.5: return "good", "Moderate-to-good vegetation. Crop or canopy cover is healthy."
+    if v >= 0.3: return "moderate", "Sparse or stressed vegetation. Could indicate dry season, young plants, or partial bare soil."
+    if v >= 0.1: return "low", "Very sparse vegetation or stressed plants. Soil is likely exposed."
+    return "critical", "Bare soil or non-vegetated surface. No significant plant cover detected."
+
+def _interpret_evi(v: float) -> tuple[str, str]:
+    if v >= 0.5: return "good", "High vegetation density. EVI accounts for atmospheric effects better than NDVI in dense canopies."
+    if v >= 0.3: return "good", "Moderate vegetation. Reliable signal with low atmospheric interference."
+    if v >= 0.1: return "moderate", "Low-to-moderate vegetation. Possible stress or sparse canopy."
+    return "low", "Minimal vegetation detected. Atmospheric correction applied but signal is weak."
+
+def _interpret_savi(v: float) -> tuple[str, str]:
+    if v >= 0.5: return "good", "Strong vegetation with low soil background influence. Healthy, dense cover."
+    if v >= 0.3: return "good", "Good vegetation signal after soil correction. Reliable for sparse-to-medium crops."
+    if v >= 0.1: return "moderate", "Sparse vegetation — soil background is contributing significantly to the signal."
+    return "low", "Predominantly bare soil. Very little plant cover above ground."
+
+def _interpret_ndmi(v: float) -> tuple[str, str]:
+    if v >= 0.2:  return "good",     "High leaf moisture content. Plants are well-hydrated and canopy is dense."
+    if v >= 0.0:  return "good",     "Adequate leaf moisture. No signs of water stress."
+    if v >= -0.2: return "moderate", "Moderate moisture stress detected. Canopy may be thinning or plants experiencing mild water deficit."
+    if v >= -0.4: return "low",      "Significant moisture stress. Canopy is likely sparse and plants may be experiencing drought conditions."
+    return "critical", "Severe water stress or very sparse dry vegetation."
+
+def _interpret_ndwi(v: float) -> tuple[str, str]:
+    if v >= 0.3:  return "low",      "Strong water signal. Surface water present in the parcel or waterlogged soil."
+    if v >= 0.0:  return "moderate", "Mild water presence or very moist soil. Could indicate irrigation or recent rainfall."
+    if v >= -0.2: return "good",     "Normal dry-land conditions. No excess surface water."
+    return "good", "Dry surface. No surface water detected. Vegetation is the dominant reflector."
+
+
+@router.get("/parcel/{parcel_id}/real-data")
+async def get_real_satellite_data(
+    parcel_id: str,
+    acquisition_date: Optional[str] = None,
+    current_user: User = Depends(require_plotra_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Returns ONLY genuine Sentinel-2 measurements for a parcel — no derived
+    estimates, no models, no fixed-ratio calculations.
+
+    Every value here is computed directly from satellite spectral bands.
+    """
+    from sqlalchemy.orm import selectinload
+    from app.services.satellite_analysis import _load_satellite_credentials, _get_sentinel_hub_token, _fetch_sentinel_hub_indices
+
+    result = await db.execute(
+        select(LandParcel)
+        .options(selectinload(LandParcel.farm))
+        .where(LandParcel.id == parcel_id)
+    )
+    parcel = result.scalar_one_or_none()
+    if not parcel:
+        raise HTTPException(status_code=404, detail="Parcel not found")
+    if not parcel.boundary_geojson:
+        raise HTTPException(status_code=400, detail="Parcel has no GPS boundary — capture the boundary first.")
+
+    acq_dt = datetime.utcnow()
+    if acquisition_date:
+        try:
+            acq_dt = datetime.fromisoformat(acquisition_date)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid acquisition_date format — use YYYY-MM-DD")
+
+    creds = await _load_satellite_credentials()
+    token = await _get_sentinel_hub_token(
+        creds.get("oauth_client_id", ""),
+        creds.get("oauth_client_secret", ""),
+    )
+
+    coords = parcel.boundary_geojson.get("coordinates", [[]])[0]
+    raw = await _fetch_sentinel_hub_indices(token, coords, acq_dt)
+
+    cloud = raw["cloud_cover_percentage"]
+    if   cloud <= 10: quality, quality_label = "excellent", "Excellent — less than 10% cloud cover"
+    elif cloud <= 25: quality, quality_label = "good",      "Good — cloud cover is low"
+    elif cloud <= 50: quality, quality_label = "moderate",  "Moderate — some pixels were masked by cloud"
+    else:             quality, quality_label = "poor",      "Poor — more than half the parcel was covered by cloud"
+
+    from datetime import timedelta
+    window_from = (acq_dt - timedelta(days=90)).strftime("%Y-%m-%d")
+    window_to   = acq_dt.strftime("%Y-%m-%d")
+
+    ndvi_status, ndvi_note = _interpret_ndvi(raw["ndvi_mean"])
+    evi_status,  evi_note  = _interpret_evi(raw["evi"])
+    savi_status, savi_note = _interpret_savi(raw["savi"])
+    ndmi_status, ndmi_note = _interpret_ndmi(raw["ndmi"])
+    ndwi_status, ndwi_note = _interpret_ndwi(raw["ndwi"])
+
+    return {
+        "parcel_id":   parcel_id,
+        "parcel_name": parcel.parcel_name or parcel.parcel_number,
+        "farm_name":   getattr(parcel.farm, "farm_name", None),
+        "farm_id":     parcel.farm_id,
+
+        "image": {
+            "source":        "Copernicus Sentinel-2 L2A",
+            "resolution_m":  20,
+            "window_from":   window_from,
+            "window_to":     window_to,
+            "acquired_at":   acq_dt.strftime("%Y-%m-%d"),
+            "cloud_cover_pct": cloud,
+            "data_quality":  quality,
+            "data_quality_label": quality_label,
+            "note": "A 90-day window is searched. The clearest available image in that period is used."
+        },
+
+        "indices": {
+            "ndvi": {
+                "label":           "NDVI — Normalized Difference Vegetation Index",
+                "mean":            raw["ndvi_mean"],
+                "min":             raw["ndvi_min"],
+                "max":             raw["ndvi_max"],
+                "std_dev":         raw["ndvi_std_dev"],
+                "unit":            "ratio (dimensionless)",
+                "scale":           [-1, 1],
+                "healthy_range":   [0.4, 0.9],
+                "bands_used":      "B08 (NIR) and B04 (Red)",
+                "formula":         "(B08 − B04) / (B08 + B04)",
+                "what_it_measures": (
+                    "How green and dense the vegetation is. "
+                    "Healthy green plants strongly absorb red light (B04) for photosynthesis "
+                    "and strongly reflect near-infrared (B08). "
+                    "A high NDVI means healthy, dense plants. "
+                    "A low NDVI means bare soil, stressed, or dead vegetation."
+                ),
+                "status":          ndvi_status,
+                "interpretation":  ndvi_note,
+            },
+            "evi": {
+                "label":           "EVI — Enhanced Vegetation Index",
+                "value":           raw["evi"],
+                "unit":            "ratio (dimensionless)",
+                "scale":           [-1, 1],
+                "healthy_range":   [0.2, 0.8],
+                "bands_used":      "B08 (NIR), B04 (Red), B02 (Blue)",
+                "formula":         "2.5 × (B08 − B04) / (B08 + 6×B04 − 7.5×B02 + 1)",
+                "what_it_measures": (
+                    "Similar to NDVI but corrects for atmospheric haze (using B02 Blue band) "
+                    "and soil background signal. "
+                    "More accurate than NDVI in very dense canopies where NDVI saturates. "
+                    "Best used for agroforestry parcels with thick tree cover."
+                ),
+                "status":          evi_status,
+                "interpretation":  evi_note,
+            },
+            "savi": {
+                "label":           "SAVI — Soil-Adjusted Vegetation Index",
+                "value":           raw["savi"],
+                "unit":            "ratio (dimensionless)",
+                "scale":           [-1, 1],
+                "healthy_range":   [0.2, 0.7],
+                "bands_used":      "B08 (NIR) and B04 (Red)",
+                "formula":         "1.5 × (B08 − B04) / (B08 + B04 + 0.5)",
+                "what_it_measures": (
+                    "Vegetation signal corrected for bare soil influence. "
+                    "The factor 0.5 reduces the effect of soil reflectance. "
+                    "More reliable than NDVI in young plantations or sparse crops "
+                    "where significant bare soil is visible between plants. "
+                    "Useful for detecting early-stage crop growth."
+                ),
+                "status":          savi_status,
+                "interpretation":  savi_note,
+            },
+            "ndmi": {
+                "label":           "NDMI — Normalized Difference Moisture Index",
+                "value":           raw["ndmi"],
+                "unit":            "ratio (dimensionless)",
+                "scale":           [-1, 1],
+                "healthy_range":   [0.0, 0.6],
+                "bands_used":      "B8A (Red-Edge NIR) and B11 (SWIR)",
+                "formula":         "(B8A − B11) / (B8A + B11)",
+                "what_it_measures": (
+                    "Water content inside plant leaves and in the canopy. "
+                    "SWIR (B11) is absorbed by water — when plants are well-watered "
+                    "B11 is low and NDMI is high. "
+                    "A dropping NDMI over time indicates drought stress, "
+                    "even before NDVI shows any change. "
+                    "Key indicator for irrigation management decisions."
+                ),
+                "status":          ndmi_status,
+                "interpretation":  ndmi_note,
+            },
+            "ndwi": {
+                "label":           "NDWI — Normalized Difference Water Index",
+                "value":           raw["ndwi"],
+                "unit":            "ratio (dimensionless)",
+                "scale":           [-1, 1],
+                "healthy_range":   [-0.3, 0.1],
+                "bands_used":      "B03 (Green) and B08 (NIR)",
+                "formula":         "(B03 − B08) / (B03 + B08)",
+                "what_it_measures": (
+                    "Surface water presence. "
+                    "Open water reflects green light (B03) and absorbs NIR (B08), "
+                    "giving a positive NDWI. Dry land gives a negative value. "
+                    "Useful for detecting flooded areas, irrigation ponds, "
+                    "or waterlogged parcels after heavy rain."
+                ),
+                "status":          ndwi_status,
+                "interpretation":  ndwi_note,
+            },
+        },
+
+        "disclaimer": (
+            "All values above are direct mathematical calculations on real Sentinel-2 spectral bands. "
+            "No models, machine learning, or fixed ratios were used. "
+            "Resolution: 20 metres per pixel — parcels smaller than 400 m² may have unreliable results."
+        ),
+    }
