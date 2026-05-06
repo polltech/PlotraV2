@@ -72,7 +72,7 @@ router = APIRouter(
 
 # ── Default account provisioning ──────────────────────────────────────────────
 
-@router.post("/setup")
+@router.post("/mobile/setup")
 async def setup_defaults(db: AsyncSession = Depends(get_db)):
     """
     Idempotent — safe to call every time the app opens.
@@ -194,7 +194,7 @@ def _random_suffix(n: int = 4) -> str:
     return "".join(random.choices(string.ascii_uppercase + string.digits, k=n))
 
 
-@router.post("/farms/create", status_code=201)
+@router.post("/mobile/farms/create", status_code=201)
 async def create_farm_mobile(
     payload: FarmCreateMobile,
     db: AsyncSession = Depends(get_db),
