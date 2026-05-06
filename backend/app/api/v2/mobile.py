@@ -187,6 +187,7 @@ class FarmCreateMobile(BaseModel):
     sub_county: Optional[str] = None
     coffee_trees: Optional[int] = None
     land_use_type: Optional[str] = "agroforestry"
+    farm_code: Optional[str] = None  # if provided, use as-is; else auto-generate
 
 
 def _random_suffix(n: int = 4) -> str:
@@ -230,16 +231,23 @@ async def create_farm_mobile(
     }
     lut = land_use_map.get((payload.land_use_type or "agroforestry").lower(), LandUseType.AGROFORESTRY)
 
-    # Generate unique farm_code
-    date_str = datetime.utcnow().strftime("%Y%m%d")
-    for _ in range(10):
-        candidate = f"APP-{date_str}-{_random_suffix()}"
-        existing = await db.execute(select(Farm).where(Farm.farm_code == candidate))
-        if not existing.scalar_one_or_none():
-            farm_code = candidate
-            break
+    # Resolve farm_code: use provided one or auto-generate
+    if payload.farm_code:
+        clean_code = payload.farm_code.strip().upper()
+        dup = await db.execute(select(Farm).where(Farm.farm_code == clean_code))
+        if dup.scalar_one_or_none():
+            raise HTTPException(status_code=409, detail=f"Farm code '{clean_code}' already exists.")
+        farm_code = clean_code
     else:
-        farm_code = f"APP-{uuid.uuid4().hex[:10].upper()}"
+        date_str = datetime.utcnow().strftime("%Y%m%d")
+        for _ in range(10):
+            candidate = f"APP-{date_str}-{_random_suffix()}"
+            existing = await db.execute(select(Farm).where(Farm.farm_code == candidate))
+            if not existing.scalar_one_or_none():
+                farm_code = candidate
+                break
+        else:
+            farm_code = f"APP-{uuid.uuid4().hex[:10].upper()}"
 
     farm = Farm(
         id=str(uuid.uuid4()),
@@ -276,8 +284,13 @@ async def create_farm_mobile(
         "farm_id": farm.id,
         "farm_code": farm.farm_code,
         "farm_name": farm.farm_name,
+        "county": payload.county,
+        "sub_county": payload.sub_county,
+        "coffee_trees": payload.coffee_trees,
+        "land_use_type": (payload.land_use_type or "agroforestry"),
         "status": "admin_approved",
-        "farmer_email": DEFAULT_FARMER_EMAIL,
+        "farmer": f"{DEFAULT_FARMER_FIRST} {DEFAULT_FARMER_LAST}",
+        "cooperative": DEFAULT_COOP_NAME,
     }
 
 
