@@ -12,7 +12,7 @@ DDL = [
 ]
 
 async def main():
-    engine = create_async_engine(settings.database_url, echo=True)
+    engine = create_async_engine(settings.database.async_url, echo=True)
     async with engine.begin() as conn:
         for stmt in DDL:
             try:
