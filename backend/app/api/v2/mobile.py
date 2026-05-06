@@ -1,12 +1,15 @@
 """
 Mobile App API — API-key authenticated endpoints for field agents.
-Handles farm lookup by farm_code and polygon capture submission.
+Handles farm lookup, farm creation, polygon capture submission,
+and auto-provisioning of the default Polygon Cooperative + Farmer.
 
 Security:
   - All endpoints require X-API-Key header (enforced at router level via dependencies=[])
   - API key is read from PLOTRA_MOBILE__API_KEY env var, not hardcoded
   - Simple per-IP rate limiting (PLOTRA_MOBILE__RATE_LIMIT_PER_MINUTE, default 60/min)
 """
+import random
+import string
 import time
 import uuid
 from collections import defaultdict
@@ -18,9 +21,27 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.auth import get_password_hash
 from app.core.config import settings
 from app.core.database import get_db
-from app.models.farm import Farm, LandParcel
+from app.models.farm import Farm, LandParcel, LandUseType
+from app.models.user import (
+    Cooperative, CooperativeMember, User, UserRole, UserStatus, VerificationStatus
+)
+
+# ── Default Polygon accounts ───────────────────────────────────────────────────
+
+DEFAULT_COOP_CODE    = "POLYCOOP"
+DEFAULT_COOP_NAME    = "Polygon Cooperative"
+DEFAULT_OFFICER_EMAIL    = "officer@polygoncoop.eu"
+DEFAULT_OFFICER_PASSWORD = "PolyOfficer2024!"
+DEFAULT_OFFICER_FIRST    = "Polygon"
+DEFAULT_OFFICER_LAST     = "Officer"
+
+DEFAULT_FARMER_EMAIL    = "farmer@polygoncoop.eu"
+DEFAULT_FARMER_PASSWORD = "PolyFarmer2024!"
+DEFAULT_FARMER_FIRST    = "Polygon"
+DEFAULT_FARMER_LAST     = "Farmer"
 
 # ── Auth & rate-limit helpers ──────────────────────────────────────────────────
 
@@ -47,6 +68,219 @@ router = APIRouter(
     tags=["Mobile App"],
     dependencies=[Depends(verify_api_key), Depends(rate_limit)],
 )
+
+
+# ── Default account provisioning ──────────────────────────────────────────────
+
+@router.post("/setup")
+async def setup_defaults(db: AsyncSession = Depends(get_db)):
+    """
+    Idempotent — safe to call every time the app opens.
+    Creates Polygon Cooperative, Cooperative Officer, and Polygon Farmer
+    if they don't already exist. Returns IDs and login credentials.
+    """
+
+    # 1. Cooperative
+    coop_result = await db.execute(
+        select(Cooperative).where(Cooperative.code == DEFAULT_COOP_CODE)
+    )
+    coop = coop_result.scalar_one_or_none()
+    if not coop:
+        coop = Cooperative(
+            id=str(uuid.uuid4()),
+            name=DEFAULT_COOP_NAME,
+            code=DEFAULT_COOP_CODE,
+            email=DEFAULT_OFFICER_EMAIL,
+            country="Kenya",
+            is_active=True,
+            verification_status="admin_approved",
+        )
+        db.add(coop)
+        await db.flush()
+
+    # 2. Cooperative officer
+    officer_result = await db.execute(
+        select(User).where(User.email == DEFAULT_OFFICER_EMAIL)
+    )
+    officer = officer_result.scalar_one_or_none()
+    if not officer:
+        officer = User(
+            id=str(uuid.uuid4()),
+            email=DEFAULT_OFFICER_EMAIL,
+            password_hash=get_password_hash(DEFAULT_OFFICER_PASSWORD),
+            first_name=DEFAULT_OFFICER_FIRST,
+            last_name=DEFAULT_OFFICER_LAST,
+            role=UserRole.COOPERATIVE_OFFICER,
+            status=UserStatus.ACTIVE,
+            verification_status=VerificationStatus.VERIFIED,
+            is_active=True,
+            cooperative_id=coop.id,
+            data_consent=True,
+        )
+        db.add(officer)
+        await db.flush()
+        # Link as primary officer
+        if not coop.primary_officer_id:
+            coop.primary_officer_id = officer.id
+
+    # 3. Farmer
+    farmer_result = await db.execute(
+        select(User).where(User.email == DEFAULT_FARMER_EMAIL)
+    )
+    farmer = farmer_result.scalar_one_or_none()
+    if not farmer:
+        farmer = User(
+            id=str(uuid.uuid4()),
+            email=DEFAULT_FARMER_EMAIL,
+            password_hash=get_password_hash(DEFAULT_FARMER_PASSWORD),
+            first_name=DEFAULT_FARMER_FIRST,
+            last_name=DEFAULT_FARMER_LAST,
+            role=UserRole.FARMER,
+            status=UserStatus.ACTIVE,
+            verification_status=VerificationStatus.VERIFIED,
+            is_active=True,
+            cooperative_id=coop.id,
+            data_consent=True,
+        )
+        db.add(farmer)
+        await db.flush()
+
+        # Cooperative membership
+        membership = CooperativeMember(
+            id=str(uuid.uuid4()),
+            user_id=farmer.id,
+            cooperative_id=coop.id,
+            membership_number="PF-001",
+            membership_type="regular",
+            is_active=True,
+        )
+        db.add(membership)
+
+    await db.commit()
+
+    return {
+        "cooperative": {
+            "id": coop.id,
+            "name": DEFAULT_COOP_NAME,
+            "code": DEFAULT_COOP_CODE,
+        },
+        "officer": {
+            "id": officer.id,
+            "email": DEFAULT_OFFICER_EMAIL,
+            "password": DEFAULT_OFFICER_PASSWORD,
+            "name": f"{DEFAULT_OFFICER_FIRST} {DEFAULT_OFFICER_LAST}",
+        },
+        "farmer": {
+            "id": farmer.id,
+            "email": DEFAULT_FARMER_EMAIL,
+            "password": DEFAULT_FARMER_PASSWORD,
+            "name": f"{DEFAULT_FARMER_FIRST} {DEFAULT_FARMER_LAST}",
+        },
+    }
+
+
+# ── Create farm (mobile add-farm flow) ────────────────────────────────────────
+
+class FarmCreateMobile(BaseModel):
+    farm_name: str = Field(..., min_length=1)
+    county: str = Field(..., min_length=1)
+    sub_county: Optional[str] = None
+    village: Optional[str] = None
+    coffee_trees: Optional[int] = None
+    land_use_type: Optional[str] = "agroforestry"
+
+
+def _random_suffix(n: int = 4) -> str:
+    return "".join(random.choices(string.ascii_uppercase + string.digits, k=n))
+
+
+@router.post("/farms/create", status_code=201)
+async def create_farm_mobile(
+    payload: FarmCreateMobile,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Create a new farm linked to the default Polygon Farmer.
+    Farm is auto-approved so polygon capture works immediately.
+    Returns farm_id and farm_code.
+    """
+    # Resolve default farmer
+    farmer_result = await db.execute(
+        select(User).where(User.email == DEFAULT_FARMER_EMAIL)
+    )
+    farmer = farmer_result.scalar_one_or_none()
+    if not farmer:
+        raise HTTPException(
+            status_code=409,
+            detail="Default Polygon Farmer not found. Call /mobile/setup first.",
+        )
+
+    # Resolve cooperative
+    coop_result = await db.execute(
+        select(Cooperative).where(Cooperative.code == DEFAULT_COOP_CODE)
+    )
+    coop = coop_result.scalar_one_or_none()
+
+    # Parse land use type
+    land_use_map = {
+        "agroforestry": LandUseType.AGROFORESTRY,
+        "monocrop": LandUseType.MONOCROP,
+        "mixed_cropping": LandUseType.MIXED_CROPPING,
+        "forest_reserve": LandUseType.FOREST_RESERVE,
+        "buffer_zone": LandUseType.BUFFER_ZONE,
+    }
+    lut = land_use_map.get((payload.land_use_type or "agroforestry").lower(), LandUseType.AGROFORESTRY)
+
+    # Generate unique farm_code
+    date_str = datetime.utcnow().strftime("%Y%m%d")
+    for _ in range(10):
+        candidate = f"APP-{date_str}-{_random_suffix()}"
+        existing = await db.execute(select(Farm).where(Farm.farm_code == candidate))
+        if not existing.scalar_one_or_none():
+            farm_code = candidate
+            break
+    else:
+        farm_code = f"APP-{uuid.uuid4().hex[:10].upper()}"
+
+    farm = Farm(
+        id=str(uuid.uuid4()),
+        owner_id=farmer.id,
+        cooperative_id=coop.id if coop else None,
+        farm_name=payload.farm_name,
+        farm_code=farm_code,
+        land_use_type=lut,
+        # Location
+        verification_status="admin_approved",
+        coop_status="coop_approved",
+        compliance_status="Under Review",
+    )
+
+    # Store extra fields in kyc_data on the farmer (farm has no county column directly)
+    # Use farm_name to embed location context; actual location stored via parcel later
+    # Save county/sub_county/village into a notes field if available via JSON
+    # We'll repurpose the admin_notes field as a metadata store for mobile-created farms
+    farm.admin_notes = (
+        f"county={payload.county}"
+        + (f"|sub_county={payload.sub_county}" if payload.sub_county else "")
+        + (f"|village={payload.village}" if payload.village else "")
+        + (f"|coffee_trees={payload.coffee_trees}" if payload.coffee_trees else "")
+    )
+
+    if payload.coffee_trees:
+        # Store estimated coffee plants — will be saved to parcel when polygon is captured
+        farm.average_annual_production_kg = None
+
+    db.add(farm)
+    await db.commit()
+    await db.refresh(farm)
+
+    return {
+        "farm_id": farm.id,
+        "farm_code": farm.farm_code,
+        "farm_name": farm.farm_name,
+        "status": "admin_approved",
+        "farmer_email": DEFAULT_FARMER_EMAIL,
+    }
 
 
 # ── Farm lookup ────────────────────────────────────────────────────────────────
