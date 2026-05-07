@@ -9851,6 +9851,8 @@ class PlotraDashboard {
             const cvStr = Array.isArray(farm.coffee_varieties) ? farm.coffee_varieties.join(', ') : (farm.coffee_varieties || '');
 
             const fv = (v) => v != null && v !== '' ? v : '';
+            const _ownershipMap = {owned:'Title Deed (Owned)',leased:'Lease Agreement',inherited:'Family Plot / Inherited',customary:'Customary Tenure',community:'Community Land',tenant:'Tenant'};
+            const ownershipLabel = fv(_ownershipMap[parcel.ownership_type] || (parcel.ownership_type||'').split('_').join(' '));
 
             content.innerHTML = `
             <form id="editFarmForm" data-farm-id="${farm.id}" class="p-3 p-md-4">
@@ -9952,7 +9954,7 @@ class PlotraDashboard {
                 </div>
                 <div class="col-md-6 col-lg-4">
                   <label class="form-label small fw-semibold">Land Ownership</label>
-                  <input class="form-control form-control-sm" value="${fv(({'owned':'Title Deed (Owned)','leased':'Lease Agreement','inherited':'Family Plot / Inherited','customary':'Customary Tenure','community':'Community Land','tenant':'Tenant'}[parcel.ownership_type] || (parcel.ownership_type||'').replace(/_/g,' ')))" placeholder="—" readonly style="background:#f8f3ee;">
+                  <input class="form-control form-control-sm" value="${ownershipLabel}" placeholder="—" readonly style="background:#f8f3ee;">
                 </div>
                 <div class="col-md-6 col-lg-4">
                   <label class="form-label small fw-semibold">Land Use Type</label>
