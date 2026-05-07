@@ -720,6 +720,7 @@ async def request_satellite_analysis(
 @router.get("/farm/{farm_id}/satellite-image")
 async def get_farm_satellite_image(
     farm_id: str,
+    date: Optional[str] = None,
     current_user: User = Depends(require_farmer),
     db: AsyncSession = Depends(get_db)
 ):
@@ -765,9 +766,15 @@ async def get_farm_satellite_image(
     client_secret = creds.get("oauth_client_secret", "")
     token = await _get_sentinel_hub_token(client_id, client_secret)
 
-    # Search last 365 days — full year maximises chance of finding a dry-season clear scene
+    # Use caller-supplied date if provided, otherwise today; search the 365-day window ending on that date
     from datetime import timedelta
-    to_dt = datetime.utcnow()
+    if date:
+        try:
+            to_dt = datetime.strptime(date[:10], "%Y-%m-%d").replace(hour=23, minute=59, second=59)
+        except ValueError:
+            to_dt = datetime.utcnow()
+    else:
+        to_dt = datetime.utcnow()
     from_dt = to_dt - timedelta(days=365)
     to_str = to_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
     from_str = from_dt.strftime("%Y-%m-%dT%H:%M:%SZ")

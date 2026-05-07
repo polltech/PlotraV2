@@ -9114,10 +9114,10 @@ class PlotraDashboard {
             this._finaliseAnalysisProgress(completed, failed);
 
             if (completed > 0) {
-                // Update selector to this farm and reload only this farm's analysis
+                // Update selector to this farm and reload analysis + image for the selected date
                 const selector = document.getElementById('analysisFarmSelector');
                 if (selector) selector.value = farmId;
-                this.switchAnalysisFarm(farmId);
+                this.switchAnalysisFarm(farmId, selectedDate);
             }
 
         } catch (error) {
@@ -9771,7 +9771,7 @@ class PlotraDashboard {
         }
     }
 
-    switchAnalysisFarm(farmId) {
+    switchAnalysisFarm(farmId, date = null) {
         if (!farmId) return;
         const setLoading = (id, msg) => {
             const el = document.getElementById(id);
@@ -9782,7 +9782,7 @@ class PlotraDashboard {
         setLoading('treeManagement', 'Loading agroforestry data...');
         setLoading('cropAnalysis', 'Loading crop analysis...');
         this.loadHistoricalAnalysis(farmId);
-        this.loadSatelliteImage(farmId);
+        this.loadSatelliteImage(farmId, date);
         this.loadTreeManagement(farmId);
         this.loadCropAnalysis(farmId);
     }
@@ -9794,12 +9794,13 @@ class PlotraDashboard {
         await this.requestSatelliteAnalysis(farmId);
     }
 
-    async loadSatelliteImage(farmId) {
+    async loadSatelliteImage(farmId, date = null) {
         const panel = document.getElementById('satelliteImagePanel');
         if (!panel) return;
         panel.innerHTML = `<div class="text-center py-5 text-secondary small"><span class="spinner-border spinner-border-sm me-2"></span>Loading satellite image…</div>`;
         try {
-            const data = await api.request(`/farmer/farm/${farmId}/satellite-image`, { optional: true });
+            const qs = date ? `?date=${encodeURIComponent(date)}` : '';
+            const data = await api.request(`/farmer/farm/${farmId}/satellite-image${qs}`, { optional: true });
             if (!data || !data.image_base64) {
                 panel.innerHTML = `
                     <div class="d-flex flex-column align-items-center justify-content-center py-5" style="min-height:180px;">
