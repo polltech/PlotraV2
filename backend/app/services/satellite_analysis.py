@@ -117,8 +117,7 @@ function setup() {
   };
 }
 function evaluatePixel(s) {
-  // SCL: 4=vegetation, 5=bare_soil, 6=water, 7=unclassified — accept all non-cloud/shadow pixels
-  let valid = (s.SCL == 4 || s.SCL == 5 || s.SCL == 6 || s.SCL == 7 || s.SCL == 11) ? 1 : 0;
+  // Accept all pixels regardless of cloud cover (diagnostic mode)
   let ndvi = (s.B08 - s.B04) / (s.B08 + s.B04 + 1e-6);
   let evi  = 2.5 * (s.B08 - s.B04) / (s.B08 + 6*s.B04 - 7.5*s.B02 + 1 + 1e-6);
   let savi = 1.5 * (s.B08 - s.B04) / (s.B08 + s.B04 + 0.5 + 1e-6);
@@ -126,7 +125,7 @@ function evaluatePixel(s) {
   let ndwi = (s.B03 - s.B08) / (s.B03 + s.B08 + 1e-6);
   return {
     ndvi: [ndvi], evi: [evi], savi: [savi],
-    ndmi: [ndmi], ndwi: [ndwi], dataMask: [valid]
+    ndmi: [ndmi], ndwi: [ndwi], dataMask: [1]
   };
 }
 """
