@@ -776,10 +776,42 @@ async def get_farm_satellite_image(
     else:
         to_dt = datetime.utcnow()
     from_dt = to_dt - timedelta(days=365)
-    to_str = to_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
-    from_str = from_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
 
-    # Standard Sentinel Hub true-colour evalscript (sampleType AUTO = no manual 0-255 mapping needed)
+    # Step 1: Use Catalog API to find the single least-cloudy acquisition date in the window.
+    # This avoids multi-scene mosaicking which causes per-pixel color noise.
+    best_scene_from = from_dt
+    best_scene_to = to_dt
+    try:
+        catalog_payload = {
+            "bbox": bbox,
+            "datetime": f"{from_dt.strftime('%Y-%m-%dT%H:%M:%SZ')}/{to_dt.strftime('%Y-%m-%dT%H:%M:%SZ')}",
+            "collections": ["sentinel-2-l2a"],
+            "limit": 50,
+            "sortby": [{"field": "eo:cloud_cover", "direction": "asc"}],
+        }
+        async with httpx.AsyncClient(timeout=30) as client:
+            cat_resp = await client.post(
+                "https://sh.dataspace.copernicus.eu/api/v1/catalog/1.0.0/search",
+                headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+                json=catalog_payload,
+            )
+        if cat_resp.status_code == 200:
+            features = cat_resp.json().get("features", [])
+            if features:
+                best_dt_str = features[0].get("properties", {}).get("datetime", "")
+                if best_dt_str:
+                    best_dt = datetime.fromisoformat(best_dt_str.replace("Z", "+00:00")).replace(tzinfo=None)
+                    best_scene_from = best_dt - timedelta(hours=12)
+                    best_scene_to   = best_dt + timedelta(hours=12)
+                    print(f"[SAT-IMG] Best scene: {best_dt.date()}  cloud={features[0].get('properties',{}).get('eo:cloud_cover','?')}%", flush=True)
+    except Exception as cat_err:
+        print(f"[SAT-IMG] Catalog lookup failed ({cat_err}), falling back to full window", flush=True)
+
+    img_from_str = best_scene_from.strftime("%Y-%m-%dT%H:%M:%SZ")
+    img_to_str   = best_scene_to.strftime("%Y-%m-%dT%H:%M:%SZ")
+    label_from   = best_scene_from.strftime("%Y-%m-%d")
+    label_to     = best_scene_to.strftime("%Y-%m-%d")
+
     evalscript = """
 //VERSION=3
 function setup() {
@@ -808,9 +840,8 @@ function evaluatePixel(s) {
             "data": [{
                 "type": "sentinel-2-l2a",
                 "dataFilter": {
-                    "timeRange": {"from": from_str, "to": to_str},
+                    "timeRange": {"from": img_from_str, "to": img_to_str},
                     "maxCloudCoverage": 100,
-                    "mosaickingOrder": "leastCC"
                 }
             }]
         },
@@ -821,7 +852,6 @@ function evaluatePixel(s) {
         "evalscript": evalscript
     }
 
-    import httpx
     try:
         async with httpx.AsyncClient(timeout=60) as client:
             resp = await client.post(
@@ -840,8 +870,8 @@ function evaluatePixel(s) {
         "image_base64": img_b64,
         "format": "image/png",
         "bbox": bbox,
-        "from_date": from_str[:10],
-        "to_date": to_str[:10],
+        "from_date": label_from,
+        "to_date": label_to,
         "source": "Sentinel-2 L2A via Copernicus Data Space"
     }
 
