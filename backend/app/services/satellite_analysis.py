@@ -144,7 +144,7 @@ async def _fetch_sentinel_hub_indices(token: str, coords: List, acquisition_date
         )
 
     to_date   = acquisition_date.strftime("%Y-%m-%dT23:59:59Z")
-    from_date = (acquisition_date - timedelta(days=90)).strftime("%Y-%m-%dT00:00:00Z")
+    from_date = (acquisition_date - timedelta(days=180)).strftime("%Y-%m-%dT00:00:00Z")
 
     print(f"[SAT-DEBUG] CDSE Stats request — coords[0]={coords[0] if coords else 'EMPTY'}, "
           f"coord_count={len(coords)}, window={from_date[:10]}–{to_date[:10]}", flush=True)
@@ -272,9 +272,9 @@ async def _fetch_sentinel_hub_indices(token: str, coords: List, acquisition_date
             status_code=404,
             detail=(
                 f"Sentinel-2 imagery found for {from_date[:10]}–{to_date[:10]} but 0 valid pixels "
-                "after cloud/shadow masking. The parcel boundary may be too small (covers < 1 pixel "
-                "at 20m resolution) or all pixels are under clouds. Ensure the parcel GPS boundary "
-                "covers at least 400 m² and try a clearer date."
+                "after cloud/shadow masking. All available scenes in the past 6 months are heavily "
+                "clouded over this parcel. This is common during rainy seasons. Try again in a few "
+                "weeks or during the dry season (Dec–Feb or Jul–Sep in Kenya)."
             )
         )
 
