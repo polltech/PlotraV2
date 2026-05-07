@@ -3,6 +3,7 @@ Plotra Platform - Farmer API Endpoints (Tier 1)
 GPS mapping, KYC, and farm management
 """
 import json
+import httpx
 from datetime import datetime, timedelta
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
