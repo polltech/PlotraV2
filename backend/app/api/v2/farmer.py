@@ -772,15 +772,14 @@ async def get_farm_satellite_image(
     to_str = to_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
     from_str = from_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
 
+    # Standard Sentinel Hub true-colour evalscript (sampleType AUTO = no manual 0-255 mapping needed)
     evalscript = """
 //VERSION=3
 function setup() {
-  return { input: [{bands: ["B04","B03","B02"]}], output: {bands:3, sampleType:"UINT8"} };
+  return { input: [{bands: ["B04","B03","B02"]}], output: {bands:3, sampleType:"AUTO"} };
 }
 function evaluatePixel(s) {
-  // Gamma-corrected true colour: brigter mid-tones without blowing highlights
-  function adj(v) { return Math.min(1, Math.pow(Math.max(0, v * 3.0), 0.75)); }
-  return [adj(s.B04)*255, adj(s.B03)*255, adj(s.B02)*255];
+  return [2.5*s.B04, 2.5*s.B03, 2.5*s.B02];
 }
 """
 
@@ -803,8 +802,8 @@ function evaluatePixel(s) {
                 "type": "sentinel-2-l2a",
                 "dataFilter": {
                     "timeRange": {"from": from_str, "to": to_str},
-                    "maxCloudCoverage": 50,
-                    "mosaickingOrder": "leastCC"
+                    "maxCloudCoverage": 30,
+                    "mosaickingOrder": "mostRecent"
                 }
             }]
         },
