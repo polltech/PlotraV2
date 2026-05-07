@@ -586,10 +586,13 @@ async def request_satellite_analysis(
     Request satellite analysis for farm parcels.
     If no parcel_ids specified, analyzes all parcels in the farm.
     """
-    # Verify farm belongs to user
-    result = await db.execute(
-        select(Farm).where(Farm.id == farm_id, Farm.owner_id == current_user.id)
-    )
+    # Admins can analyse any farm; farmers only their own
+    from app.models.user import UserRole
+    is_admin = getattr(current_user, 'role', None) in (UserRole.PLOTRA_ADMIN, 'plotra_admin')
+    farm_filter = select(Farm).where(Farm.id == farm_id)
+    if not is_admin:
+        farm_filter = farm_filter.where(Farm.owner_id == current_user.id)
+    result = await db.execute(farm_filter)
     farm = result.scalar_one_or_none()
 
     if not farm:

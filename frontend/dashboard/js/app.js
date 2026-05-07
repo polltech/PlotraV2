@@ -9066,7 +9066,10 @@ class PlotraDashboard {
         if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Analysing…'; }
 
         try {
-            const farm = await api.getFarmById(farmId);
+            // Fetch farm details — try farmer endpoint first, fall back to admin endpoint
+            // (admin users don't own the farms they manage so the farmer endpoint returns 404)
+            let farm = await api.getFarmById(farmId);
+            if (!farm) farm = await api.getFarm(farmId).catch(() => null);
             const parcels = (farm?.parcels || []).filter(p => p.boundary_geojson);
             if (!parcels.length) {
                 this.showToast('Please capture the farm polygon first before running satellite analysis.', 'warning');
@@ -9573,23 +9576,14 @@ class PlotraDashboard {
                                 </button>
                             </div>
                         </div>
-                        <div class="card-body">
-                            <div class="row g-3 mb-3">
-                                <div class="col-md-5">
-                                    <div class="card border-0 shadow-sm h-100">
-                                        <div class="card-header py-2 fw-semibold small d-flex align-items-center gap-2" style="background:#f8f4f0;">
-                                            <i class="bi bi-image text-success"></i> Satellite Image
-                                        </div>
-                                        <div class="card-body p-2" id="satelliteImagePanel">
-                                            <div class="text-muted text-center py-3 small"><i class="bi bi-clock-history me-2"></i>No farm selected</div>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="col-md-7">
-                                    <div id="historicalAnalysis">
-                                        <div class="text-muted text-center py-3"><i class="bi bi-clock-history me-2"></i>No farm selected</div>
-                                    </div>
-                                </div>
+                        <div class="card-body p-0">
+                            <!-- Satellite image — full width at the top -->
+                            <div id="satelliteImagePanel" style="background:#0d1b2a;min-height:220px;border-radius:0;overflow:hidden;position:relative;">
+                                <div class="text-center py-5 text-secondary small"><i class="bi bi-clock-history me-2"></i>No farm selected</div>
+                            </div>
+                            <!-- Analysis text below the image -->
+                            <div class="p-3" id="historicalAnalysis">
+                                <div class="text-muted text-center py-3"><i class="bi bi-clock-history me-2"></i>No farm selected</div>
                             </div>
                         </div>
                     </div>
@@ -9803,27 +9797,35 @@ class PlotraDashboard {
     async loadSatelliteImage(farmId) {
         const panel = document.getElementById('satelliteImagePanel');
         if (!panel) return;
+        panel.innerHTML = `<div class="text-center py-5 text-secondary small"><span class="spinner-border spinner-border-sm me-2"></span>Loading satellite image…</div>`;
         try {
             const data = await api.request(`/farmer/farm/${farmId}/satellite-image`, { optional: true });
             if (!data || !data.image_base64) {
-                panel.innerHTML = '<div class="text-muted text-center py-3 small">No satellite image available</div>';
+                panel.innerHTML = `
+                    <div class="d-flex flex-column align-items-center justify-content-center py-5" style="min-height:180px;">
+                        <i class="bi bi-cloud-slash fs-2 text-secondary mb-2"></i>
+                        <span class="text-secondary small">No satellite image available yet.<br>Run analysis to fetch one.</span>
+                    </div>`;
                 return;
             }
             panel.innerHTML = `
-                <div class="position-relative">
+                <div class="position-relative" style="line-height:0;">
                     <img src="data:image/png;base64,${data.image_base64}"
                          alt="Sentinel-2 true-colour image"
-                         class="img-fluid rounded w-100"
-                         style="max-height:340px;object-fit:cover;border:1px solid #dee2e6;">
-                    <div class="position-absolute bottom-0 start-0 end-0 p-2 text-white small"
-                         style="background:linear-gradient(transparent,rgba(0,0,0,.65));border-radius:0 0 6px 6px;">
-                        <i class="bi bi-satellite me-1"></i>Sentinel-2 L2A &nbsp;·&nbsp;
-                        ${data.from_date} – ${data.to_date} &nbsp;·&nbsp;
-                        True colour (B4/B3/B2) &nbsp;·&nbsp; Copernicus Data Space
+                         style="width:100%;max-height:420px;object-fit:cover;display:block;">
+                    <div class="position-absolute bottom-0 start-0 end-0 px-3 py-2 text-white"
+                         style="background:linear-gradient(transparent,rgba(0,0,0,.72));font-size:.8rem;letter-spacing:.02em;">
+                        <i class="bi bi-satellite me-1 text-info"></i>
+                        <strong>Sentinel-2 L2A</strong> &nbsp;·&nbsp; ${data.from_date || ''} – ${data.to_date || ''} &nbsp;·&nbsp;
+                        True colour RGB &nbsp;·&nbsp; Copernicus Data Space
                     </div>
                 </div>`;
         } catch (e) {
-            panel.innerHTML = `<div class="text-muted text-center py-3 small"><i class="bi bi-exclamation-circle me-1"></i>${e.message || 'Image unavailable'}</div>`;
+            panel.innerHTML = `
+                <div class="d-flex flex-column align-items-center justify-content-center py-5" style="min-height:180px;">
+                    <i class="bi bi-exclamation-triangle fs-2 text-warning mb-2"></i>
+                    <span class="text-secondary small">${e.message || 'Image unavailable'}</span>
+                </div>`;
         }
     }
 
