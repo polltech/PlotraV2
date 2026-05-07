@@ -9029,7 +9029,55 @@ class PlotraDashboard {
         }
     }
 
+    async _promptAnalysisDate() {
+        return new Promise(resolve => {
+            const today = new Date().toISOString().slice(0, 10);
+            let modal = document.getElementById('analysisDateModal');
+            if (!modal) {
+                modal = document.createElement('div');
+                modal.id = 'analysisDateModal';
+                modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:center;justify-content:center;';
+                document.body.appendChild(modal);
+            }
+            modal.innerHTML = `
+                <div class="card shadow-lg" style="min-width:320px;max-width:420px;width:90%;">
+                    <div class="card-header fw-semibold d-flex align-items-center gap-2">
+                        <i class="bi bi-calendar3 text-info"></i> Select Analysis Date
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted small mb-3">
+                            Sentinel-2 will be searched for the best clear image in the 90-day window
+                            ending on the date you choose. Use today for the latest data, or pick an earlier
+                            date to view a past snapshot.
+                        </p>
+                        <label class="form-label fw-semibold small text-uppercase" style="letter-spacing:.05em;">Analysis date</label>
+                        <input type="date" id="analysisDateInput" class="form-control form-control-lg"
+                            value="${today}" max="${today}" />
+                        <p class="text-muted mt-2 mb-0" style="font-size:.78rem;">
+                            Cannot select a future date. Earliest useful data is after June 2015.
+                        </p>
+                    </div>
+                    <div class="card-footer d-flex gap-2 justify-content-end">
+                        <button class="btn btn-sm btn-outline-secondary" id="analysisDateCancel">Cancel</button>
+                        <button class="btn btn-sm btn-primary" id="analysisDateConfirm">
+                            <i class="bi bi-satellite-fill me-1"></i>Run Analysis
+                        </button>
+                    </div>
+                </div>`;
+            modal.style.display = 'flex';
+            document.getElementById('analysisDateCancel').onclick = () => { modal.style.display = 'none'; resolve(null); };
+            document.getElementById('analysisDateConfirm').onclick = () => {
+                const val = document.getElementById('analysisDateInput').value;
+                modal.style.display = 'none';
+                resolve(val || today);
+            };
+        });
+    }
+
     async requestSatelliteAnalysis(farmId) {
+        const selectedDate = await this._promptAnalysisDate();
+        if (!selectedDate) return;
+
         const btn = document.querySelector(`[onclick*="requestSatelliteAnalysis('${farmId}')"]`);
         if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Analysing…'; }
 
@@ -9046,7 +9094,7 @@ class PlotraDashboard {
 
             let completed = 0;
             let failed = 0;
-            const acquisitionDate = new Date().toISOString();
+            const acquisitionDate = new Date(selectedDate + 'T12:00:00Z').toISOString();
 
             for (let i = 0; i < parcels.length; i++) {
                 const parcel = parcels[i];
