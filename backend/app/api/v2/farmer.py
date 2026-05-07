@@ -753,10 +753,10 @@ async def get_farm_satellite_image(
     if not coords:
         raise HTTPException(status_code=404, detail="No parcel boundary found for this farm")
 
-    # Compute bounding box and expand by ~0.005° (~500m) for context
+    # Compute bounding box — tight 0.001° (~110m) padding so farm fills the frame
     lons = [c[0] for c in coords]
     lats = [c[1] for c in coords]
-    buf = 0.005
+    buf = 0.001
     bbox = [min(lons) - buf, min(lats) - buf, max(lons) + buf, max(lats) + buf]
 
     # Get CDSE token
@@ -775,12 +775,23 @@ async def get_farm_satellite_image(
     evalscript = """
 //VERSION=3
 function setup() {
-  return { input: [{bands: ["B04","B03","B02"]}], output: {bands:3, sampleType:"AUTO"} };
+  return { input: [{bands: ["B04","B03","B02"]}], output: {bands:3, sampleType:"UINT8"} };
 }
 function evaluatePixel(s) {
-  return [3.5*s.B04, 3.5*s.B03, 3.5*s.B02];
+  // Gamma-corrected true colour: brigter mid-tones without blowing highlights
+  function adj(v) { return Math.min(1, Math.pow(Math.max(0, v * 3.0), 0.75)); }
+  return [adj(s.B04)*255, adj(s.B03)*255, adj(s.B02)*255];
 }
 """
+
+    # Maintain correct aspect ratio so the farm isn't stretched
+    lon_span = bbox[2] - bbox[0]
+    lat_span = bbox[3] - bbox[1]
+    max_px = 1024
+    if lon_span >= lat_span:
+        img_w, img_h = max_px, max(64, round(max_px * lat_span / lon_span))
+    else:
+        img_w, img_h = max(64, round(max_px * lon_span / lat_span)), max_px
 
     payload = {
         "input": {
@@ -798,7 +809,7 @@ function evaluatePixel(s) {
             }]
         },
         "output": {
-            "width": 512, "height": 512,
+            "width": img_w, "height": img_h,
             "responses": [{"identifier": "default", "format": {"type": "image/png"}}]
         },
         "evalscript": evalscript
