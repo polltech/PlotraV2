@@ -164,7 +164,7 @@ async def _fetch_sentinel_hub_indices(token: str, coords: List, acquisition_date
         },
         "aggregation": {
             "timeRange": {"from": from_date, "to": to_date},
-            "aggregationInterval": {"of": "P30D"},
+            "aggregationInterval": {"of": "P90D"},
             "evalscript": _EVALSCRIPT,
             "resx": 20,
             "resy": 20
