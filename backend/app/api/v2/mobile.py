@@ -296,7 +296,9 @@ async def create_farm_mobile(
         "land_use_type": (payload.land_use_type or "agroforestry"),
         "status": "admin_approved",
         "farmer": f"{DEFAULT_FARMER_FIRST} {DEFAULT_FARMER_LAST}",
+        "farmer_phone": DEFAULT_FARMER_PHONE,
         "cooperative": DEFAULT_COOP_NAME,
+        "cooperative_phone": DEFAULT_OFFICER_PHONE,
     }
 
 
