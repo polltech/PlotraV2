@@ -753,10 +753,10 @@ async def get_farm_satellite_image(
     if not coords:
         raise HTTPException(status_code=404, detail="No parcel boundary found for this farm")
 
-    # Compute bounding box — tight 0.001° (~110m) padding so farm fills the frame
+    # Compute bounding box — small padding so farm fills most of the frame
     lons = [c[0] for c in coords]
     lats = [c[1] for c in coords]
-    buf = 0.001
+    buf = 0.002
     bbox = [min(lons) - buf, min(lats) - buf, max(lons) + buf, max(lats) + buf]
 
     # Get CDSE token
@@ -765,10 +765,10 @@ async def get_farm_satellite_image(
     client_secret = creds.get("oauth_client_secret", "")
     token = await _get_sentinel_hub_token(client_id, client_secret)
 
-    # Use the most recent 90 days
+    # Search last 180 days — gives more passes to find a clear scene
     from datetime import timedelta
     to_dt = datetime.utcnow()
-    from_dt = to_dt - timedelta(days=90)
+    from_dt = to_dt - timedelta(days=180)
     to_str = to_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
     from_str = from_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
 
@@ -802,8 +802,8 @@ function evaluatePixel(s) {
                 "type": "sentinel-2-l2a",
                 "dataFilter": {
                     "timeRange": {"from": from_str, "to": to_str},
-                    "maxCloudCoverage": 30,
-                    "mosaickingOrder": "mostRecent"
+                    "maxCloudCoverage": 20,
+                    "mosaickingOrder": "leastCC"
                 }
             }]
         },
