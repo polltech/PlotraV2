@@ -765,10 +765,10 @@ async def get_farm_satellite_image(
     client_secret = creds.get("oauth_client_secret", "")
     token = await _get_sentinel_hub_token(client_id, client_secret)
 
-    # Search last 180 days — gives more passes to find a clear scene
+    # Search last 365 days — full year maximises chance of finding a dry-season clear scene
     from datetime import timedelta
     to_dt = datetime.utcnow()
-    from_dt = to_dt - timedelta(days=180)
+    from_dt = to_dt - timedelta(days=365)
     to_str = to_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
     from_str = from_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
 
@@ -802,7 +802,7 @@ function evaluatePixel(s) {
                 "type": "sentinel-2-l2a",
                 "dataFilter": {
                     "timeRange": {"from": from_str, "to": to_str},
-                    "maxCloudCoverage": 20,
+                    "maxCloudCoverage": 100,
                     "mosaickingOrder": "leastCC"
                 }
             }]
