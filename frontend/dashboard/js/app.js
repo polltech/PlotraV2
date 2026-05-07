@@ -5662,23 +5662,7 @@ class PlotraDashboard {
     }
 
     async analyzeSingleFarm(farmId) {
-        try {
-            // We need parcel IDs for analysis
-            const farm = await api.getFarms({ id: farmId });
-            const parcelIds = farm[0]?.parcels?.map(p => p.id) || [];
-            
-            if (parcelIds.length === 0) {
-                this.showToast('No parcels found for this farm to analyze', 'warning');
-                return;
-            }
-
-            this.showToast('Starting analysis for ' + parcelIds.length + ' parcels...', 'info');
-            await api.triggerSatelliteAnalysis(parcelIds);
-            this.showToast('Analysis complete', 'success');
-            this.loadPage('satellite');
-        } catch (error) {
-            this.showToast(error.message, 'error');
-        }
+        await this.requestSatelliteAnalysis(farmId);
     }
     async loadCompliance(content) {
         const role = (this.currentUser?.role || '').toUpperCase();
@@ -9557,11 +9541,16 @@ class PlotraDashboard {
                 <!-- Analysis Farm Selector -->
                 <div class="col-12">
                     <div class="card border-0 shadow-sm">
-                        <div class="card-body py-2 d-flex align-items-center gap-3">
+                        <div class="card-body py-2 d-flex align-items-center gap-3 flex-wrap">
                             <label class="form-label mb-0 fw-semibold text-nowrap"><i class="bi bi-geo-alt-fill me-1" style="color:#6f4e37;"></i>View analysis for:</label>
-                            <select class="form-select form-select-sm" id="analysisFarmSelector" style="max-width:320px;" onchange="app.switchAnalysisFarm(this.value)">
+                            <select class="form-select form-select-sm" id="analysisFarmSelector" style="max-width:320px;"
+                                onchange="app.switchAnalysisFarm(this.value); document.getElementById('runSelectedFarmAnalysisBtn').disabled = !this.value;">
                                 <option value="">— select a mapped farm —</option>
                             </select>
+                            <button id="runSelectedFarmAnalysisBtn" class="btn btn-info btn-sm text-white text-nowrap" disabled
+                                onclick="app.runAnalysisForSelectedFarm()">
+                                <i class="bi bi-satellite-fill me-1"></i>Run Analysis for This Farm
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -9767,6 +9756,8 @@ class PlotraDashboard {
                     : (mappedFarms.length > 0 ? mappedFarms[0].id : '');
                 if (targetId) {
                     selector.value = targetId;
+                    const runBtn = document.getElementById('runSelectedFarmAnalysisBtn');
+                    if (runBtn) runBtn.disabled = false;
                     this.loadHistoricalAnalysis(targetId);
                     this.loadTreeManagement(targetId);
                     this.loadCropAnalysis(targetId);
@@ -9800,6 +9791,13 @@ class PlotraDashboard {
         this.loadSatelliteImage(farmId);
         this.loadTreeManagement(farmId);
         this.loadCropAnalysis(farmId);
+    }
+
+    async runAnalysisForSelectedFarm() {
+        const selector = document.getElementById('analysisFarmSelector');
+        const farmId = selector?.value;
+        if (!farmId) { this.showToast('Select a farm from the dropdown first.', 'warning'); return; }
+        await this.requestSatelliteAnalysis(farmId);
     }
 
     async loadSatelliteImage(farmId) {
