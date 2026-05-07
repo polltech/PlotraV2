@@ -35,11 +35,13 @@ DEFAULT_COOP_CODE    = "POLYCOOP"
 DEFAULT_COOP_NAME    = "Polygon Cooperative"
 DEFAULT_OFFICER_EMAIL    = "officer@polygoncoop.eu"
 DEFAULT_OFFICER_PASSWORD = "PolyOfficer2024!"
+DEFAULT_OFFICER_PHONE    = "+254700000002"
 DEFAULT_OFFICER_FIRST    = "Polygon"
 DEFAULT_OFFICER_LAST     = "Officer"
 
 DEFAULT_FARMER_EMAIL    = "farmer@polygoncoop.eu"
 DEFAULT_FARMER_PASSWORD = "PolyFarmer2024!"
+DEFAULT_FARMER_PHONE    = "+254700000001"
 DEFAULT_FARMER_FIRST    = "Polygon"
 DEFAULT_FARMER_LAST     = "Farmer"
 
@@ -107,6 +109,7 @@ async def setup_defaults(db: AsyncSession = Depends(get_db)):
         officer = User(
             id=str(uuid.uuid4()),
             email=DEFAULT_OFFICER_EMAIL,
+            phone=DEFAULT_OFFICER_PHONE,
             password_hash=get_password_hash(DEFAULT_OFFICER_PASSWORD),
             first_name=DEFAULT_OFFICER_FIRST,
             last_name=DEFAULT_OFFICER_LAST,
@@ -132,6 +135,7 @@ async def setup_defaults(db: AsyncSession = Depends(get_db)):
         farmer = User(
             id=str(uuid.uuid4()),
             email=DEFAULT_FARMER_EMAIL,
+            phone=DEFAULT_FARMER_PHONE,
             password_hash=get_password_hash(DEFAULT_FARMER_PASSWORD),
             first_name=DEFAULT_FARMER_FIRST,
             last_name=DEFAULT_FARMER_LAST,
@@ -166,15 +170,17 @@ async def setup_defaults(db: AsyncSession = Depends(get_db)):
         },
         "officer": {
             "id": officer.id,
-            "email": DEFAULT_OFFICER_EMAIL,
-            "password": DEFAULT_OFFICER_PASSWORD,
             "name": f"{DEFAULT_OFFICER_FIRST} {DEFAULT_OFFICER_LAST}",
+            "email": DEFAULT_OFFICER_EMAIL,
+            "phone": DEFAULT_OFFICER_PHONE,
+            "password": DEFAULT_OFFICER_PASSWORD,
         },
         "farmer": {
             "id": farmer.id,
-            "email": DEFAULT_FARMER_EMAIL,
-            "password": DEFAULT_FARMER_PASSWORD,
             "name": f"{DEFAULT_FARMER_FIRST} {DEFAULT_FARMER_LAST}",
+            "email": DEFAULT_FARMER_EMAIL,
+            "phone": DEFAULT_FARMER_PHONE,
+            "password": DEFAULT_FARMER_PASSWORD,
         },
     }
 
