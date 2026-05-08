@@ -9115,6 +9115,92 @@ class PlotraDashboard {
         });
     }
 
+    async checkFarmCompliance(farmId, farmName) {
+        const modalId = 'complianceModal';
+        let modal = document.getElementById(modalId);
+        if (!modal) {
+            modal = document.createElement('div');
+            modal.id = modalId;
+            modal.className = 'modal fade';
+            modal.setAttribute('tabindex', '-1');
+            modal.innerHTML = `
+                <div class="modal-dialog modal-lg modal-dialog-scrollable">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title"><i class="bi bi-shield-check me-2"></i><span id="complianceModalTitle">Compliance Check</span></h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body" id="complianceModalBody">
+                            <div class="text-center py-4"><div class="spinner-border text-success"></div><div class="mt-2 text-muted">Running compliance assessment…</div></div>
+                        </div>
+                    </div>
+                </div>`;
+            document.body.appendChild(modal);
+        }
+        document.getElementById('complianceModalTitle').textContent = `Compliance — ${farmName}`;
+        document.getElementById('complianceModalBody').innerHTML =
+            `<div class="text-center py-4"><div class="spinner-border text-success"></div><div class="mt-2 text-muted">Running compliance assessment…</div></div>`;
+        new bootstrap.Modal(modal).show();
+
+        try {
+            const r = await api.request(`/farm/${farmId}/compliance`, { optional: true });
+            if (!r) throw new Error('No response from server');
+
+            const riskColors = { low: 'success', medium: 'warning', high: 'danger', critical: 'danger' };
+            const riskColor = riskColors[r.overall_risk_level] || 'secondary';
+            const score = r.overall_risk_score ?? 0;
+            const compliant = r.eudr_compliant;
+
+            const parcelsHtml = (r.parcels || []).map(p => {
+                const pc = riskColors[p.risk_level] || 'secondary';
+                const triggers = p.triggers?.length
+                    ? `<ul class="mb-0 ps-3">${p.triggers.map(t => `<li class="small text-muted">${t}</li>`).join('')}</ul>`
+                    : `<span class="small text-muted">No triggers</span>`;
+                const deforest = p.deforestation_check;
+                const deforestBadge = deforest?.deforestation_detected
+                    ? `<span class="badge bg-danger ms-1">Deforestation detected</span>`
+                    : `<span class="badge bg-success ms-1">No deforestation</span>`;
+                return `
+                    <div class="border rounded p-2 mb-2">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <strong class="small">${p.parcel_name || 'Parcel'}</strong>
+                            <span class="badge bg-${pc}">${p.risk_level} (${p.risk_score})</span>
+                        </div>
+                        <div class="mt-1">${deforestBadge}${p.block_submission ? '<span class="badge bg-danger ms-1">Blocks DDS submission</span>' : ''}</div>
+                        <div class="mt-1">${triggers}</div>
+                    </div>`;
+            }).join('') || '<p class="text-muted small">No parcels assessed.</p>';
+
+            const satHtml = r.satellite_data_available && r.satellite_summary
+                ? `<div class="row g-2 mt-1">
+                    <div class="col-4 text-center"><div class="fw-bold">${r.satellite_summary.ndvi_mean?.toFixed(2) ?? '—'}</div><div class="text-muted small">NDVI</div></div>
+                    <div class="col-4 text-center"><div class="fw-bold">${r.satellite_summary.canopy_change_percentage?.toFixed(1) ?? '—'}%</div><div class="text-muted small">Canopy change</div></div>
+                    <div class="col-4 text-center"><div class="fw-bold">${r.satellite_summary.deforestation_detected ? '<span class="text-danger">Yes</span>' : '<span class="text-success">No</span>'}</div><div class="text-muted small">Deforestation</div></div>
+                   </div>`
+                : `<p class="text-muted small mb-0">No satellite data yet — run Analyse first.</p>`;
+
+            document.getElementById('complianceModalBody').innerHTML = `
+                <div class="d-flex align-items-center gap-3 mb-4">
+                    <div class="text-center" style="min-width:80px">
+                        <div class="display-6 fw-bold text-${riskColor}">${score}</div>
+                        <div class="small text-muted">Risk score</div>
+                    </div>
+                    <div>
+                        <span class="badge bg-${riskColor} fs-6 text-capitalize">${r.overall_risk_level} risk</span><br>
+                        <span class="badge mt-1 ${compliant ? 'bg-success' : 'bg-danger'}">${compliant ? 'EUDR Compliant' : 'Not Compliant'}</span>
+                    </div>
+                </div>
+                <h6>Parcel Assessments</h6>
+                ${parcelsHtml}
+                <h6 class="mt-3">Satellite Summary</h6>
+                ${satHtml}
+                <div class="text-muted small mt-3">Assessed: ${new Date(r.assessed_at).toLocaleString()}</div>`;
+        } catch (e) {
+            document.getElementById('complianceModalBody').innerHTML =
+                `<div class="alert alert-danger"><i class="bi bi-x-circle me-1"></i>${e.message}</div>`;
+        }
+    }
+
     async requestSatelliteAnalysis(farmId) {
         const selectedDate = await this._promptAnalysisDate();
         if (!selectedDate) return;
@@ -9778,6 +9864,10 @@ class PlotraDashboard {
                                     onclick="app.requestSatelliteAnalysis('${farm.id}')"
                                     ${!hasPolygon ? 'disabled title="Capture farm polygon first"' : ''}>
                                     <i class="bi bi-satellite-fill me-1"></i>Analyse
+                                </button>
+                                <button class="btn btn-outline-success btn-sm flex-fill" style="min-width:70px"
+                                    onclick="app.checkFarmCompliance('${farm.id}', '${(farm.farm_name||'Farm').replace(/'/g,"\\'")}')">
+                                    <i class="bi bi-shield-check me-1"></i>Compliance
                                 </button>
                             </div>
                         </div>
