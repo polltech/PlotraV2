@@ -533,19 +533,22 @@ async def get_farm_compliance(
     )
     parcels = parcels_result.scalars().all()
 
-    # Latest satellite observation for this farm
-    sat_result = await db.execute(
-        select(SatelliteObservation)
-        .where(SatelliteObservation.farm_id == farm_id)
-        .order_by(SatelliteObservation.acquisition_date.desc())
-        .limit(1)
-    )
-    latest_sat = sat_result.scalar_one_or_none()
+    # Latest satellite observation across all parcels of this farm
+    parcel_ids = [p.id for p in parcels]
+    latest_sat = None
+    if parcel_ids:
+        sat_result = await db.execute(
+            select(SatelliteObservation)
+            .where(SatelliteObservation.parcel_id.in_(parcel_ids))
+            .order_by(SatelliteObservation.acquisition_date.desc())
+            .limit(1)
+        )
+        latest_sat = sat_result.scalar_one_or_none()
     sat_data = None
     if latest_sat:
         sat_data = {
-            "deforestation_detected": latest_sat.deforestation_detected,
-            "canopy_change_percentage": latest_sat.canopy_change_percentage,
+            "deforestation_detected": getattr(latest_sat, "deforestation_detected", None),
+            "canopy_change_percentage": latest_sat.canopy_cover_percentage,
             "ndvi_mean": latest_sat.ndvi_mean,
         }
 
