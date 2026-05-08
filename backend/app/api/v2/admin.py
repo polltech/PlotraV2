@@ -649,7 +649,7 @@ async def list_dds(
 
 @router.get("/eudr/dds/{dds_id}")
 async def get_dds(
-    dds_id: int,
+    dds_id: str,
     current_user: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db)
 ):
@@ -725,7 +725,7 @@ async def verify_certificate(
 
 @router.get("/eudr/export/xml/{dds_id}")
 async def export_dds_xml(
-    dds_id: int,
+    dds_id: str,
     current_user: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db)
 ):
