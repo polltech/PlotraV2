@@ -681,7 +681,7 @@ class DDSRequest(BaseModel):
 
 class DDSResponse(BaseModel):
     """Due Diligence Statement response with detailed information"""
-    id: int
+    id: str
     dds_number: str
     version: str
     operator_name: str
