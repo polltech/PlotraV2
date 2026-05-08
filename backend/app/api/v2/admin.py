@@ -583,7 +583,7 @@ async def generate_dds(
         supplier_name=dds_data.supplier_name,
         supplier_country=dds_data.supplier_country,
         first_placement_country=dds_data.first_placement_country,
-        first_placement_date=dds_data.first_placement_date,
+        first_placement_date=datetime.fromisoformat(dds_data.first_placement_date) if dds_data.first_placement_date else None,
         farm_ids=dds_data.farm_ids
     )
     

@@ -639,9 +639,27 @@ class DDSRequest(BaseModel):
     supplier_name: Optional[str] = None
     supplier_country: Optional[str] = None
     first_placement_country: Optional[str] = None
-    first_placement_date: Optional[datetime] = None
-    farm_ids: List[str] = []
-    
+    first_placement_date: Optional[str] = None
+    farm_ids: List[Optional[str]] = []
+
+    @field_validator('first_placement_date', mode='before')
+    @classmethod
+    def coerce_date(cls, v):
+        if not v:
+            return None
+        v = str(v).strip()
+        # Accept date-only strings like 2026-05-08 → add time
+        if len(v) == 10 and v[4] == '-':
+            v = v + 'T00:00:00'
+        return v
+
+    @field_validator('farm_ids', mode='before')
+    @classmethod
+    def filter_farm_ids(cls, v):
+        if not v:
+            return []
+        return [str(i) for i in v if i is not None]
+
     @field_validator('country_of_origin')
     def validate_country(cls, v):
         if v not in ['Kenya', 'Uganda', 'Ethiopia', 'Tanzania']:
