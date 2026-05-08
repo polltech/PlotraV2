@@ -57,6 +57,32 @@ services:
     networks:
       - plotrav2_plotra_network
 
+  wordpress-db:
+    image: mysql:8.0
+    container_name: plotra-wordpress-db
+    environment:
+      MYSQL_ROOT_PASSWORD: plotra_wp_root_2024
+      MYSQL_DATABASE: orderifi_wp283
+      MYSQL_USER: orderifi_wp283
+      MYSQL_PASSWORD: "7fT!5SCp]7"
+    volumes:
+      - wordpress_db_data:/var/lib/mysql
+      - ./plotra/orderifi_wp283.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    restart: unless-stopped
+    networks:
+      - plotrav2_plotra_network
+
+  wordpress:
+    image: wordpress:php8.1-apache
+    container_name: plotra-wordpress
+    volumes:
+      - ./plotra:/var/www/html
+    depends_on:
+      - wordpress-db
+    restart: unless-stopped
+    networks:
+      - plotrav2_plotra_network
+
   nginx-proxy:
     image: nginx:alpine
     container_name: plotra-nginx-proxy
@@ -66,10 +92,10 @@ services:
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
       - /root/ssl-certs:/etc/nginx/ssl:ro
-      - /var/www/plotra-website:/var/www/plotra-website:ro
     depends_on:
       - dashboard
       - backend
+      - wordpress
     restart: unless-stopped
     networks:
       - plotrav2_plotra_network
@@ -77,6 +103,7 @@ services:
 volumes:
   postgres_data:
   uploads_data:
+  wordpress_db_data:
 
 networks:
   plotrav2_plotra_network:
