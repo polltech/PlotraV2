@@ -2242,6 +2242,9 @@ async def get_system_settings(
             "access_token_expire_minutes": db_or("cfg_token_expire", settings.app.access_token_expire_minutes),
             "frontend_base_url": db_or("cfg_frontend_url", settings.app.frontend_base_url),
         },
+        "eudr": {
+            "api_key": mask(db_or("cfg_eudr_api_key", "")),
+        },
     }
 
 

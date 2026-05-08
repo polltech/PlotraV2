@@ -6677,6 +6677,7 @@ class PlotraDashboard {
             const storage = sysSettings?.storage || {};
             const payments = sysSettings?.payments || {};
             const appCfg = sysSettings?.app || {};
+            const eudrCfg = sysSettings?.eudr || {};
 
             const fieldRow = (label, id, val, type = 'text', hint = '') => `
                 <div class="col-md-6 mb-3">
@@ -6707,6 +6708,7 @@ class PlotraDashboard {
                             <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabStorage">Storage / S3</button></li>
                             <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabPayments">Payments</button></li>
                             <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabApp">App Settings</button></li>
+                            <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabEudr">EUDR API</button></li>
                             <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabCreds">API Credentials</button></li>
                         </ul>
                         <div class="tab-content mt-4">
@@ -6825,6 +6827,26 @@ class PlotraDashboard {
                                     ${checkRow('Debug Mode', 'app_debug', appCfg.debug)}
                                 </div>
                             </div>
+                            <!-- EUDR API -->
+                            <div class="tab-pane fade" id="tabEudr">
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <h5 class="mb-0">EUDR API Configuration</h5>
+                                    <button class="btn btn-primary btn-sm" onclick="app.saveSystemSection('eudr')"><i class="bi bi-save me-1"></i>Save</button>
+                                </div>
+                                <div class="alert alert-info py-2 mb-3" style="font-size:0.85rem;">
+                                    <i class="bi bi-info-circle me-1"></i>
+                                    Get your API key from <strong>eudr-api.eu → API Keys Dashboard</strong>.
+                                    The key is used to submit Due Diligence Statements to the EU EUDR system.
+                                </div>
+                                <div class="row">
+                                    ${fieldRow('EUDR API Key', 'eudr_api_key', eudrCfg.api_key || '', 'password', 'Leave *** to keep existing key')}
+                                </div>
+                                <div class="mt-3 d-flex align-items-center gap-3">
+                                    <button class="btn btn-success btn-sm" onclick="app.saveSystemSection('eudr')"><i class="bi bi-save me-1"></i>Save Key</button>
+                                    <button class="btn btn-outline-secondary btn-sm" onclick="app.testEudrConnection()"><i class="bi bi-wifi me-1"></i>Test Connection</button>
+                                    <span id="eudrTestResult" class="small"></span>
+                                </div>
+                            </div>
                             <!-- API Credentials -->
                             <div class="tab-pane fade" id="tabCreds">
                                 <h5 class="mb-3">Custom API Credentials</h5>
@@ -6855,6 +6877,7 @@ class PlotraDashboard {
             storage: { s3_bucket: 'bucket', s3_endpoint: 'endpoint', s3_access_key: 'access_key', s3_secret_key: 'secret_key', s3_region: 'region' },
             payments: { pay_enabled: 'enabled', pay_mpesa_consumer_key: 'mpesa_consumer_key', pay_mpesa_consumer_secret: 'mpesa_consumer_secret', pay_mpesa_shortcode: 'mpesa_shortcode' },
             app: { app_name: 'name', app_frontend_base_url: 'frontend_base_url', app_access_token_expire_minutes: 'access_token_expire_minutes', app_debug: 'debug' },
+            eudr: { eudr_api_key: 'api_key' },
         };
         const checkboxIds = new Set(['sat_simulation_mode', 'pay_enabled', 'app_debug']);
         const fields = fieldMap[section] || {};
@@ -6881,6 +6904,22 @@ class PlotraDashboard {
                 if (el) el.innerHTML = `<span class="text-success"><i class="bi bi-check-circle me-1"></i>${res.message}</span>`;
             } else {
                 if (el) el.innerHTML = `<span class="text-danger"><i class="bi bi-x-circle me-1"></i>${res?.message || 'Connection failed'}</span>`;
+            }
+        } catch (e) {
+            if (el) el.innerHTML = `<span class="text-danger"><i class="bi bi-x-circle me-1"></i>${e.message}</span>`;
+        }
+    }
+
+    async testEudrConnection() {
+        const el = document.getElementById('eudrTestResult');
+        if (el) el.innerHTML = '<span class="text-muted">Testing...</span>';
+        try {
+            const res = await api.request('/eudr/api-status', { optional: true });
+            if (res && (res.connected || res.status === 'ok')) {
+                if (el) el.innerHTML = `<span class="text-success"><i class="bi bi-check-circle me-1"></i>Connected to eudr-api.eu</span>`;
+            } else {
+                const msg = res?.message || res?.detail || 'Connection failed';
+                if (el) el.innerHTML = `<span class="text-danger"><i class="bi bi-x-circle me-1"></i>${msg}</span>`;
             }
         } catch (e) {
             if (el) el.innerHTML = `<span class="text-danger"><i class="bi bi-x-circle me-1"></i>${e.message}</span>`;
