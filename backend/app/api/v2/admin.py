@@ -594,6 +594,8 @@ async def generate_dds(
     dds = DueDiligenceStatement(
         dds_number=dds_dict['dds_number'],
         version=dds_dict['version'],
+        entity_type="cooperative",
+        entity_id=str(dds_data.operator_id or ""),
         operator_name=dds_dict['operator_name'],
         operator_id=dds_dict.get('operator_id'),
         contact_name=dds_dict.get('contact_name'),
