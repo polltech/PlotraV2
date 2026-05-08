@@ -287,6 +287,43 @@ class EUDRIntegrationService:
         }
 
     # ------------------------------------------------------------------
+    def generate_dds_xml(self, dds) -> str:
+        """Generate EUDR-compliant XML export for a DueDiligenceStatement ORM object."""
+        farm_coords = dds.farm_coordinates or []
+        plots_xml = ""
+        for fc in (farm_coords if isinstance(farm_coords, list) else []):
+            plots_xml += (
+                f"<plot>"
+                f"<plotId>{fc.get('farm_id','')}</plotId>"
+                f"<name>{fc.get('name','')}</name>"
+                f"<latitude>{fc.get('lat','')}</latitude>"
+                f"<longitude>{fc.get('lon','')}</longitude>"
+                f"</plot>"
+            )
+        return (
+            '<?xml version="1.0" encoding="UTF-8"?>'
+            "<dueDiligenceStatement>"
+            f"<ddsNumber>{dds.dds_number}</ddsNumber>"
+            f"<version>{dds.version or '2'}</version>"
+            f"<operatorName>{dds.operator_name or ''}</operatorName>"
+            f"<operatorId>{dds.operator_id or ''}</operatorId>"
+            f"<contactName>{dds.contact_name or ''}</contactName>"
+            f"<contactEmail>{dds.contact_email or ''}</contactEmail>"
+            f"<commodityType>{dds.commodity_type or ''}</commodityType>"
+            f"<hsCode>{dds.hs_code or ''}</hsCode>"
+            f"<countryOfOrigin>{dds.country_of_origin or ''}</countryOfOrigin>"
+            f"<quantity>{dds.quantity or 0}</quantity>"
+            f"<unit>{dds.unit or 'kg'}</unit>"
+            f"<supplierName>{dds.supplier_name or ''}</supplierName>"
+            f"<firstPlacementCountry>{dds.first_placement_country or ''}</firstPlacementCountry>"
+            f"<firstPlacementDate>{dds.first_placement_date.isoformat() if dds.first_placement_date else ''}</firstPlacementDate>"
+            f"<riskLevel>{dds.risk_level or ''}</riskLevel>"
+            f"<submissionStatus>{dds.submission_status or 'DRAFT'}</submissionStatus>"
+            f"<ddsHash>{dds.dds_hash or ''}</ddsHash>"
+            f"<plots>{plots_xml}</plots>"
+            "</dueDiligenceStatement>"
+        )
+
     def _mitigation_measures(self, risk_level: str) -> List[str]:
         if risk_level == "critical":
             return [
