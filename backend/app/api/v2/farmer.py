@@ -755,10 +755,11 @@ async def get_farm_satellite_image(
     if not coords:
         raise HTTPException(status_code=404, detail="No parcel boundary found for this farm")
 
-    # Compute bounding box — small padding so farm fills most of the frame
+    # Bounding box — 0.005° (~550m) each side so the farm sits in landscape context.
+    # Small farms (<10 pixels) look completely blocky when cropped too tight.
     lons = [c[0] for c in coords]
     lats = [c[1] for c in coords]
-    buf = 0.002
+    buf = 0.005
     bbox = [min(lons) - buf, min(lats) - buf, max(lons) + buf, max(lats) + buf]
 
     # Get CDSE token
@@ -778,24 +779,25 @@ async def get_farm_satellite_image(
         to_dt = datetime.utcnow()
     from_dt = to_dt - timedelta(days=365)
 
-    # Step 1: CDSE public STAC — find the single least-cloudy Sentinel-2 scene in the window.
-    # Using a single scene eliminates the per-pixel mixing that causes colour noise.
+    # Step 1: SH Catalog API — find the single least-cloudy Sentinel-2 scene in the window.
+    # Using a single 24-hour window eliminates multi-scene colour noise entirely.
     best_date = None
     try:
         async with httpx.AsyncClient(timeout=30) as client:
-            stac_resp = await client.post(
-                "https://catalogue.dataspace.copernicus.eu/stac/search",
-                headers={"Content-Type": "application/json"},
+            cat_resp = await client.post(
+                "https://sh.dataspace.copernicus.eu/api/v1/catalog/1.0.0/search",
+                headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
                 json={
                     "bbox": bbox,
                     "datetime": f"{from_dt.strftime('%Y-%m-%dT%H:%M:%SZ')}/{to_dt.strftime('%Y-%m-%dT%H:%M:%SZ')}",
-                    "collections": ["SENTINEL-2"],
+                    "collections": ["sentinel-2-l2a"],
                     "limit": 100,
                 },
             )
-        if stac_resp.status_code == 200:
-            features = stac_resp.json().get("features", [])
-            # Sort by cloud cover ascending in Python (don't rely on API sorting)
+        print(f"[SAT-IMG] Catalog API status={cat_resp.status_code} body={cat_resp.text[:300]}", flush=True)
+        if cat_resp.status_code == 200:
+            features = cat_resp.json().get("features", [])
+            # Sort by cloud cover ascending in Python
             features.sort(key=lambda f: f.get("properties", {}).get("eo:cloud_cover", 100))
             if features:
                 best_props = features[0].get("properties", {})
@@ -803,11 +805,9 @@ async def get_farm_satellite_image(
                 cloud = best_props.get("eo:cloud_cover", "?")
                 if best_dt_str:
                     best_date = datetime.fromisoformat(best_dt_str.replace("Z", "+00:00")).replace(tzinfo=None)
-                    print(f"[SAT-IMG] Best scene via STAC: {best_date.date()}  cloud={cloud}%", flush=True)
-        else:
-            print(f"[SAT-IMG] STAC returned {stac_resp.status_code}: {stac_resp.text[:200]}", flush=True)
+                    print(f"[SAT-IMG] Best scene: {best_date.date()}  cloud={cloud}%  total_scenes={len(features)}", flush=True)
     except Exception as cat_err:
-        print(f"[SAT-IMG] STAC lookup failed ({cat_err})", flush=True)
+        print(f"[SAT-IMG] Catalog lookup failed: {cat_err}", flush=True)
 
     if best_date:
         img_from_str = (best_date - timedelta(hours=12)).strftime("%Y-%m-%dT%H:%M:%SZ")
