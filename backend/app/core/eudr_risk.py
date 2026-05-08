@@ -127,7 +127,7 @@ def assess_eudr_risk(country: str, commodity: str, parcel: Optional[Dict] = None
 
     # 3. Parcel-specific risk factors (if parcel data provided)
     if parcel:
-        get_val = lambda k, default=None: getattr(parcel, k, None) if hasattr(parcel, k) else parcel.get(k, default)
+        get_val = lambda k, default=None: getattr(parcel, k, default) if not isinstance(parcel, dict) else parcel.get(k, default)
 
         # Geolocation requirement (MANDATORY for EUDR)
         boundary = get_val('boundary_geojson')
