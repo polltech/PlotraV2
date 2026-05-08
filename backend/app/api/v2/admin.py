@@ -607,7 +607,7 @@ async def generate_dds(
         supplier_name=dds_dict.get('supplier_name'),
         supplier_country=dds_dict.get('supplier_country'),
         first_placement_country=dds_dict.get('first_placement_country'),
-        first_placement_date=dds_dict.get('first_placement_date'),
+        first_placement_date=datetime.fromisoformat(dds_dict['first_placement_date']) if dds_dict.get('first_placement_date') else None,
         risk_level=dds_dict['risk_level'],
         submission_status='draft',
         dds_hash=dds_dict.get('dds_hash'),
