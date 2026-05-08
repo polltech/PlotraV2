@@ -10181,6 +10181,21 @@ class PlotraDashboard {
                         <div class="col-md-3 col-6"><span class="text-muted">Mixed farming:</span> <strong>${p.practice_mixed_farming?'Yes':'No'}</strong></div>
                         <div class="col-md-3 col-6"><span class="text-muted">Other crops:</span> <strong>${p.other_crops||'—'}</strong></div>
                       </div>
+                      <div class="border-top mt-2 pt-2 d-flex align-items-center justify-content-between flex-wrap gap-2">
+                        <div class="form-check form-switch mb-0">
+                          <input class="form-check-input parcel-consent-toggle" type="checkbox" id="consent_${p.id}"
+                            data-parcel-id="${p.id}" data-farm-id="${farm.id}"
+                            ${p.consent_satellite_monitoring == 1 ? 'checked' : ''}>
+                          <label class="form-check-label small fw-semibold" for="consent_${p.id}">
+                            <i class="bi bi-satellite me-1"></i>Satellite monitoring consent
+                            ${p.consent_satellite_monitoring != 1 ? '<span class="badge bg-danger ms-1">Missing — triggers EUDR risk</span>' : '<span class="badge bg-success ms-1">Granted</span>'}
+                          </label>
+                        </div>
+                        <button type="button" class="btn btn-sm btn-outline-success"
+                          onclick="app.saveParcelConsent('${farm.id}', '${p.id}')">
+                          <i class="bi bi-save me-1"></i>Save Consent
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>`).join('')}
@@ -10260,6 +10275,30 @@ class PlotraDashboard {
         } catch (error) {
             console.error('Error loading farm details:', error);
             content.innerHTML = `<div class="text-center py-5 text-danger"><i class="bi bi-exclamation-triangle fs-1"></i><p class="mt-2">${error.message}</p></div>`;
+        }
+    }
+
+    async saveParcelConsent(farmId, parcelId) {
+        const toggle = document.getElementById(`consent_${parcelId}`);
+        if (!toggle) return;
+        const value = toggle.checked ? 1 : 0;
+        try {
+            await api.request(`/farmer/farm/${farmId}/parcels/${parcelId}`, {
+                method: 'PUT',
+                body: JSON.stringify({ consent_satellite_monitoring: value }),
+            });
+            this.showToast(value ? 'Satellite consent granted' : 'Satellite consent removed', 'success');
+            // Update badge inline
+            const label = toggle.nextElementSibling;
+            if (label) {
+                const badge = label.querySelector('.badge');
+                if (badge) {
+                    badge.className = value ? 'badge bg-success ms-1' : 'badge bg-danger ms-1';
+                    badge.textContent = value ? 'Granted' : 'Missing — triggers EUDR risk';
+                }
+            }
+        } catch (e) {
+            this.showToast(e.message, 'error');
         }
     }
 
