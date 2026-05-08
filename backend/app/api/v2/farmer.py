@@ -778,48 +778,61 @@ async def get_farm_satellite_image(
         to_dt = datetime.utcnow()
     from_dt = to_dt - timedelta(days=365)
 
-    # Step 1: Use Catalog API to find the single least-cloudy acquisition date in the window.
-    # This avoids multi-scene mosaicking which causes per-pixel color noise.
-    best_scene_from = from_dt
-    best_scene_to = to_dt
+    # Step 1: CDSE public STAC — find the single least-cloudy Sentinel-2 scene in the window.
+    # Using a single scene eliminates the per-pixel mixing that causes colour noise.
+    best_date = None
     try:
-        catalog_payload = {
-            "bbox": bbox,
-            "datetime": f"{from_dt.strftime('%Y-%m-%dT%H:%M:%SZ')}/{to_dt.strftime('%Y-%m-%dT%H:%M:%SZ')}",
-            "collections": ["sentinel-2-l2a"],
-            "limit": 50,
-            "sortby": [{"field": "eo:cloud_cover", "direction": "asc"}],
-        }
         async with httpx.AsyncClient(timeout=30) as client:
-            cat_resp = await client.post(
-                "https://sh.dataspace.copernicus.eu/api/v1/catalog/1.0.0/search",
-                headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
-                json=catalog_payload,
+            stac_resp = await client.post(
+                "https://catalogue.dataspace.copernicus.eu/stac/search",
+                headers={"Content-Type": "application/json"},
+                json={
+                    "bbox": bbox,
+                    "datetime": f"{from_dt.strftime('%Y-%m-%dT%H:%M:%SZ')}/{to_dt.strftime('%Y-%m-%dT%H:%M:%SZ')}",
+                    "collections": ["SENTINEL-2"],
+                    "limit": 100,
+                },
             )
-        if cat_resp.status_code == 200:
-            features = cat_resp.json().get("features", [])
+        if stac_resp.status_code == 200:
+            features = stac_resp.json().get("features", [])
+            # Sort by cloud cover ascending in Python (don't rely on API sorting)
+            features.sort(key=lambda f: f.get("properties", {}).get("eo:cloud_cover", 100))
             if features:
-                best_dt_str = features[0].get("properties", {}).get("datetime", "")
+                best_props = features[0].get("properties", {})
+                best_dt_str = best_props.get("datetime", "")
+                cloud = best_props.get("eo:cloud_cover", "?")
                 if best_dt_str:
-                    best_dt = datetime.fromisoformat(best_dt_str.replace("Z", "+00:00")).replace(tzinfo=None)
-                    best_scene_from = best_dt - timedelta(hours=12)
-                    best_scene_to   = best_dt + timedelta(hours=12)
-                    print(f"[SAT-IMG] Best scene: {best_dt.date()}  cloud={features[0].get('properties',{}).get('eo:cloud_cover','?')}%", flush=True)
+                    best_date = datetime.fromisoformat(best_dt_str.replace("Z", "+00:00")).replace(tzinfo=None)
+                    print(f"[SAT-IMG] Best scene via STAC: {best_date.date()}  cloud={cloud}%", flush=True)
+        else:
+            print(f"[SAT-IMG] STAC returned {stac_resp.status_code}: {stac_resp.text[:200]}", flush=True)
     except Exception as cat_err:
-        print(f"[SAT-IMG] Catalog lookup failed ({cat_err}), falling back to full window", flush=True)
+        print(f"[SAT-IMG] STAC lookup failed ({cat_err})", flush=True)
 
-    img_from_str = best_scene_from.strftime("%Y-%m-%dT%H:%M:%SZ")
-    img_to_str   = best_scene_to.strftime("%Y-%m-%dT%H:%M:%SZ")
-    label_from   = best_scene_from.strftime("%Y-%m-%d")
-    label_to     = best_scene_to.strftime("%Y-%m-%d")
+    if best_date:
+        img_from_str = (best_date - timedelta(hours=12)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        img_to_str   = (best_date + timedelta(hours=12)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        label_from   = best_date.strftime("%Y-%m-%d")
+        label_to     = best_date.strftime("%Y-%m-%d")
+        mosaic_order = None  # single scene — no mosaicking needed
+    else:
+        # Fallback: use leastCC across the full window
+        img_from_str = from_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+        img_to_str   = to_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+        label_from   = from_dt.strftime("%Y-%m-%d")
+        label_to     = to_dt.strftime("%Y-%m-%d")
+        mosaic_order = "leastCC"
+        print("[SAT-IMG] No STAC result — falling back to leastCC over full window", flush=True)
 
+    # Gamma-corrected true colour: better mid-tone visibility than flat 2.5x linear
     evalscript = """
 //VERSION=3
 function setup() {
   return { input: [{bands: ["B04","B03","B02"]}], output: {bands:3, sampleType:"AUTO"} };
 }
 function evaluatePixel(s) {
-  return [2.5*s.B04, 2.5*s.B03, 2.5*s.B02];
+  function tc(v) { return Math.pow(Math.min(1, Math.max(0, v * 3.5)), 0.7); }
+  return [tc(s.B04), tc(s.B03), tc(s.B02)];
 }
 """
 
@@ -832,6 +845,10 @@ function evaluatePixel(s) {
     else:
         img_w, img_h = max(64, round(max_px * lon_span / lat_span)), max_px
 
+    data_filter = {"timeRange": {"from": img_from_str, "to": img_to_str}, "maxCloudCoverage": 100}
+    if mosaic_order:
+        data_filter["mosaickingOrder"] = mosaic_order
+
     payload = {
         "input": {
             "bounds": {
@@ -840,10 +857,7 @@ function evaluatePixel(s) {
             },
             "data": [{
                 "type": "sentinel-2-l2a",
-                "dataFilter": {
-                    "timeRange": {"from": img_from_str, "to": img_to_str},
-                    "maxCloudCoverage": 100,
-                }
+                "dataFilter": data_filter,
             }]
         },
         "output": {
