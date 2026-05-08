@@ -755,11 +755,12 @@ async def get_farm_satellite_image(
     if not coords:
         raise HTTPException(status_code=404, detail="No parcel boundary found for this farm")
 
-    # Bounding box — 0.005° (~550m) each side so the farm sits in landscape context.
-    # Small farms (<10 pixels) look completely blocky when cropped too tight.
+    # Bounding box — 0.015° (~1.65km) each side: farm in landscape context.
+    # Sentinel-2 is 10m/pixel native; zooming in too tight makes pixels huge.
+    # A ~3km wide view at 1024px → ~3m/output-pixel → each S2 pixel ≈ 3px → smooth.
     lons = [c[0] for c in coords]
     lats = [c[1] for c in coords]
-    buf = 0.005
+    buf = 0.015
     bbox = [min(lons) - buf, min(lats) - buf, max(lons) + buf, max(lats) + buf]
 
     # Get CDSE token
@@ -824,15 +825,13 @@ async def get_farm_satellite_image(
         mosaic_order = "leastCC"
         print("[SAT-IMG] No STAC result — falling back to leastCC over full window", flush=True)
 
-    # Gamma-corrected true colour: better mid-tone visibility than flat 2.5x linear
     evalscript = """
 //VERSION=3
 function setup() {
   return { input: [{bands: ["B04","B03","B02"]}], output: {bands:3, sampleType:"AUTO"} };
 }
 function evaluatePixel(s) {
-  function tc(v) { return Math.pow(Math.min(1, Math.max(0, v * 3.5)), 0.7); }
-  return [tc(s.B04), tc(s.B03), tc(s.B02)];
+  return [2.5*s.B04, 2.5*s.B03, 2.5*s.B02];
 }
 """
 
