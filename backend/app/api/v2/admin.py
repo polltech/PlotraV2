@@ -743,12 +743,13 @@ async def export_dds_xml(
         )
     
     xml_content = eudr_service.generate_dds_xml(dds)
-    
-    return {
-        "content": xml_content,
-        "content_type": "application/xml",
-        "filename": f"{dds.dds_number}.xml"
-    }
+
+    from fastapi.responses import Response
+    return Response(
+        content=xml_content,
+        media_type="application/xml",
+        headers={"Content-Disposition": f'attachment; filename="{dds.dds_number}.xml"'},
+    )
 
 
 @router.post("/farms/{farm_id}/compliance-check")
