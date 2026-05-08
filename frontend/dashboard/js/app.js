@@ -6839,7 +6839,17 @@ class PlotraDashboard {
                                     The key is used to submit Due Diligence Statements to the EU EUDR system.
                                 </div>
                                 <div class="row">
-                                    ${fieldRow('EUDR API Key', 'eudr_api_key', eudrCfg.api_key || '', 'password', 'Leave *** to keep existing key')}
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label fw-semibold">EUDR API Key</label>
+                                        <div class="input-group input-group-sm">
+                                            <input type="password" class="form-control form-control-sm" id="eudr_api_key"
+                                                value=""
+                                                data-has-key="${eudrCfg.api_key === '***' ? '1' : ''}"
+                                                placeholder="${eudrCfg.api_key === '***' ? 'Key saved — enter new value to replace' : 'Paste API key here'}">
+                                            <button class="btn btn-outline-secondary" type="button" onclick="const i=document.getElementById('eudr_api_key');i.type=i.type==='password'?'text':'password';this.innerHTML=i.type==='password'?'<i class=&quot;bi bi-eye&quot;></i>':'<i class=&quot;bi bi-eye-slash&quot;></i>';"><i class="bi bi-eye"></i></button>
+                                        </div>
+                                        <small class="text-muted">${eudrCfg.api_key === '***' ? 'Leave blank to keep the existing key' : ''}</small>
+                                    </div>
                                 </div>
                                 <div class="mt-3 d-flex align-items-center gap-3">
                                     <button class="btn btn-success btn-sm" onclick="app.saveSystemSection('eudr')"><i class="bi bi-save me-1"></i>Save Key</button>
@@ -6885,7 +6895,9 @@ class PlotraDashboard {
         for (const [elId, key] of Object.entries(fields)) {
             const el = document.getElementById(elId);
             if (!el) continue;
-            values[key] = checkboxIds.has(elId) ? el.checked : el.value;
+            const val = checkboxIds.has(elId) ? el.checked : el.value;
+            if (val === '' && el.dataset.hasKey === '1') continue;
+            values[key] = val;
         }
         try {
             await api.updateSystemSettings(section, values);
