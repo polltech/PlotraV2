@@ -1,21 +1,140 @@
 """
-Plotra Platform - EUDR Integration Layer (Backend Stub)
-Stub implementation for backend compatibility
+Plotra Platform - EUDR Integration Layer
+Real integration with eudr-api.eu REST API (x-api-key auth, version 2).
 """
 import hashlib
-import hmac
-import json
 import uuid
+import httpx
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
-from app.core.config import settings
+try:
+    from app.core.logging import logger
+except ImportError:
+    import logging
+    logger = logging.getLogger(__name__)
 
+
+# ---------------------------------------------------------------------------
+# Config helpers
+# ---------------------------------------------------------------------------
+
+_EUDR_BASE_URL = "https://www.eudr-api.eu"
+_EUDR_VERSION  = "2"
+
+
+async def _load_eudr_api_key() -> str:
+    """Load cfg_eudr_api_key from SystemConfig DB table."""
+    try:
+        from app.core.database import async_session_factory
+        from app.models.system import SystemConfig
+        from sqlalchemy import select
+        async with async_session_factory() as session:
+            result = await session.execute(
+                select(SystemConfig).where(SystemConfig.config_key == "cfg_eudr_api_key")
+            )
+            row = result.scalar_one_or_none()
+            return (row.config_value or "") if row else ""
+    except Exception as e:
+        logger.error(f"Failed to load EUDR API key: {e}")
+        return ""
+
+
+def _eudr_headers(api_key: str) -> Dict[str, str]:
+    return {
+        "x-api-key": api_key,
+        "x-api-eudr-version": _EUDR_VERSION,
+        "Content-Type": "application/json",
+    }
+
+
+# ---------------------------------------------------------------------------
+# Real EUDR API client
+# ---------------------------------------------------------------------------
+
+class EUDRApiClient:
+    """Thin async wrapper around the eudr-api.eu REST API."""
+
+    def __init__(self, api_key: str):
+        self.api_key = api_key
+        self.headers = _eudr_headers(api_key)
+
+    async def echo(self, message: str = "Plotra ping") -> Dict:
+        """Verify connectivity and authentication."""
+        async with httpx.AsyncClient(timeout=30) as client:
+            resp = await client.get(
+                f"{_EUDR_BASE_URL}/api/eudr/echo",
+                headers=self.headers,
+                params={"message": message},
+            )
+        return {"status_code": resp.status_code, "body": resp.json() if resp.content else {}}
+
+    async def submit_dds(self, dds_payload: Dict) -> Dict:
+        """
+        Submit a Due Diligence Statement to the EUDR system.
+        POST /api/eudr/dds  (v2 format)
+        """
+        async with httpx.AsyncClient(timeout=60) as client:
+            resp = await client.post(
+                f"{_EUDR_BASE_URL}/api/eudr/dds",
+                headers=self.headers,
+                json=dds_payload,
+            )
+        body = resp.json() if resp.content else {}
+        if resp.status_code not in (200, 201, 202):
+            raise RuntimeError(f"EUDR DDS submission failed ({resp.status_code}): {body}")
+        return body
+
+    async def get_dds_status(self, reference: str) -> Dict:
+        """GET /api/eudr/dds/{reference}"""
+        async with httpx.AsyncClient(timeout=30) as client:
+            resp = await client.get(
+                f"{_EUDR_BASE_URL}/api/eudr/dds/{reference}",
+                headers=self.headers,
+            )
+        return resp.json() if resp.content else {}
+
+    async def get_risk_assessment(self, country: str, commodity: str) -> Dict:
+        """GET /api/eudr/risk-assessment"""
+        async with httpx.AsyncClient(timeout=30) as client:
+            resp = await client.get(
+                f"{_EUDR_BASE_URL}/api/eudr/risk-assessment",
+                headers=self.headers,
+                params={"country": country, "commodity": commodity},
+            )
+        if resp.status_code == 200:
+            return resp.json()
+        return {}
+
+    async def get_usage_stats(self) -> Dict:
+        """GET /api/eudr/usage  — dashboard stats."""
+        async with httpx.AsyncClient(timeout=30) as client:
+            resp = await client.get(
+                f"{_EUDR_BASE_URL}/api/eudr/usage",
+                headers=self.headers,
+            )
+        return resp.json() if resp.content else {}
+
+
+async def get_eudr_client() -> EUDRApiClient:
+    """Load API key from DB and return a configured client."""
+    api_key = await _load_eudr_api_key()
+    if not api_key:
+        raise RuntimeError(
+            "EUDR API key not configured. "
+            "Go to Admin → System → EUDR and enter your API key."
+        )
+    return EUDRApiClient(api_key)
+
+
+# ---------------------------------------------------------------------------
+# Data structures (unchanged — used by EUDR router)
+# ---------------------------------------------------------------------------
 
 @dataclass
 class DDSData:
-    """Data structure for Due Diligence Statement generation (stub)"""
+    """Due Diligence Statement data."""
     operator_name: str
     operator_id: str = ""
     contact_name: str = ""
@@ -40,7 +159,7 @@ class DDSData:
 
 @dataclass
 class CertificateData:
-    """Data structure for certificate generation (stub)"""
+    """Certificate generation data."""
     certificate_type: str
     entity_type: str
     entity_id: int
@@ -53,31 +172,36 @@ class CertificateData:
     validity_days: int = 365
 
 
+# ---------------------------------------------------------------------------
+# Service (used by EUDR router endpoints)
+# ---------------------------------------------------------------------------
+
 class EUDRIntegrationService:
     """
-    EUDR compliance integration service stub.
-    Provides interface without actual EUDR integration.
+    EUDR compliance service.
+    Generates DDS locally and submits via the eudr-api.eu REST API.
     """
-    
+
     def __init__(self, secret_key: str = None):
-        self.secret_key = secret_key or "stub-secret-key"
+        self.secret_key = secret_key or "plotra-eudr"
         self.certificate_validity_days = 365
-    
-    def generate_due_diligence_statement(self, dds_data: DDSData, farms: Optional[List[Dict]] = None) -> Dict[str, Any]:
-        """Generate complete DDS with all required fields for EUDR compliance."""
-        dds_number = f"DDS-{datetime.utcnow().strftime('%Y%m%d')}-{uuid.uuid4().hex[:8].upper()}"
-        
-        # Ensure farms is not None
+
+    def generate_due_diligence_statement(
+        self, dds_data: DDSData, farms: Optional[List[Dict]] = None
+    ) -> Dict[str, Any]:
+        """Build a DDS document (v2 format) ready for submission."""
         farms = farms or []
+        dds_number = f"DDS-{datetime.utcnow().strftime('%Y%m%d')}-{uuid.uuid4().hex[:8].upper()}"
 
-        # Calculate risk level based on farms and commodity type
-        commodity_type = str(dds_data.commodity_type or "Coffee")
-        risk_level = self._calculate_risk_level(farms, commodity_type)
+        from app.core.eudr_risk import assess_eudr_risk
+        country = dds_data.country_of_origin or "Kenya"
+        commodity = dds_data.commodity_type or "Coffee"
+        risk = assess_eudr_risk(country, commodity)
+        risk_level = risk["risk_level"]
 
-        # Generate DDS data structure with all required fields
         dds = {
             "dds_number": dds_number,
-            "version": "1.0",
+            "version": "2",
             "operator_name": dds_data.operator_name,
             "operator_id": dds_data.operator_id,
             "contact_name": dds_data.contact_name,
@@ -91,234 +215,122 @@ class EUDRIntegrationService:
             "supplier_name": dds_data.supplier_name,
             "supplier_country": dds_data.supplier_country,
             "first_placement_country": dds_data.first_placement_country,
-            "first_placement_date": dds_data.first_placement_date.isoformat() if dds_data.first_placement_date else None,
+            "first_placement_date": (
+                dds_data.first_placement_date.isoformat()
+                if dds_data.first_placement_date else None
+            ),
             "risk_level": risk_level,
+            "risk_score": risk["risk_score"],
+            "risk_triggers": risk["triggers"],
             "submission_status": "draft",
             "dds_hash": hashlib.sha256(dds_number.encode()).hexdigest(),
-            "signature": self._generate_signature(dds_number),
             "farms": farms,
-            "risk_assessment": self._generate_risk_assessment(farms),
-            "mitigation_measures": self._generate_mitigation_measures(risk_level),
-            "evidence_references": self._generate_evidence_references(farms),
-            "farm_coordinates": self._get_farm_coordinates(farms)
+            "risk_assessment": {
+                "overall_risk": risk_level,
+                "risk_score": risk["risk_score"],
+                "country_risk": risk["country_risk"],
+                "commodity_risk": risk["commodity_risk"],
+                "triggers": risk["triggers"],
+                "requires_satellite_review": risk["requires_satellite_review"],
+                "requires_additional_docs": risk["requires_additional_docs"],
+                "monitoring_frequency": risk["monitoring_frequency"],
+            },
+            "mitigation_measures": self._mitigation_measures(risk_level),
+            "evidence_references": self._evidence_refs(farms),
+            "farm_coordinates": self._farm_coords(farms),
         }
-        
         return dds
-    
-    def _calculate_risk_level(self, farms: Optional[List[Dict]], commodity_type: str) -> str:
-        """Calculate risk level using official EUDR risk assessment."""
-        if not farms:
-            return "low"
 
-        from app.core.eudr_risk import assess_eudr_risk
+    async def submit_dds_to_eudr(self, dds: Dict) -> Dict:
+        """Submit a generated DDS to the eudr-api.eu system."""
+        client = await get_eudr_client()
+        return await client.submit_dds(dds)
 
-        # Use official EU risk assessment for the primary farm/country
-        primary_farm = farms[0] if farms else {}
-        country = primary_farm.get('country', 'Kenya')
+    async def check_connection(self) -> Dict:
+        """Test connectivity and return echo response."""
+        client = await get_eudr_client()
+        return await client.echo("Plotra connection test")
 
-        risk_assessment = assess_eudr_risk(country, commodity_type)
+    async def fetch_usage_stats(self) -> Dict:
+        """Return API usage stats from the EUDR dashboard."""
+        client = await get_eudr_client()
+        return await client.get_usage_stats()
 
-        return risk_assessment['risk_level']
-    
-    def _generate_signature(self, dds_number: str) -> str:
-        """Generate digital signature for DDS."""
-        # This would typically use a private key for signing
-        signature_data = f"{dds_number}{datetime.utcnow().isoformat()}"
-        return hashlib.sha256(signature_data.encode()).hexdigest()
-    
-    def _generate_risk_assessment(self, farms: Optional[List[Dict]]) -> Dict:
-        """Generate risk assessment based on farms."""
-        if not farms:
-            return {
-                "overall_risk": "low",
-                "factors": [],
-                "description": "No farms linked - low risk"
-            }
-
-        factors = []
-        for farm in farms or []:
-            factors.append({
-                "farm_id": farm.get('id'),
-                "farm_name": farm.get('farm_name', 'Unknown'),
-                "region": farm.get('region', 'Unknown'),
-                "risk_level": "low"
-            })
-            
-        return {
-            "overall_risk": "low",
-            "factors": factors,
-            "description": "All farms are in low-risk areas"
-        }
-    
-    def _generate_mitigation_measures(self, risk_level: str) -> List[str]:
-        """Generate mitigation measures based on risk level."""
-        if risk_level == "high":
-            return [
-                "Enhanced monitoring of farm activities",
-                "Regular satellite imagery checks",
-                "Verification of land use practices",
-                "Farmer training on sustainable practices"
-            ]
-        elif risk_level == "medium":
-            return [
-                "Regular monitoring of farm boundaries",
-                "Documentation of farming practices",
-                "Farmer awareness programs"
-            ]
-        else:
-            return [
-                "Standard monitoring procedures",
-                "Annual sustainability assessments"
-            ]
-    
-    def _generate_evidence_references(self, farms: Optional[List[Dict]]) -> List[str]:
-        """Generate evidence references for linked farms."""
-        evidence = []
-        for farm in farms or []:
-            evidence.append(f"Satellite analysis for farm {farm.get('farm_name', 'Unknown')}")
-            evidence.append(f"Farmer registration documents for farm {farm.get('farm_name', 'Unknown')}")
-
-        return evidence
-
-    def _get_farm_coordinates(self, farms: Optional[List[Dict]]) -> List[Dict]:
-        """Get farm coordinates for geospatial reference."""
-        coordinates = []
-        for farm in farms or []:
-            if farm.get('centroid_lat') and farm.get('centroid_lon'):
-                coordinates.append({
-                    "farm_id": farm.get('id'),
-                    "lat": farm.get('centroid_lat'),
-                    "lon": farm.get('centroid_lon'),
-                    "name": farm.get('farm_name', 'Unknown')
-                })
-                
-        return coordinates
-    
-    def generate_certificate(self, cert_data: CertificateData, compliance_id: Optional[int] = None) -> Dict[str, Any]:
-        """Generate mock certificate."""
+    def generate_certificate(
+        self, cert_data: CertificateData, compliance_id: Optional[int] = None
+    ) -> Dict[str, Any]:
         cert_number = f"Cert-EUDR-{datetime.utcnow().strftime('%Y%m')}-{uuid.uuid4().hex[:8].upper()}"
         issue_date = datetime.utcnow()
-        expiry_date = issue_date + timedelta(days=cert_data.validity_days)
-        
         return {
             "certificate_number": cert_number,
             "certificate_type": cert_data.certificate_type,
             "entity_type": cert_data.entity_type,
             "entity_id": cert_data.entity_id,
-            "issue_date": issue_date,
-            "expiry_date": expiry_date,
+            "issue_date": issue_date.isoformat(),
+            "expiry_date": (issue_date + timedelta(days=cert_data.validity_days)).isoformat(),
             "status": "active",
-            "hmac_signature": "stub_hmac_signature"
         }
-    
-    def verify_certificate(self, certificate: Any) -> Dict[str, Any]:
-        """Verify certificate stub."""
-        return {
-            "valid": True,
-            "certificate_number": "stub",
-            "message": "Certificate verification stub"
-        }
-    
-    def generate_dds_xml(self, dds: Dict) -> str:
-        """Generate EUDR-compliant XML representation of DDS."""
-        import xml.etree.ElementTree as ET
-        
-        # Create root element
-        root = ET.Element("DueDiligenceStatement")
-        root.set("version", dds.get("version", "1.0"))
-        
-        # Header section
-        header = ET.SubElement(root, "Header")
-        ET.SubElement(header, "DDSNumber").text = dds.get("dds_number", "")
-        ET.SubElement(header, "Version").text = dds.get("version", "1.0")
-        ET.SubElement(header, "CreationDate").text = datetime.utcnow().isoformat()
-        ET.SubElement(header, "OperatorName").text = dds.get("operator_name", "")
-        ET.SubElement(header, "OperatorID").text = dds.get("operator_id", "")
-        
-        # Contact information
-        contact = ET.SubElement(root, "Contact")
-        ET.SubElement(contact, "Name").text = dds.get("contact_name", "")
-        ET.SubElement(contact, "Email").text = dds.get("contact_email", "")
-        ET.SubElement(contact, "Address").text = dds.get("contact_address", "")
-        
-        # Commodity details
-        commodity = ET.SubElement(root, "Commodity")
-        ET.SubElement(commodity, "Type").text = dds.get("commodity_type", "Coffee")
-        ET.SubElement(commodity, "HSCode").text = dds.get("hs_code", "090111")
-        ET.SubElement(commodity, "CountryOfOrigin").text = dds.get("country_of_origin", "Kenya")
-        quantity = ET.SubElement(commodity, "Quantity")
-        ET.SubElement(quantity, "Value").text = str(dds.get("quantity", 0))
-        ET.SubElement(quantity, "Unit").text = dds.get("unit", "kg")
-        
-        # Supplier information
-        supplier = ET.SubElement(root, "Supplier")
-        ET.SubElement(supplier, "Name").text = dds.get("supplier_name", "")
-        ET.SubElement(supplier, "Country").text = dds.get("supplier_country", "")
-        
-        # Placement information
-        placement = ET.SubElement(root, "FirstPlacement")
-        ET.SubElement(placement, "Country").text = dds.get("first_placement_country", "")
-        if dds.get("first_placement_date"):
-            placement_date = dds.get("first_placement_date")
-            if hasattr(placement_date, 'isoformat'):
-                ET.SubElement(placement, "Date").text = placement_date.isoformat()
-            else:
-                ET.SubElement(placement, "Date").text = str(placement_date)
-        
-        # Risk assessment
-        risk = ET.SubElement(root, "RiskAssessment")
-        ET.SubElement(risk, "OverallRisk").text = dds.get("risk_level", "low")
-        
-        # Risk factors
-        risk_factors = ET.SubElement(risk, "RiskFactors")
-        risk_assessment = dds.get("risk_assessment", {})
-        for factor in risk_assessment.get("factors", []):
-            factor_elem = ET.SubElement(risk_factors, "Factor")
-            ET.SubElement(factor_elem, "FarmID").text = str(factor.get("farm_id", ""))
-            ET.SubElement(factor_elem, "FarmName").text = factor.get("farm_name", "")
-            ET.SubElement(factor_elem, "Region").text = factor.get("region", "")
-            ET.SubElement(factor_elem, "RiskLevel").text = factor.get("risk_level", "low")
-        
-        # Mitigation measures
-        mitigation = ET.SubElement(root, "MitigationMeasures")
-        for measure in dds.get("mitigation_measures", []):
-            ET.SubElement(mitigation, "Measure").text = measure
-        
-        # Evidence references
-        evidence = ET.SubElement(root, "EvidenceReferences")
-        for ref in dds.get("evidence_references", []):
-            ET.SubElement(evidence, "Reference").text = ref
-        
-        # Farm coordinates (geospatial evidence)
-        farms = ET.SubElement(root, "Farms")
-        for farm in dds.get("farm_coordinates", []):
-            farm_elem = ET.SubElement(farms, "Farm")
-            ET.SubElement(farm_elem, "FarmID").text = str(farm.get("farm_id", ""))
-            ET.SubElement(farm_elem, "Name").text = farm.get("name", "")
-            coords = ET.SubElement(farm_elem, "Coordinates")
-            ET.SubElement(coords, "Latitude").text = str(farm.get("lat", 0))
-            ET.SubElement(coords, "Longitude").text = str(farm.get("lon", 0))
-        
-        # Digital signature
-        signature = ET.SubElement(root, "DigitalSignature")
-        ET.SubElement(signature, "Hash").text = dds.get("dds_hash", "")
-        ET.SubElement(signature, "Signature").text = dds.get("signature", "")
-        
-        # Convert to string with proper formatting
-        from xml.dom import minidom
-        xml_str = ET.tostring(root, encoding="UTF-8")
-        dom = minidom.parseString(xml_str)
-        return dom.toprettyxml(indent="  ")
-    
+
     def calculate_compliance_score(self, compliance_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Calculate compliance score stub."""
+        from app.core.eudr_risk import assess_eudr_risk
+        country = compliance_data.get("country", "Kenya")
+        commodity = compliance_data.get("commodity", "Coffee")
+        risk = assess_eudr_risk(country, commodity)
+        score = max(0, 100 - risk["risk_score"])
         return {
-            "compliance_percentage": 85.0,
-            "total_score": 85,
+            "compliance_percentage": round(score, 1),
+            "total_score": round(score),
             "max_score": 100,
-            "status": "compliant"
+            "risk_level": risk["risk_level"],
+            "status": "compliant" if score >= 50 else "non_compliant",
+            "triggers": risk["triggers"],
         }
 
+    # ------------------------------------------------------------------
+    def _mitigation_measures(self, risk_level: str) -> List[str]:
+        if risk_level == "critical":
+            return [
+                "Immediate suspension of procurement from this source",
+                "Third-party field audit required",
+                "Enhanced satellite monitoring (monthly)",
+                "Legal review of land title and deforestation history",
+            ]
+        if risk_level == "high":
+            return [
+                "Enhanced monitoring of farm activities",
+                "Regular satellite imagery checks (monthly)",
+                "Verification of land use practices",
+                "Farmer training on sustainable practices",
+            ]
+        if risk_level == "medium":
+            return [
+                "Regular monitoring of farm boundaries",
+                "Documentation of farming practices",
+                "Farmer awareness programs",
+                "Quarterly satellite review",
+            ]
+        return ["Standard monitoring procedures", "Annual sustainability assessments"]
 
-# Service instance
+    def _evidence_refs(self, farms: List[Dict]) -> List[str]:
+        refs = []
+        for farm in farms:
+            name = farm.get("farm_name", "Unknown")
+            refs.append(f"Satellite analysis for farm {name}")
+            refs.append(f"Farmer registration documents for farm {name}")
+        return refs
+
+    def _farm_coords(self, farms: List[Dict]) -> List[Dict]:
+        coords = []
+        for farm in farms:
+            if farm.get("centroid_lat") and farm.get("centroid_lon"):
+                coords.append({
+                    "farm_id": farm.get("id"),
+                    "lat": farm.get("centroid_lat"),
+                    "lon": farm.get("centroid_lon"),
+                    "name": farm.get("farm_name", "Unknown"),
+                })
+        return coords
+
+
+# Service singleton
 eudr_service = EUDRIntegrationService()

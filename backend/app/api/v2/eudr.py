@@ -22,7 +22,7 @@ from app.core.auth import (
 from app.models.user import User, UserRole
 from app.models.farm import Farm, LandParcel
 from app.models.traceability import Batch
-from app.services.eudr_integration import EUDRIntegrationService, DDSData
+from app.services.eudr_integration import EUDRIntegrationService, DDSData, get_eudr_client
 from app.core.schema_enforcement import HashedIDGenerator, DualSchemaEnforcer
 
 router = APIRouter(prefix="", tags=["EUDR & DDS"])
@@ -407,4 +407,184 @@ async def get_four_tier_status(
         "cooperative_approved": stats.coop_approved or 0,
         "kipawa_verified": stats.kipawa_verified or 0,
         "eudr_submitted": stats.eudr_submitted or 0
+    }
+
+
+# ---------------------------------------------------------------------------
+# Real EUDR API endpoints (eudr-api.eu)
+# ---------------------------------------------------------------------------
+
+@router.get("/api-status")
+async def eudr_api_status(
+    current_user: User = Depends(require_plotra_admin),
+):
+    """
+    Test connectivity to the eudr-api.eu REST API.
+    Returns echo response and confirms API key is working.
+    """
+    try:
+        client = await get_eudr_client()
+        result = await client.echo("Plotra connection test")
+        return {
+            "connected": result.get("status_code") in (200, 201),
+            "status_code": result.get("status_code"),
+            "response": result.get("body"),
+            "api_version": "2",
+            "base_url": "https://www.eudr-api.eu",
+        }
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"EUDR API unreachable: {e}")
+
+
+@router.get("/usage-stats")
+async def eudr_usage_stats(
+    current_user: User = Depends(require_plotra_admin),
+):
+    """Get API usage statistics from the EUDR dashboard."""
+    try:
+        client = await get_eudr_client()
+        stats = await client.get_usage_stats()
+        return {"source": "eudr-api.eu", "stats": stats}
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"EUDR API error: {e}")
+
+
+@router.post("/batch/{batch_id}/submit-dds")
+async def submit_dds_to_eudr(
+    batch_id: str,
+    current_user: User = Depends(require_plotra_admin),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Generate a DDS for the batch and submit it to the real EUDR API (eudr-api.eu).
+    Returns the EUDR reference number on success.
+    """
+    result = await db.execute(select(Batch).where(Batch.id == batch_id))
+    batch = result.scalar_one_or_none()
+    if not batch:
+        raise HTTPException(status_code=404, detail="Batch not found")
+
+    from app.models.user import Cooperative
+    coop_result = await db.execute(
+        select(Cooperative).where(Cooperative.id == batch.cooperative_id)
+    )
+    coop = coop_result.scalar_one_or_none()
+
+    farms_result = await db.execute(
+        select(Farm).where(Farm.cooperative_id == batch.cooperative_id)
+    )
+    farms = [
+        {"id": str(f.id), "farm_name": f.farm_name,
+         "centroid_lat": f.centroid_lat, "centroid_lon": f.centroid_lon}
+        for f in farms_result.scalars().all()
+    ]
+
+    dds_data = DDSData(
+        operator_name=coop.name if coop else "Unknown Cooperative",
+        commodity_type="Coffee",
+        country_of_origin="Kenya",
+        quantity=float(batch.weight_kg or 0),
+        hs_code="090111",
+    )
+
+    svc = EUDRIntegrationService()
+    dds = svc.generate_due_diligence_statement(dds_data, farms)
+
+    try:
+        submission = await svc.submit_dds_to_eudr(dds)
+        return {
+            "status": "submitted",
+            "dds_number": dds["dds_number"],
+            "eudr_reference": submission.get("reference") or submission.get("id"),
+            "risk_level": dds["risk_level"],
+            "submitted_at": datetime.utcnow().isoformat(),
+            "eudr_response": submission,
+        }
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"DDS submission failed: {e}")
+
+
+@router.get("/farm/{farm_id}/compliance")
+async def get_farm_compliance(
+    farm_id: str,
+    current_user: User = Depends(require_farmer),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Full EUDR compliance assessment for a farm.
+    Combines local rule engine + satellite analysis data.
+    """
+    from app.core.eudr_risk import assess_eudr_risk, check_2020_deforestation_baseline
+    from app.models.satellite import SatelliteObservation
+
+    result = await db.execute(select(Farm).where(Farm.id == farm_id))
+    farm = result.scalar_one_or_none()
+    if not farm:
+        raise HTTPException(status_code=404, detail="Farm not found")
+
+    parcels_result = await db.execute(
+        select(LandParcel).where(LandParcel.farm_id == farm_id)
+    )
+    parcels = parcels_result.scalars().all()
+
+    # Latest satellite observation for this farm
+    sat_result = await db.execute(
+        select(SatelliteObservation)
+        .where(SatelliteObservation.farm_id == farm_id)
+        .order_by(SatelliteObservation.acquisition_date.desc())
+        .limit(1)
+    )
+    latest_sat = sat_result.scalar_one_or_none()
+    sat_data = None
+    if latest_sat:
+        sat_data = {
+            "deforestation_detected": latest_sat.deforestation_detected,
+            "canopy_change_percentage": latest_sat.canopy_change_percentage,
+            "ndvi_mean": latest_sat.ndvi_mean,
+        }
+
+    parcel_assessments = []
+    overall_risk_score = 0
+    for parcel in parcels:
+        risk = assess_eudr_risk("Kenya", "Coffee", parcel)
+        deforestation = check_2020_deforestation_baseline(parcel, sat_data)
+        parcel_assessments.append({
+            "parcel_id": str(parcel.id),
+            "parcel_name": parcel.parcel_name,
+            "risk_level": risk["risk_level"],
+            "risk_score": risk["risk_score"],
+            "triggers": risk["triggers"],
+            "deforestation_check": deforestation,
+            "requires_satellite_review": risk["requires_satellite_review"],
+            "requires_additional_docs": risk["requires_additional_docs"],
+            "block_submission": risk["block_submission"],
+            "monitoring_frequency": risk["monitoring_frequency"],
+        })
+        overall_risk_score = max(overall_risk_score, risk["risk_score"])
+
+    if overall_risk_score >= 70:
+        overall_level = "critical"
+    elif overall_risk_score >= 50:
+        overall_level = "high"
+    elif overall_risk_score >= 25:
+        overall_level = "medium"
+    else:
+        overall_level = "low"
+
+    return {
+        "farm_id": farm_id,
+        "farm_name": farm.farm_name,
+        "overall_risk_level": overall_level,
+        "overall_risk_score": round(overall_risk_score, 1),
+        "eudr_compliant": overall_risk_score < 50,
+        "parcels": parcel_assessments,
+        "satellite_data_available": sat_data is not None,
+        "satellite_summary": sat_data,
+        "assessed_at": datetime.utcnow().isoformat(),
     }

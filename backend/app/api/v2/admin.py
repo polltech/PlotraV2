@@ -2264,6 +2264,7 @@ async def update_system_settings(
         "storage": "cfg_s3_",
         "payments": "cfg_payments_",
         "app": "cfg_app_",
+        "eudr": "cfg_eudr_",
     }
     prefix = prefix_map.get(section, f"cfg_{section}_")
 
