@@ -6914,7 +6914,7 @@ class PlotraDashboard {
         const el = document.getElementById('eudrTestResult');
         if (el) el.innerHTML = '<span class="text-muted">Testing...</span>';
         try {
-            const res = await api.request('/eudr/api-status', { optional: true });
+            const res = await api.request('/api-status', { optional: true });
             if (res && (res.connected || res.status === 'ok')) {
                 if (el) el.innerHTML = `<span class="text-success"><i class="bi bi-check-circle me-1"></i>Connected to eudr-api.eu</span>`;
             } else {
