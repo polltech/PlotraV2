@@ -90,6 +90,11 @@ define( 'WP_DEBUG', false );
 
 /* Add any custom values between this line and the "stop editing" line. */
 
+/* Increase PHP memory for Elementor and heavy plugins */
+@ini_set( 'memory_limit', '512M' );
+define( 'WP_MEMORY_LIMIT', '512M' );
+define( 'WP_MAX_MEMORY_LIMIT', '512M' );
+
 /* Trust X-Forwarded-Proto from nginx reverse proxy to avoid redirect loops */
 if ( isset( $_SERVER['HTTP_X_FORWARDED_PROTO'] ) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https' ) {
     $_SERVER['HTTPS'] = 'on';
