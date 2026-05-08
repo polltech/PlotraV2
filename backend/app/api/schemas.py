@@ -640,7 +640,7 @@ class DDSRequest(BaseModel):
     supplier_country: Optional[str] = None
     first_placement_country: Optional[str] = None
     first_placement_date: Optional[datetime] = None
-    farm_ids: List[int] = []
+    farm_ids: List[str] = []
     
     @field_validator('country_of_origin')
     def validate_country(cls, v):

@@ -4976,7 +4976,7 @@ class PlotraDashboard {
             // Get selected farm IDs
             const farmSelect = document.getElementById('ddsFarmIds');
             const selectedOptions = Array.from(farmSelect.selectedOptions);
-            const farmIds = selectedOptions.map(option => parseInt(option.value));
+            const farmIds = selectedOptions.map(option => option.value).filter(v => v);
 
             const data = {
                 operator_name: document.getElementById('ddsOperatorName').value,
@@ -4992,7 +4992,7 @@ class PlotraDashboard {
                 supplier_name: document.getElementById('ddsSupplierName').value,
                 supplier_country: document.getElementById('ddsSupplierCountry').value,
                 first_placement_country: document.getElementById('ddsFirstPlacementCountry').value,
-                first_placement_date: document.getElementById('ddsFirstPlacementDate').value || null,
+                first_placement_date: document.getElementById('ddsFirstPlacementDate').value ? document.getElementById('ddsFirstPlacementDate').value + 'T00:00:00' : null,
                 farm_ids: farmIds
             };
 
