@@ -67,7 +67,6 @@ services:
       MYSQL_PASSWORD: "7fT!5SCp]7"
     volumes:
       - wordpress_db_data:/var/lib/mysql
-      - ./plotra/orderifi_wp283.sql:/docker-entrypoint-initdb.d/init.sql:ro
     restart: unless-stopped
     networks:
       - plotrav2_plotra_network
