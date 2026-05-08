@@ -625,7 +625,20 @@ async def generate_dds(
     db.add(dds)
     await db.commit()
     await db.refresh(dds)
-    
+
+    # Attempt live submission to eudr-api.eu; update status if successful
+    try:
+        from app.models.compliance import SubmissionStatus
+        submission = await eudr_service.submit_dds_to_eudr(dds_dict)
+        dds.submission_status = SubmissionStatus.SUBMITTED
+        dds.portal_reference = submission.get("reference") or submission.get("id") or ""
+        dds.submitted_date = datetime.utcnow()
+        dds.portal_response = submission
+        await db.commit()
+        await db.refresh(dds)
+    except Exception as submit_err:
+        logger.warning(f"EUDR API submission failed (DDS kept as draft): {submit_err}")
+
     return dds
 
 
