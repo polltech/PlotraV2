@@ -460,39 +460,105 @@ async def submit_dds_to_eudr(
     db: AsyncSession = Depends(get_db)
 ):
     """
-    Generate a DDS for the batch and submit it to the real EUDR API (eudr-api.eu).
-    Returns the EUDR reference number on success.
+    Pre-check all farms in the batch, then generate and submit a full DDS
+    to the eudr-api.eu system. Returns blockers as 422 before submitting.
     """
+    from app.core.eudr_risk import assess_eudr_risk
+    from app.models.user import Cooperative
+    from app.models.farm import LandParcel
+
     result = await db.execute(select(Batch).where(Batch.id == batch_id))
     batch = result.scalar_one_or_none()
     if not batch:
         raise HTTPException(status_code=404, detail="Batch not found")
 
-    from app.models.user import Cooperative
     coop_result = await db.execute(
         select(Cooperative).where(Cooperative.id == batch.cooperative_id)
     )
     coop = coop_result.scalar_one_or_none()
 
-    farms_result = await db.execute(
-        select(Farm).where(Farm.cooperative_id == batch.cooperative_id)
-    )
-    farms = [
-        {"id": str(f.id), "farm_name": f.farm_name,
-         "centroid_lat": f.centroid_lat, "centroid_lon": f.centroid_lon}
-        for f in farms_result.scalars().all()
-    ]
+    # Farms: use origin_farms list if populated, otherwise all cooperative farms
+    farm_ids = batch.origin_farms or []
+    if farm_ids:
+        farms_result = await db.execute(select(Farm).where(Farm.id.in_(farm_ids)))
+    else:
+        farms_result = await db.execute(
+            select(Farm).where(Farm.cooperative_id == batch.cooperative_id)
+        )
+    farms = farms_result.scalars().all()
 
+    # ── Pre-check: run compliance on every parcel ──────────────────────────
+    blockers = []
+    farms_payload = []
+
+    for farm in farms:
+        parcels_result = await db.execute(
+            select(LandParcel).where(LandParcel.farm_id == farm.id)
+        )
+        parcels = parcels_result.scalars().all()
+
+        farm_plots = []
+        for parcel in parcels:
+            risk = assess_eudr_risk("Kenya", "Coffee", parcel)
+            if risk["block_submission"]:
+                blockers.append({
+                    "farm_id": str(farm.id),
+                    "farm_name": farm.farm_name,
+                    "parcel_id": str(parcel.id),
+                    "parcel_name": parcel.parcel_name,
+                    "triggers": risk["triggers"],
+                    "risk_score": risk["risk_score"],
+                    "risk_level": risk["risk_level"],
+                })
+
+            # Build GeoJSON plot entry for EUDR API
+            plot = {
+                "plot_id": str(parcel.id),
+                "plot_name": parcel.parcel_name or f"Parcel {parcel.id[:8]}",
+                "area_hectares": parcel.area_hectares,
+                "country": "KE",
+                "centroid": {
+                    "latitude": parcel.centroid_lat or farm.centroid_lat,
+                    "longitude": parcel.centroid_lon or farm.centroid_lon,
+                },
+            }
+            if parcel.boundary_geojson:
+                plot["geojson"] = parcel.boundary_geojson
+            farm_plots.append(plot)
+
+        farms_payload.append({
+            "id": str(farm.id),
+            "farm_name": farm.farm_name,
+            "centroid_lat": farm.centroid_lat,
+            "centroid_lon": farm.centroid_lon,
+            "plots": farm_plots,
+        })
+
+    if blockers:
+        raise HTTPException(
+            status_code=422,
+            detail={"message": "DDS blocked — fix farm issues before submitting", "blockers": blockers},
+        )
+
+    # ── Build full DDS payload ─────────────────────────────────────────────
     dds_data = DDSData(
         operator_name=coop.name if coop else "Unknown Cooperative",
+        operator_id=coop.registration_number or coop.tax_id or "" if coop else "",
+        contact_name=coop.contact_person or "" if coop else "",
+        contact_email=coop.contact_person_email or coop.email or "" if coop else "",
+        contact_address=coop.address or "" if coop else "",
         commodity_type="Coffee",
-        country_of_origin="Kenya",
-        quantity=float(batch.weight_kg or 0),
         hs_code="090111",
+        country_of_origin="Kenya",
+        quantity=float(batch.total_weight_kg or 0),
+        unit="kg",
+        supplier_name=coop.name if coop else "",
+        supplier_country="KE",
+        first_placement_date=batch.harvest_end_date or batch.created_at,
     )
 
     svc = EUDRIntegrationService()
-    dds = svc.generate_due_diligence_statement(dds_data, farms)
+    dds = svc.generate_due_diligence_statement(dds_data, farms_payload)
 
     try:
         submission = await svc.submit_dds_to_eudr(dds)
@@ -501,6 +567,7 @@ async def submit_dds_to_eudr(
             "dds_number": dds["dds_number"],
             "eudr_reference": submission.get("reference") or submission.get("id"),
             "risk_level": dds["risk_level"],
+            "farm_count": len(farms),
             "submitted_at": datetime.utcnow().isoformat(),
             "eudr_response": submission,
         }

@@ -9865,10 +9865,6 @@ class PlotraDashboard {
                                     ${!hasPolygon ? 'disabled title="Capture farm polygon first"' : ''}>
                                     <i class="bi bi-satellite-fill me-1"></i>Analyse
                                 </button>
-                                <button class="btn btn-outline-success btn-sm flex-fill" style="min-width:70px"
-                                    onclick="app.checkFarmCompliance('${farm.id}', '${(farm.farm_name||'Farm').replace(/'/g,"\\'")}')">
-                                    <i class="bi bi-shield-check me-1"></i>Compliance
-                                </button>
                             </div>
                         </div>
                     </div>
