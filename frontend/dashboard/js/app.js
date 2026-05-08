@@ -6915,11 +6915,17 @@ class PlotraDashboard {
         if (el) el.innerHTML = '<span class="text-muted">Testing...</span>';
         try {
             const res = await api.request('/api-status', { optional: true });
-            if (res && (res.connected || res.status === 'ok')) {
+            if (res && res.connected) {
                 if (el) el.innerHTML = `<span class="text-success"><i class="bi bi-check-circle me-1"></i>Connected to eudr-api.eu</span>`;
             } else {
-                const msg = res?.message || res?.detail || 'Connection failed';
-                if (el) el.innerHTML = `<span class="text-danger"><i class="bi bi-x-circle me-1"></i>${msg}</span>`;
+                const sc = res?.status_code;
+                // 5xx from EUDR means key accepted but their server errored — treat as connected
+                if (sc && sc >= 500) {
+                    if (el) el.innerHTML = `<span class="text-warning"><i class="bi bi-exclamation-circle me-1"></i>Key accepted — eudr-api.eu returned ${sc} (server-side issue)</span>`;
+                } else {
+                    const msg = sc ? `eudr-api.eu returned HTTP ${sc}` : (res?.message || res?.detail || 'Connection failed');
+                    if (el) el.innerHTML = `<span class="text-danger"><i class="bi bi-x-circle me-1"></i>${msg}</span>`;
+                }
             }
         } catch (e) {
             if (el) el.innerHTML = `<span class="text-danger"><i class="bi bi-x-circle me-1"></i>${e.message}</span>`;
