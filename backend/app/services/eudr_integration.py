@@ -293,9 +293,7 @@ class EUDRIntegrationService:
                         "descriptors": {
                             "descriptionOfGoods": dds.get("commodity_type", "Coffee"),
                             "goodsMeasure": {
-                                "netMass": float(dds.get("quantity") or 1),
-                                "supplementaryUnit": float(dds.get("quantity") or 1),
-                                "supplementaryUnitQualifier": "KSD",
+                                "netMass": max(1.0, float(dds.get("quantity") or 1)),
                             },
                         },
                         "hsHeading": dds.get("hs_code", "090111"),
