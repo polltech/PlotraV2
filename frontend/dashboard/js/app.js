@@ -5877,7 +5877,7 @@ class PlotraDashboard {
         try {
             const response = await api.getFarms();
             const farms = response.farms || [];
-            farmSelect.innerHTML = '';
+            farmSelect.innerHTML = '<option value="">— Select a farm —</option>';
             farms.forEach(farm => {
                 const option = document.createElement('option');
                 option.value = farm.id;
