@@ -278,7 +278,7 @@ class EUDRIntegrationService:
                 "date": (dds.get("first_placement_date") or datetime.utcnow().isoformat())[:10],
             },
         }
-        logger.info(f"EUDR submit payload: {payload}")
+        logger.warning(f"EUDR submit payload keys={list(payload.keys())} internalRef={payload.get('internalReferenceNumber')!r}")
         return await client.submit_dds(payload)
 
     async def check_connection(self) -> Dict:
