@@ -271,6 +271,7 @@ class EUDRIntegrationService:
                     "productionPlaces": production_places,
                 }
             ],
+            "internalReferenceNumber": dds.get("dds_number", ""),
             "statement": {
                 "type": "FULL",
                 "reference": dds.get("dds_number", ""),
