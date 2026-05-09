@@ -2,9 +2,12 @@
 Plotra Platform - Admin API Endpoints (Tier 3 & 4)
 Satellite analysis, user management, and compliance oversight
 """
+import logging
 import uuid
 from datetime import datetime, timedelta
 from typing import List, Optional
+
+logger = logging.getLogger(__name__)
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, Form, File
 from typing import Union
 from sqlalchemy.ext.asyncio import AsyncSession

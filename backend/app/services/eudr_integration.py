@@ -242,9 +242,42 @@ class EUDRIntegrationService:
         return dds
 
     async def submit_dds_to_eudr(self, dds: Dict) -> Dict:
-        """Submit a generated DDS to the eudr-api.eu system."""
+        """Submit a generated DDS to the eudr-api.eu system (v2 format)."""
         client = await get_eudr_client()
-        return await client.submit_dds(dds)
+        # Build v2 payload with required commodities array
+        farm_coords = dds.get("farm_coordinates") or []
+        production_places = [
+            {
+                "id": str(fc.get("farm_id", "")),
+                "name": fc.get("name", ""),
+                "coordinates": {"type": "Point", "coordinates": [fc.get("lon", 0), fc.get("lat", 0)]},
+            }
+            for fc in farm_coords if fc.get("lat") and fc.get("lon")
+        ]
+        payload = {
+            "operator": {
+                "name": dds.get("operator_name", ""),
+                "identifier": dds.get("operator_id", ""),
+                "address": dds.get("contact_address", ""),
+                "email": dds.get("contact_email", ""),
+            },
+            "commodities": [
+                {
+                    "hsCode": dds.get("hs_code", "090111"),
+                    "description": dds.get("commodity_type", "Coffee"),
+                    "countryOfOrigin": dds.get("country_of_origin", "KE"),
+                    "quantity": dds.get("quantity", 0),
+                    "unit": dds.get("unit", "KGM"),
+                    "productionPlaces": production_places,
+                }
+            ],
+            "statement": {
+                "type": "FULL",
+                "reference": dds.get("dds_number", ""),
+                "date": (dds.get("first_placement_date") or datetime.utcnow().isoformat())[:10],
+            },
+        }
+        return await client.submit_dds(payload)
 
     async def check_connection(self) -> Dict:
         """Test connectivity and return echo response."""
