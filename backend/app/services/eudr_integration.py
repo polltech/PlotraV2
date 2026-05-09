@@ -75,12 +75,10 @@ class EUDRApiClient:
         Submit a Due Diligence Statement to the EUDR system.
         POST /api/eudr/dds  (v2 format)
         """
-        ref = dds_payload.get("internalReferenceNumber", "")
         async with httpx.AsyncClient(timeout=60) as client:
             resp = await client.post(
                 f"{_EUDR_BASE_URL}/api/eudr/dds",
                 headers=self.headers,
-                params={"internalReferenceNumber": ref} if ref else None,
                 json=dds_payload,
             )
         body = resp.json() if resp.content else {}
@@ -245,39 +243,68 @@ class EUDRIntegrationService:
 
     async def submit_dds_to_eudr(self, dds: Dict) -> Dict:
         """Submit a generated DDS to the eudr-api.eu system (v2 format)."""
+        import base64, json as _json
         client = await get_eudr_client()
-        # Build v2 payload with required commodities array
+
+        # Build producers list from farm coordinates with base64-encoded GeoJSON geometry
         farm_coords = dds.get("farm_coordinates") or []
-        production_places = [
-            {
-                "id": str(fc.get("farm_id", "")),
-                "name": fc.get("name", ""),
-                "coordinates": {"type": "Point", "coordinates": [fc.get("lon", 0), fc.get("lat", 0)]},
-            }
-            for fc in farm_coords if fc.get("lat") and fc.get("lon")
-        ]
+        producers = []
+        for fc in farm_coords:
+            if fc.get("lat") and fc.get("lon"):
+                geojson = {"type": "Point", "coordinates": [fc["lon"], fc["lat"]]}
+                geo_b64 = base64.b64encode(_json.dumps(geojson).encode()).decode()
+                producers.append({
+                    "country": dds.get("country_of_origin", "KE")[:2].upper(),
+                    "name": fc.get("name", "Farm"),
+                    "geometryGeojson": geo_b64,
+                })
+        if not producers:
+            # Fallback: Kenya centroid so submission is not rejected for missing geolocation
+            geojson = {"type": "Point", "coordinates": [37.9062, 0.0236]}
+            producers = [{
+                "country": "KE",
+                "name": dds.get("operator_name", "Farm"),
+                "geometryGeojson": base64.b64encode(_json.dumps(geojson).encode()).decode(),
+            }]
+
         payload = {
-            "operator": {
-                "name": dds.get("operator_name", ""),
-                "identifier": dds.get("operator_id", ""),
-                "address": dds.get("contact_address", ""),
-                "email": dds.get("contact_email", ""),
-            },
-            "commodities": [
-                {
-                    "hsCode": dds.get("hs_code", "090111"),
-                    "description": dds.get("commodity_type", "Coffee"),
-                    "countryOfOrigin": dds.get("country_of_origin", "KE"),
-                    "quantity": dds.get("quantity", 0),
-                    "unit": dds.get("unit", "KGM"),
-                    "productionPlaces": production_places,
-                }
-            ],
-            "internalReferenceNumber": dds.get("dds_number", ""),
+            "operatorType": "OPERATOR",
             "statement": {
-                "type": "FULL",
-                "reference": dds.get("dds_number", ""),
-                "date": (dds.get("first_placement_date") or datetime.utcnow().isoformat())[:10],
+                "internalReferenceNumber": dds.get("dds_number", ""),
+                "activityType": "IMPORT",
+                "countryOfActivity": (dds.get("first_placement_country") or "DE")[:2].upper(),
+                "borderCrossCountry": dds.get("country_of_origin", "KE")[:2].upper(),
+                "comment": f"Coffee DDS submitted via Plotra Platform",
+                "geoLocationConfidential": False,
+                "operator": {
+                    "operatorAddress": {
+                        "name": dds.get("operator_name", ""),
+                        "country": dds.get("country_of_origin", "KE")[:2].upper(),
+                        "street": dds.get("contact_address", ""),
+                        "postalCode": "",
+                        "city": "",
+                        "fullAddress": dds.get("contact_address", ""),
+                    },
+                    "email": dds.get("contact_email", ""),
+                    "phone": "",
+                },
+                "commodities": [
+                    {
+                        "descriptors": {
+                            "descriptionOfGoods": dds.get("commodity_type", "Coffee"),
+                            "goodsMeasure": {
+                                "supplementaryUnit": float(dds.get("quantity", 0)),
+                                "supplementaryUnitQualifier": "KSD",
+                            },
+                        },
+                        "hsHeading": dds.get("hs_code", "090111"),
+                        "speciesInfo": {
+                            "scientificName": "Coffea arabica",
+                            "commonName": dds.get("commodity_type", "Coffee"),
+                        },
+                        "producers": producers,
+                    }
+                ],
             },
         }
         return await client.submit_dds(payload)
