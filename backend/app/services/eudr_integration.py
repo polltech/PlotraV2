@@ -267,6 +267,7 @@ class EUDRIntegrationService:
                 "geometryGeojson": base64.b64encode(_json.dumps(geojson).encode()).decode(),
             }]
 
+        net_mass = max(1.0, float(dds.get("quantity") or 1))
         payload = {
             "operatorType": "OPERATOR",
             "statement": {
@@ -274,7 +275,7 @@ class EUDRIntegrationService:
                 "activityType": "IMPORT",
                 "countryOfActivity": (dds.get("first_placement_country") or "DE")[:2].upper(),
                 "borderCrossCountry": dds.get("country_of_origin", "KE")[:2].upper(),
-                "comment": f"Coffee DDS submitted via Plotra Platform",
+                "comment": "Coffee DDS submitted via Plotra Platform",
                 "geoLocationConfidential": False,
                 "operator": {
                     "operatorAddress": {
@@ -290,11 +291,9 @@ class EUDRIntegrationService:
                 },
                 "commodities": [
                     {
-                        "descriptors": {
+                        "descriptor": {
                             "descriptionOfGoods": dds.get("commodity_type", "Coffee"),
-                            "goodsMeasure": {
-                                "netMass": max(1.0, float(dds.get("quantity") or 1)),
-                            },
+                            "netMass": net_mass,
                         },
                         "hsHeading": dds.get("hs_code", "090111"),
                         "speciesInfo": {
@@ -306,6 +305,7 @@ class EUDRIntegrationService:
                 ],
             },
         }
+        logger.info(f"EUDR DDS payload: {_json.dumps(payload, default=str)}")
         return await client.submit_dds(payload)
 
     async def check_connection(self) -> Dict:
