@@ -5781,6 +5781,16 @@ class PlotraDashboard {
         const isAdmin = ['PLATFORM_ADMIN', 'SUPER_ADMIN', 'ADMIN', 'PLOTRA_ADMIN', 'EUDR_REVIEWER'].includes(role);
         
         content.innerHTML = `
+            <div class="alert alert-warning d-flex align-items-start gap-2 mb-3" role="alert">
+                <i class="bi bi-exclamation-triangle-fill fs-5 mt-1"></i>
+                <div>
+                    <strong>EU EUDR Information System Offline</strong> &mdash;
+                    The EU EUDR Information System has been in read-only mode since <strong>16 February 2026</strong>
+                    and is not accepting new DDS submissions.
+                    DDS records are saved locally and will be submitted automatically when the system reopens.
+                    <a href="https://green-forum.ec.europa.eu/nature-and-biodiversity/deforestation-regulation-implementation/information-system-deforestation-regulation_en" target="_blank" rel="noopener" class="alert-link">More info</a>
+                </div>
+            </div>
             <div class="row g-4 mb-4">
                 <div class="col-md-12">
                     <div class="card">
@@ -5832,7 +5842,7 @@ class PlotraDashboard {
                         <td>${dds.commodity_type}</td>
                         <td>${dds.quantity} ${dds.unit}</td>
                         <td><span class="badge bg-${this.getRiskBadgeClass(dds.risk_level)}">${dds.risk_level.toUpperCase()}</span></td>
-                        <td><span class="badge bg-${this.getStatusBadgeClass(dds.submission_status)}">${dds.submission_status}</span></td>
+                        <td>${this.getDDSStatusBadge(dds)}</td>
                         <td>${new Date(dds.created_at).toLocaleDateString()}</td>
                         <td>
                             <button class="btn btn-sm btn-outline-primary" onclick="app.exportDDS('${dds.id}')">
@@ -5869,6 +5879,13 @@ class PlotraDashboard {
             case 'rejected': return 'danger';
             default: return 'secondary';
         }
+    }
+
+    getDDSStatusBadge(dds) {
+        if (dds.portal_response && dds.portal_response.eudr_is_offline) {
+            return `<span class="badge bg-warning text-dark" title="EU EUDR Information System is offline since Feb 2026. DDS will be resubmitted when the system reopens.">IS Offline</span>`;
+        }
+        return `<span class="badge bg-${this.getStatusBadgeClass(dds.submission_status)}">${dds.submission_status}</span>`;
     }
 
     async showGenerateDDSModal() {
@@ -5921,7 +5938,7 @@ class PlotraDashboard {
                             <tr><td><strong>Supplier:</strong></td><td>${dds.supplier_name || '-'}<br>${dds.supplier_country || ''}</td></tr>
                             <tr><td><strong>First Placement:</strong></td><td>${dds.first_placement_country || '-'}<br>${dds.first_placement_date ? new Date(dds.first_placement_date).toLocaleDateString() : '-'}</td></tr>
                             <tr><td><strong>Risk Level:</strong></td><td><span class="badge bg-${this.getRiskBadgeClass(dds.risk_level)}">${dds.risk_level.toUpperCase()}</span></td></tr>
-                            <tr><td><strong>Status:</strong></td><td><span class="badge bg-${this.getStatusBadgeClass(dds.submission_status)}">${dds.submission_status}</span></td></tr>
+                            <tr><td><strong>Status:</strong></td><td>${this.getDDSStatusBadge(dds)}</td></tr>
                             <tr><td><strong>Created:</strong></td><td>${new Date(dds.created_at).toLocaleString()}</td></tr>
                         </table>
                     </div>

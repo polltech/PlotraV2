@@ -640,7 +640,21 @@ async def generate_dds(
         await db.commit()
         await db.refresh(dds)
     except Exception as submit_err:
-        logger.warning(f"EUDR API submission failed (DDS kept as draft): {submit_err}")
+        err_str = str(submit_err)
+        if "503" in err_str or "timeout" in err_str.lower() or "Service Temporarily Unavailable" in err_str:
+            dds.portal_response = {
+                "eudr_is_offline": True,
+                "message": (
+                    "The EU EUDR Information System is temporarily unavailable "
+                    "(offline since 16 Feb 2026, read-only mode). "
+                    "No new submissions are being accepted. "
+                    "DDS will be resubmitted automatically when the system reopens."
+                ),
+            }
+            await db.commit()
+            logger.warning(f"EUDR IS offline — DDS {dds.dds_number} queued as draft for later resubmission")
+        else:
+            logger.warning(f"EUDR API submission failed (DDS kept as draft): {submit_err}")
 
     return dds
 

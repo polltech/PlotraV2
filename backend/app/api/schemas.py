@@ -702,8 +702,9 @@ class DDSResponse(BaseModel):
     submission_status: str
     dds_hash: Optional[str] = None
     signature: Optional[str] = None
+    portal_response: Optional[dict] = None
     created_at: datetime
-    
+
     class Config:
         from_attributes = True
 
