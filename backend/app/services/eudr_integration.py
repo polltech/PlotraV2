@@ -75,10 +75,12 @@ class EUDRApiClient:
         Submit a Due Diligence Statement to the EUDR system.
         POST /api/eudr/dds  (v2 format)
         """
+        ref = dds_payload.get("internalReferenceNumber", "")
         async with httpx.AsyncClient(timeout=60) as client:
             resp = await client.post(
                 f"{_EUDR_BASE_URL}/api/eudr/dds",
                 headers=self.headers,
+                params={"internalReferenceNumber": ref} if ref else None,
                 json=dds_payload,
             )
         body = resp.json() if resp.content else {}
@@ -278,7 +280,6 @@ class EUDRIntegrationService:
                 "date": (dds.get("first_placement_date") or datetime.utcnow().isoformat())[:10],
             },
         }
-        logger.warning(f"EUDR submit payload keys={list(payload.keys())} internalRef={payload.get('internalReferenceNumber')!r}")
         return await client.submit_dds(payload)
 
     async def check_connection(self) -> Dict:
