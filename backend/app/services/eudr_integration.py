@@ -246,18 +246,24 @@ class EUDRIntegrationService:
         import base64, json as _json
         client = await get_eudr_client()
 
-        # Build producers list from farm coordinates with base64-encoded GeoJSON geometry
+        # Build producers list — EUDR rule: polygon for >4 ha, point for ≤4 ha (WGS84 / EPSG:4326)
         farm_coords = dds.get("farm_coordinates") or []
         producers = []
         for fc in farm_coords:
-            if fc.get("lat") and fc.get("lon"):
+            area = fc.get("area_hectares") or 0
+            boundary = fc.get("boundary_geojson")
+            if area > 4 and boundary and boundary.get("type") in ("Polygon", "MultiPolygon"):
+                geojson = boundary  # already WGS84 from PostGIS SRID 4326
+            elif fc.get("lat") and fc.get("lon"):
                 geojson = {"type": "Point", "coordinates": [fc["lon"], fc["lat"]]}
-                geo_b64 = base64.b64encode(_json.dumps(geojson).encode()).decode()
-                producers.append({
-                    "country": dds.get("country_of_origin", "KE")[:2].upper(),
-                    "name": fc.get("name", "Farm"),
-                    "geometryGeojson": geo_b64,
-                })
+            else:
+                continue
+            geo_b64 = base64.b64encode(_json.dumps(geojson).encode()).decode()
+            producers.append({
+                "country": dds.get("country_of_origin", "KE")[:2].upper(),
+                "name": fc.get("name", "Farm"),
+                "geometryGeojson": geo_b64,
+            })
         if not producers:
             # Fallback: Kenya centroid so submission is not rejected for missing geolocation
             geojson = {"type": "Point", "coordinates": [37.9062, 0.0236]}
@@ -421,13 +427,23 @@ class EUDRIntegrationService:
     def _farm_coords(self, farms: List[Dict]) -> List[Dict]:
         coords = []
         for farm in farms:
-            if farm.get("centroid_lat") and farm.get("centroid_lon"):
-                coords.append({
-                    "farm_id": farm.get("id"),
-                    "lat": farm.get("centroid_lat"),
-                    "lon": farm.get("centroid_lon"),
-                    "name": farm.get("farm_name", "Unknown"),
-                })
+            if not (farm.get("centroid_lat") or farm.get("parcels")):
+                continue
+            # Pick the largest parcel's polygon for the boundary
+            best_boundary = None
+            parcels = farm.get("parcels") or []
+            if parcels:
+                best = max(parcels, key=lambda p: p.get("area_hectares") or 0)
+                if best.get("boundary_geojson"):
+                    best_boundary = best["boundary_geojson"]
+            coords.append({
+                "farm_id": farm.get("id"),
+                "lat": farm.get("centroid_lat"),
+                "lon": farm.get("centroid_lon"),
+                "name": farm.get("farm_name", "Unknown"),
+                "area_hectares": farm.get("area_hectares") or 0,
+                "boundary_geojson": best_boundary,
+            })
         return coords
 
 

@@ -568,7 +568,16 @@ async def generate_dds(
                 "coffee_area_hectares": farm.coffee_area_hectares,
                 "verification_status": farm.verification_status,
                 "compliance_status": farm.compliance_status,
-                "deforestation_risk_score": farm.deforestation_risk_score
+                "deforestation_risk_score": farm.deforestation_risk_score,
+                "parcels": [
+                    {
+                        "parcel_id": p.id,
+                        "area_hectares": p.area_hectares,
+                        "boundary_geojson": p.boundary_geojson,
+                    }
+                    for p in farm.parcels
+                    if not getattr(p, "is_deleted", 0)
+                ],
             })
     
     # Create DDS data structure
