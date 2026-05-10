@@ -416,6 +416,7 @@ async def _store_weather_observations(parcel_id: str, weather_quarters: List[Dic
             rec = result.scalar_one_or_none()
             if rec is None:
                 rec = WeatherObservation(parcel_id=parcel_id)
+                rec.period_from = wq["period_from"]
                 session.add(rec)
             rec.period_to         = wq["period_to"]
             rec.rainfall_mm       = wq.get("rainfall_mm")
