@@ -7194,18 +7194,20 @@ class PlotraDashboard {
         const drawRadio   = document.getElementById('farmModeDraw');
         const coordsRadio = document.getElementById('farmModeCoords');
         const coordsPanel = document.getElementById('coordsInputPanel');
+        const drawShapePanel = document.getElementById('drawShapePanel');
         const _setMode = (mode) => {
             this._farmCaptureMode = mode;
-            if (coordsPanel) coordsPanel.style.display = mode === 'coords' ? '' : 'none';
+            if (coordsPanel)    coordsPanel.style.display    = mode === 'coords' ? '' : 'none';
+            if (drawShapePanel) drawShapePanel.style.display = mode === 'draw'   ? '' : 'none';
             // Stop any active draw session when switching away
-            if (mode !== 'draw' && this._drawControl && this.farmMap) {
-                try { this._drawControl.remove(); } catch(e) {}
+            if (mode !== 'draw' && this._drawControl) {
+                try { this._drawControl.disable(); } catch(e) {}
                 this._drawControl = null;
             }
             const inst = document.getElementById('captureInstructions');
             const startBtn = document.getElementById('startCaptureBtn');
             if (mode === 'draw') {
-                if (inst) inst.textContent = 'Press "Start Capture" to activate the draw tool, then click the map to draw your farm boundary.';
+                if (inst) inst.textContent = 'Choose a shape, press Start Capture, then draw on the map.';
                 if (startBtn) startBtn.disabled = false;
             } else if (mode === 'coords') {
                 if (inst) inst.textContent = 'Enter lat,lon pairs (one per line) or paste GeoJSON, then click Import Coordinates.';
@@ -7314,16 +7316,42 @@ class PlotraDashboard {
             this._drawnItems = new L.FeatureGroup().addTo(this.farmMap);
             this.farmMap.on(L.Draw.Event.CREATED, (e) => {
                 const layer = e.layer;
-                const latlngs = layer.getLatLngs()[0]; // outer ring
+                const type  = e.layerType;
+                let latlngs = [];
+
+                if (type === 'circle') {
+                    // Approximate circle as 64-point polygon (WGS84)
+                    const center = layer.getLatLng();
+                    const R = layer.getRadius(); // metres
+                    const pts = 64;
+                    for (let i = 0; i < pts; i++) {
+                        const angle = (2 * Math.PI * i) / pts;
+                        const dLat = (R * Math.cos(angle)) / 111320;
+                        const dLon = (R * Math.sin(angle)) / (111320 * Math.cos(center.lat * Math.PI / 180));
+                        latlngs.push({ lat: center.lat + dLat, lng: center.lng + dLon });
+                    }
+                } else if (type === 'rectangle') {
+                    latlngs = layer.getLatLngs()[0];
+                } else {
+                    latlngs = layer.getLatLngs()[0]; // polygon outer ring
+                }
+
                 this.gpsPoints = latlngs.map(ll => ({ lat: ll.lat, lon: ll.lng, accuracy: 0, timestamp: Date.now() }));
                 this._rebuildFarmOverlay();
                 this._farmIsCapturing = false;
+                if (this.farmMap) {
+                    const bounds = L.latLngBounds(latlngs.map(ll => [ll.lat, ll.lng]));
+                    this.farmMap.fitBounds(bounds, { padding: [20, 20] });
+                }
                 const fb = document.getElementById('finishCaptureBtn');
+                const sb = document.getElementById('startCaptureBtn');
                 const cb = document.getElementById('clearPointsBtn');
                 if (fb) fb.disabled = this.gpsPoints.length < 3;
+                if (sb) sb.disabled = false;
                 if (cb) cb.disabled = false;
                 const inst = document.getElementById('captureInstructions');
-                if (inst) inst.textContent = `Polygon imported — ${this.gpsPoints.length} points. Press Finish to confirm or Clear to redo.`;
+                const label = type === 'circle' ? 'Circle (64-pt polygon)' : type === 'rectangle' ? 'Rectangle' : 'Polygon';
+                if (inst) inst.textContent = `${label} drawn — ${this.gpsPoints.length} points. Press Finish to confirm or Clear to redo.`;
             });
 
             // Wire up buttons
@@ -7384,23 +7412,34 @@ class PlotraDashboard {
     _startFarmCapture() {
         const mode = this._farmCaptureMode || 'walk';
 
-        // Draw mode: activate Leaflet.Draw polygon tool
+        // Draw mode: activate the selected Leaflet.Draw shape tool
         if (mode === 'draw') {
             if (!this.farmMap || !this._drawnItems) return;
-            if (this._drawControl) { try { this._drawControl.remove(); } catch(e) {} }
-            this._drawControl = new L.Draw.Polygon(this.farmMap, {
-                shapeOptions: { color: '#40916c', fillColor: '#52b788', fillOpacity: 0.3, weight: 2 },
-                showArea: true,
-                metric: true,
-                repeatMode: false,
-            });
+            if (this._drawControl) { try { this._drawControl.disable(); } catch(e) {} }
+            const shapeOpts = { color: '#40916c', fillColor: '#52b788', fillOpacity: 0.3, weight: 2 };
+            const shape = document.getElementById('shapeRectangle')?.checked ? 'rectangle'
+                        : document.getElementById('shapeCircle')?.checked    ? 'circle'
+                        : 'polygon';
+            let hint = '';
+            if (shape === 'rectangle') {
+                this._drawControl = new L.Draw.Rectangle(this.farmMap, { shapeOptions: shapeOpts });
+                hint = 'Click and drag to draw a rectangle over the farm area.';
+            } else if (shape === 'circle') {
+                this._drawControl = new L.Draw.Circle(this.farmMap, { shapeOptions: shapeOpts });
+                hint = 'Click the farm centre, then drag to set the boundary radius.';
+            } else {
+                this._drawControl = new L.Draw.Polygon(this.farmMap, {
+                    shapeOptions: shapeOpts, showArea: true, metric: true, repeatMode: false,
+                });
+                hint = 'Click corners to draw the boundary. Double-click or click the first point to close.';
+            }
             this._drawControl.enable();
             const startBtn = document.getElementById('startCaptureBtn');
             const clearBtn = document.getElementById('clearPointsBtn');
             if (startBtn) startBtn.disabled = true;
             if (clearBtn) clearBtn.disabled = false;
             const inst = document.getElementById('captureInstructions');
-            if (inst) inst.textContent = 'Click on the map to place polygon corners. Double-click or click the first point to close the shape.';
+            if (inst) inst.textContent = hint;
             return;
         }
 

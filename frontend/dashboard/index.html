@@ -1017,6 +1017,18 @@
                                                                     Area: <strong id="calculatedArea">--</strong> ha
                                                                 </span>
                                                             </div>
+                                                            <!-- Shape selector (shown only in Draw mode) -->
+                                                            <div id="drawShapePanel" style="display:none;" class="mb-2">
+                                                                <small class="text-muted d-block mb-1">Select shape, then press Start Capture:</small>
+                                                                <div class="btn-group btn-group-sm" role="group" id="drawShapeGroup">
+                                                                    <input type="radio" class="btn-check" name="drawShapeRadio" id="shapePolygon" autocomplete="off" checked>
+                                                                    <label class="btn btn-outline-warning" for="shapePolygon" title="Draw a custom polygon"><i class="bi bi-pentagon me-1"></i>Polygon</label>
+                                                                    <input type="radio" class="btn-check" name="drawShapeRadio" id="shapeRectangle" autocomplete="off">
+                                                                    <label class="btn btn-outline-warning" for="shapeRectangle" title="Drag to draw a rectangle"><i class="bi bi-bounding-box me-1"></i>Rectangle</label>
+                                                                    <input type="radio" class="btn-check" name="drawShapeRadio" id="shapeCircle" autocomplete="off">
+                                                                    <label class="btn btn-outline-warning" for="shapeCircle" title="Click center then drag radius"><i class="bi bi-circle me-1"></i>Circle</label>
+                                                                </div>
+                                                            </div>
                                                             <!-- Coords input panel (shown only in Coords mode) -->
                                                             <div id="coordsInputPanel" style="display:none;" class="mb-2">
                                                                 <textarea id="coordsTextarea" class="form-control form-control-sm font-monospace" rows="4"
