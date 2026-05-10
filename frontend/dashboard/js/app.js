@@ -10300,23 +10300,6 @@ class PlotraDashboard {
                     </div>
                 </div>
 
-                <!-- Tree & Crop Management -->
-                <div class="col-12">
-                    <div class="card border-0 shadow-sm">
-                        <div class="card-header d-flex justify-content-between align-items-center" style="background: linear-gradient(135deg, #6f4e37 0%, #8b4513 100%); color: white;">
-                            <h6 class="mb-0"><i class="bi bi-tree me-2"></i>Agroforestry Management</h6>
-                            <button class="btn btn-sm" style="background-color: #daa520; color: #3d2515;" onclick="app.openTreeMapping()">
-                                <i class="bi bi-plus-circle me-1"></i>Map Trees & Crops
-                            </button>
-                        </div>
-                        <div class="card-body">
-                            <div id="treeManagement">
-                                <div class="text-muted text-center py-3"><i class="bi bi-tree me-2"></i>No farm selected</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
                 <!-- Crop Analysis Results -->
                 <div class="col-12">
                     <div class="card border-0 shadow-sm">
@@ -10464,7 +10447,6 @@ class PlotraDashboard {
                     const runBtn = document.getElementById('runSelectedFarmAnalysisBtn');
                     if (runBtn) runBtn.disabled = false;
                     this.loadHistoricalAnalysis(targetId);
-                    this.loadTreeManagement(targetId);
                     this.loadCropAnalysis(targetId);
                 }
             }
@@ -10490,11 +10472,9 @@ class PlotraDashboard {
         };
         setLoading('historicalAnalysis', 'Loading historical data...');
         setLoading('satelliteImagePanel', 'Loading satellite image...');
-        setLoading('treeManagement', 'Loading agroforestry data...');
         setLoading('cropAnalysis', 'Loading crop analysis...');
         this.loadHistoricalAnalysis(farmId);
         this.loadSatelliteImage(farmId, date);
-        this.loadTreeManagement(farmId);
         this.loadCropAnalysis(farmId);
     }
 
