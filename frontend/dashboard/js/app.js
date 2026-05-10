@@ -7212,7 +7212,7 @@ class PlotraDashboard {
                 if (startBtn) startBtn.disabled = true;
             } else {
                 if (inst) inst.textContent = mode === 'walk'
-                    ? 'Press Start Capture, then walk the farm perimeter — points auto-add every 5 m.'
+                    ? 'Press Start Capture, walk to each corner or edge, then press Add Point.'
                     : 'Press Start Capture, then click the map to place boundary points.';
                 if (startBtn) startBtn.disabled = false;
             }
@@ -7292,12 +7292,6 @@ class PlotraDashboard {
                     if (this._farmAutoAddPoint1 && this._farmIsCapturing) {
                         this._farmAutoAddPoint1 = false;
                         this._addFarmPoint(lat, lng, accuracy);
-                    } else if (this._farmIsCapturing && this._farmCaptureMode === 'walk' && this.gpsPoints.length > 0) {
-                        // Walk mode: auto-add every 5 m
-                        const last = this.gpsPoints[this.gpsPoints.length - 1];
-                        if (this._haversineDistance(last.lat, last.lon, lat, lng) >= 5) {
-                            this._addFarmPoint(lat, lng, accuracy);
-                        }
                     }
 
                     // Follow user while walking and capturing
@@ -7425,7 +7419,7 @@ class PlotraDashboard {
         if (this._farmMapCurrentPos) {
             this._addFarmPoint(this._farmMapCurrentPos.latitude, this._farmMapCurrentPos.longitude, this._farmMapCurrentPos.accuracy);
             if (inst) inst.textContent = mode === 'walk'
-                ? 'Point 1 placed. Walk the perimeter — points auto-add every 5 m. Press Add Point at key corners.'
+                ? 'Point 1 placed. Walk to each corner or edge, then press Add Point.'
                 : 'Point 1 placed at your location. Click the map to add boundary corners.';
         } else {
             this._farmAutoAddPoint1 = true;
