@@ -2099,6 +2099,45 @@ async def get_historical_farm_analysis(
     }
 
 
+@router.get("/farm/{farm_id}/deforestation-history")
+async def get_farm_deforestation_history(
+    farm_id: str,
+    current_user: User = Depends(require_farmer),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Full quarterly deforestation history from Dec 2020 to today for a farmer's own farm.
+    Uses 4-index fusion (NDVI/EVI/SAVI/NDMI), weather fusion via Open-Meteo,
+    drought discrimination, and canopy-intact detection.
+    Returns EUDR compliance verdict + classified events with full reasoning.
+    """
+    from app.services.satellite_analysis import satellite_engine
+
+    # Verify farm belongs to this farmer
+    farm_result = await db.execute(
+        select(Farm).where(Farm.id == farm_id, Farm.owner_id == current_user.id)
+    )
+    farm = farm_result.scalar_one_or_none()
+    if not farm:
+        raise HTTPException(status_code=404, detail="Farm not found or access denied.")
+
+    # Get first parcel with a boundary polygon
+    parcel_result = await db.execute(
+        select(LandParcel)
+        .where(LandParcel.farm_id == farm_id)
+        .where(LandParcel.boundary_geojson.isnot(None))
+        .limit(1)
+    )
+    parcel = parcel_result.scalar_one_or_none()
+    if not parcel:
+        raise HTTPException(
+            status_code=404,
+            detail="No mapped parcel found for this farm. Add a boundary polygon first."
+        )
+
+    return await satellite_engine.analyze_parcel_history(parcel)
+
+
 @router.post("/farm/{farm_id}/store-historical-analysis")
 async def store_historical_analysis(
     farm_id: str,

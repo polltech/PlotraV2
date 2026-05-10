@@ -10260,32 +10260,41 @@ class PlotraDashboard {
                     </div>
                 </div>
 
-                <!-- Historical Analysis -->
+                <!-- Deforestation History & EUDR Analysis -->
                 <div class="col-12">
                     <div class="card border-0 shadow-sm">
-                        <div class="card-header bg-light d-flex justify-content-between align-items-center">
-                            <h6 class="mb-0">Historical Analysis</h6>
+                        <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2"
+                             style="background:linear-gradient(135deg,#2c1a0e,#6f4e37);color:#fff;">
                             <div class="d-flex align-items-center gap-2">
-                                <select class="form-select form-select-sm" id="historyYearFilter" style="width: auto;">
-                                    <option value="">All Years</option>
-                                    <option value="2024">2024</option>
-                                    <option value="2023">2023</option>
-                                    <option value="2022">2022</option>
-                                    <option value="2021">2021</option>
-                                </select>
-                                <button class="btn btn-sm btn-outline-success" onclick="app.exportAnalysisReport()" title="Export as PDF proof">
-                                    <i class="bi bi-file-earmark-arrow-down me-1"></i>Export Report
+                                <i class="bi bi-graph-up-arrow fs-5"></i>
+                                <span class="fw-semibold">Deforestation History &amp; EUDR Analysis</span>
+                                <span class="badge bg-warning text-dark fw-normal small ms-1"
+                                      title="4-Index fusion: NDVI+EVI+SAVI+NDMI">4-Index</span>
+                            </div>
+                            <div class="d-flex align-items-center gap-2">
+                                <button class="btn btn-sm btn-light" id="refreshHistoryBtn"
+                                        onclick="app.refreshDeforestationHistory()" style="display:none;">
+                                    <i class="bi bi-arrow-clockwise me-1"></i>Refresh
+                                </button>
+                                <button class="btn btn-sm" style="background:#daa520;color:#3d2515;"
+                                        onclick="app.exportAnalysisReport()" title="Export compliance report">
+                                    <i class="bi bi-file-earmark-arrow-down me-1"></i>Export
                                 </button>
                             </div>
                         </div>
                         <div class="card-body p-0">
-                            <!-- Satellite image — full width at the top -->
-                            <div id="satelliteImagePanel" style="background:#0d1b2a;min-height:220px;border-radius:0;overflow:hidden;position:relative;">
-                                <div class="text-center py-5 text-secondary small"><i class="bi bi-clock-history me-2"></i>No farm selected</div>
+                            <!-- Satellite true-colour image -->
+                            <div id="satelliteImagePanel" style="background:#0d1b2a;min-height:180px;overflow:hidden;position:relative;">
+                                <div class="text-center py-5 text-secondary small">
+                                    <i class="bi bi-satellite me-2"></i>Select a farm to load satellite imagery
+                                </div>
                             </div>
-                            <!-- Analysis text below the image -->
-                            <div class="p-3" id="historicalAnalysis">
-                                <div class="text-muted text-center py-3"><i class="bi bi-clock-history me-2"></i>No farm selected</div>
+                            <!-- Deforestation history charts + events -->
+                            <div id="historicalAnalysis" class="p-3">
+                                <div class="text-muted text-center py-4">
+                                    <i class="bi bi-clock-history fs-3 d-block mb-2"></i>
+                                    Select a farm above to view quarterly deforestation history
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -11436,171 +11445,350 @@ class PlotraDashboard {
     }
 
     async loadHistoricalAnalysis(farmId) {
+        this._currentHistoryFarmId = farmId;
+        const container = document.getElementById('historicalAnalysis');
+        if (!container) return;
+
+        container.innerHTML = `
+            <div class="text-center py-5">
+                <span class="spinner-border text-success" style="color:#6f4e37!important;"></span>
+                <p class="mt-3 text-muted small">
+                    Fetching quarterly satellite data Dec 2020 → today…<br>
+                    Fetching weather history from Open-Meteo…<br>
+                    Running 4-index fusion analysis (NDVI · EVI · SAVI · NDMI)…
+                </p>
+            </div>`;
+
+        const refreshBtn = document.getElementById('refreshHistoryBtn');
+        if (refreshBtn) refreshBtn.style.display = 'none';
+
         try {
-            const historicalData = await api.request(`/farmer/farm/${farmId}/historical-analysis`, { optional: true }) || {};
-
-            const container = document.getElementById('historicalAnalysis');
-            if (!container) return;
-
-            if (!historicalData.historical_data || Object.keys(historicalData.historical_data).length === 0) {
-                container.innerHTML = '<div class="text-muted text-center py-3">No historical analysis data available</div>';
-                return;
-            }
-
-            // Flatten all records across all years, newest first
-            const allRecords = [];
-            Object.keys(historicalData.historical_data).sort().reverse().forEach(year => {
-                historicalData.historical_data[year].forEach(r => allRecords.push({ ...r, year }));
-            });
-
-            // Compute aggregate summary across ALL records
-            const totalAnalyses = allRecords.length;
-            const ndviVals = allRecords.filter(r => r.ndvi_mean).map(r => r.ndvi_mean);
-            const avgNdvi = ndviVals.length ? ndviVals.reduce((s, v) => s + v, 0) / ndviVals.length : 0;
-            const deforestationEvents = allRecords.filter(r => r.deforestation_detected).length;
-            const treeVals = allRecords.filter(r => r.tree_cover_percentage).map(r => r.tree_cover_percentage);
-            const avgTreeCover = treeVals.length ? treeVals.reduce((s, v) => s + v, 0) / treeVals.length : 0;
-            const biomassVals = allRecords.filter(r => r.biomass_tons_hectare).map(r => r.biomass_tons_hectare);
-            const avgBiomass = biomassVals.length ? biomassVals.reduce((s, v) => s + v, 0) / biomassVals.length : 0;
-            const years = Object.keys(historicalData.historical_data).sort().reverse();
-
-            let html = `
-                <div class="card border-0 shadow-sm mb-4" style="background:linear-gradient(135deg,#2c1a0e,#6f4e37);color:#fff;">
-                    <div class="card-body py-3">
-                        <div class="row text-center g-2">
-                            <div class="col">
-                                <div class="h4 mb-0 fw-bold">${totalAnalyses}</div>
-                                <small class="opacity-75">Total Analyses</small>
-                            </div>
-                            <div class="col">
-                                <div class="h4 mb-0 fw-bold text-success">${avgNdvi.toFixed(3)}</div>
-                                <small class="opacity-75">Avg NDVI</small>
-                            </div>
-                            <div class="col">
-                                <div class="h4 mb-0 fw-bold ${deforestationEvents > 0 ? 'text-danger' : 'text-success'}">${deforestationEvents}</div>
-                                <small class="opacity-75">Deforestation Events</small>
-                            </div>
-                            <div class="col">
-                                <div class="h4 mb-0 fw-bold">${avgTreeCover.toFixed(1)}%</div>
-                                <small class="opacity-75">Avg Tree Cover</small>
-                            </div>
-                            <div class="col">
-                                <div class="h4 mb-0 fw-bold text-info">${avgBiomass.toFixed(2)} t/ha</div>
-                                <small class="opacity-75">Avg Biomass</small>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            `;
-
-            // Year sections — each year shows every individual run
-            years.forEach(year => {
-                const yearRecords = historicalData.historical_data[year];
-                const yearNdvi = yearRecords.filter(r => r.ndvi_mean).reduce((s, r) => s + r.ndvi_mean, 0) / (yearRecords.filter(r => r.ndvi_mean).length || 1);
-                const yearDefo = yearRecords.filter(r => r.deforestation_detected).length;
-
-                html += `
-                    <div class="mb-4">
-                        <div class="d-flex align-items-center justify-content-between mb-2">
-                            <h6 class="mb-0 fw-bold"><i class="bi bi-calendar3 me-2" style="color:#6f4e37;"></i>${year}</h6>
-                            <span class="text-muted small">${yearRecords.length} analyses &nbsp;·&nbsp; Avg NDVI ${yearNdvi.toFixed(3)} &nbsp;·&nbsp; ${yearDefo === 0 ? '<span class="text-success">No deforestation</span>' : '<span class="text-danger">' + yearDefo + ' deforestation event(s)</span>'}</span>
-                        </div>
-                        <div class="row g-2">
-                `;
-
-                yearRecords.forEach((rec, idx) => {
-                    const riskLevel = rec.risk_level || 'low';
-                    const riskColor = riskLevel === 'high' ? 'danger' : riskLevel === 'medium' ? 'warning' : 'success';
-                    const eudrOk = rec.analysis_metadata?.eudr_compliant !== false;
-                    const agroScore = rec.analysis_metadata?.agroforestry_score || 0;
-                    const runDate = new Date(rec.analysis_date);
-                    const runLabel = runDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
-
-                    html += `
-                        <div class="col-md-6 col-lg-4">
-                            <div class="card border-0 shadow-sm h-100">
-                                <div class="card-header d-flex justify-content-between align-items-center py-2" style="background:#f8f4f0;">
-                                    <span class="small fw-bold text-dark"><i class="bi bi-satellite me-1" style="color:#6f4e37;"></i>Run #${idx + 1} &mdash; ${runLabel}</span>
-                                    <div class="d-flex gap-1">
-                                        <span class="badge bg-${riskColor} py-1">${riskLevel}</span>
-                                        <span class="badge bg-${eudrOk ? 'success' : 'danger'} py-1">${eudrOk ? 'EUDR ✓' : 'EUDR ✗'}</span>
-                                    </div>
-                                </div>
-                                <div class="card-body p-3">
-                                    <div class="row text-center g-1 mb-3">
-                                        <div class="col-4">
-                                            <div class="fw-bold text-success">${(rec.ndvi_mean || 0).toFixed(3)}</div>
-                                            <small class="text-muted" style="font-size:0.7rem;">NDVI</small>
-                                        </div>
-                                        <div class="col-4">
-                                            <div class="fw-bold" style="color:#6f4e37;">${(rec.canopy_cover_percentage || 0).toFixed(1)}%</div>
-                                            <small class="text-muted" style="font-size:0.7rem;">Canopy</small>
-                                        </div>
-                                        <div class="col-4">
-                                            <div class="fw-bold text-info">${(rec.biomass_tons_hectare || 0).toFixed(2)}</div>
-                                            <small class="text-muted" style="font-size:0.7rem;">t/ha</small>
-                                        </div>
-                                    </div>
-                                    <div class="small">
-                                        <div class="d-flex justify-content-between py-1 border-bottom">
-                                            <span class="text-muted"><i class="bi bi-tree me-1"></i>Tree Cover</span>
-                                            <strong>${(rec.tree_cover_percentage || 0).toFixed(1)}%</strong>
-                                        </div>
-                                        <div class="d-flex justify-content-between py-1 border-bottom">
-                                            <span class="text-muted"><i class="bi bi-seedling me-1"></i>Crop Cover</span>
-                                            <strong>${(rec.crop_cover_percentage || 0).toFixed(1)}%</strong>
-                                        </div>
-                                        <div class="d-flex justify-content-between py-1 border-bottom">
-                                            <span class="text-muted"><i class="bi bi-bar-chart me-1"></i>NDVI Range</span>
-                                            <strong>${(rec.ndvi_min || 0).toFixed(3)} – ${(rec.ndvi_max || 0).toFixed(3)}</strong>
-                                        </div>
-                                        <div class="d-flex justify-content-between py-1 border-bottom">
-                                            <span class="text-muted"><i class="bi bi-cloud me-1"></i>Carbon Stored</span>
-                                            <strong>${(rec.carbon_stored_tons || 0).toFixed(2)} t</strong>
-                                        </div>
-                                        <div class="d-flex justify-content-between py-1 border-bottom">
-                                            <span class="text-muted"><i class="bi bi-arrow-repeat me-1"></i>Carbon/yr</span>
-                                            <strong>${(rec.carbon_sequestered_kg_year || 0).toFixed(0)} kg</strong>
-                                        </div>
-                                        <div class="d-flex justify-content-between py-1 border-bottom">
-                                            <span class="text-muted"><i class="bi bi-heart-pulse me-1"></i>Tree Health</span>
-                                            <strong>${(rec.tree_health_score || 0).toFixed(1)}/10</strong>
-                                        </div>
-                                        <div class="d-flex justify-content-between py-1 border-bottom">
-                                            <span class="text-muted"><i class="bi bi-heart-pulse me-1"></i>Crop Health</span>
-                                            <strong>${(rec.crop_health_score || 0).toFixed(1)}/10</strong>
-                                        </div>
-                                        <div class="d-flex justify-content-between py-1 border-bottom">
-                                            <span class="text-muted"><i class="bi bi-cloud-sun me-1"></i>Cloud Cover</span>
-                                            <strong>${(rec.cloud_cover_percentage || 0).toFixed(1)}%</strong>
-                                        </div>
-                                        <div class="d-flex justify-content-between py-1 border-bottom">
-                                            <span class="text-muted"><i class="bi bi-graph-up me-1"></i>Agroforestry</span>
-                                            <strong>${agroScore.toFixed(1)}/10</strong>
-                                        </div>
-                                        <div class="d-flex justify-content-between py-1">
-                                            <span class="text-muted"><i class="bi bi-exclamation-triangle me-1"></i>Deforestation</span>
-                                            <strong class="${rec.deforestation_detected ? 'text-danger' : 'text-success'}">${rec.deforestation_detected ? 'Detected' : 'None'}</strong>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    `;
-                });
-
-                html += '</div></div>';
-            });
-
-            container.innerHTML = html;
-
-        } catch (error) {
-            console.error('Error loading historical analysis:', error);
-            const container = document.getElementById('historicalAnalysis');
-            if (container) {
-                container.innerHTML = '<div class="text-danger text-center py-3">Error loading historical data</div>';
+            const data = await api.request(`/farmer/farm/${farmId}/deforestation-history`);
+            this._renderInlineDeforestationHistory(container, data, farmId);
+            if (refreshBtn) refreshBtn.style.display = '';
+        } catch (err) {
+            // Fallback: if deforestation history fails (e.g. no polygon), show old records
+            console.warn('Deforestation history failed:', err.message);
+            try {
+                const old = await api.request(`/farmer/farm/${farmId}/historical-analysis`, { optional: true }) || {};
+                this._renderLegacyHistoricalCards(container, old);
+            } catch (e2) {
+                container.innerHTML = `
+                    <div class="alert alert-warning m-3">
+                        <i class="bi bi-exclamation-triangle me-2"></i>
+                        <strong>Analysis unavailable:</strong> ${err.message}
+                        <div class="small mt-1 text-muted">Add a boundary polygon to this farm's parcel to enable deforestation history.</div>
+                    </div>`;
             }
         }
+    }
+
+    refreshDeforestationHistory() {
+        if (this._currentHistoryFarmId) this.loadHistoricalAnalysis(this._currentHistoryFarmId);
+    }
+
+    _renderInlineDeforestationHistory(container, data, farmId) {
+        const quarters    = data.quarters || [];
+        const events      = data.events   || [];
+        const weather     = data.weather  || [];
+        const compliant   = data.eudr_compliant;
+        const violations  = events.filter(e => e.eudr_violation);
+        const droughtEvts = events.filter(e => e.drought_induced);
+        const canopyEvts  = events.filter(e => e.event_type === 'CANOPY_DISTURBANCE');
+
+        // ── helpers ───────────────────────────────────────────────────────────
+        const fmtV = v => v != null ? (+v).toFixed(3) : '—';
+        const fmtD = d => d != null
+            ? `<span class="text-${d < 0 ? 'danger' : 'success'} fw-semibold">${d > 0 ? '+' : ''}${(+d).toFixed(3)}</span>` : '';
+
+        const severityBadge = s => ({
+            critical: '<span class="badge bg-danger">Critical</span>',
+            high:     '<span class="badge bg-danger">High</span>',
+            medium:   '<span class="badge bg-warning text-dark">Medium</span>',
+            low:      '<span class="badge bg-info text-dark">Low</span>',
+            info:     '<span class="badge bg-success">Info</span>',
+        }[s] || `<span class="badge bg-secondary">${s}</span>`);
+
+        const eventMeta = t => ({
+            DEFORESTATION:      { icon: 'bi-tree',                 color: 'danger',    label: 'Deforestation' },
+            VEGETATION_LOSS:    { icon: 'bi-exclamation-triangle',  color: 'warning',   label: 'Vegetation Loss' },
+            DROUGHT_STRESS:     { icon: 'bi-droplet-half',          color: 'warning',   label: 'Drought Stress' },
+            CANOPY_DISTURBANCE: { icon: 'bi-tree',                  color: 'info',      label: 'Canopy Disturbance' },
+            SEASONAL_DIP:       { icon: 'bi-arrow-down',            color: 'secondary', label: 'Seasonal Dip' },
+            REGROWTH:           { icon: 'bi-arrow-up',              color: 'success',   label: 'Regrowth' },
+        }[t] || { icon: 'bi-dot', color: 'secondary', label: t });
+
+        const eudrBadge = e => {
+            if (e.eudr_violation)                    return '<span class="badge bg-danger">VIOLATION</span>';
+            if (e.drought_induced)                   return '<span class="badge bg-warning text-dark">DROUGHT</span>';
+            if (e.event_type === 'CANOPY_DISTURBANCE') return '<span class="badge bg-info text-dark">CANOPY OK</span>';
+            if (e.event_type === 'SEASONAL_DIP')       return '<span class="badge bg-secondary">SEASONAL</span>';
+            if (e.event_type === 'REGROWTH')           return '<span class="badge bg-success">RECOVERY</span>';
+            return '<span class="badge bg-success">OK</span>';
+        };
+
+        const indexBlock = e => {
+            const rows = [
+                `<span class="text-success">NDVI</span> ${fmtV(e.ndvi_before)}→${fmtV(e.ndvi_after)} ${fmtD(e.ndvi_change)}`,
+                e.evi_change   != null ? `<span class="text-primary">EVI</span> ${fmtD(e.evi_change)}`   : null,
+                e.fusion_change != null ? `<span style="color:#6f42c1">Fusion</span> ${fmtV(e.fusion_before)}→${fmtV(e.fusion_after)} ${fmtD(e.fusion_change)}` : null,
+            ].filter(Boolean);
+            return rows.map(r => `<div class="text-nowrap small font-monospace">${r}</div>`).join('');
+        };
+
+        // Events table rows (collapsible reasoning)
+        const eventRows = events.length
+            ? events.map((e, idx) => {
+                const m = eventMeta(e.event_type);
+                const rc = e.eudr_violation ? 'table-danger'
+                    : e.drought_induced ? 'table-warning'
+                    : e.event_type === 'CANOPY_DISTURBANCE' ? 'table-info' : '';
+                return `
+                <tr class="${rc}" style="cursor:pointer"
+                    onclick="document.getElementById('fr-reason-${idx}').classList.toggle('d-none')">
+                    <td class="small fw-semibold">${e.period_from}</td>
+                    <td>
+                        <i class="bi ${m.icon} text-${m.color} me-1"></i><strong>${m.label}</strong>
+                        ${e.drought_induced ? '<span class="badge bg-warning text-dark ms-1">Drought</span>' : ''}
+                        ${e.canopy_intact   ? '<span class="badge bg-info text-dark ms-1">Canopy OK</span>' : ''}
+                    </td>
+                    <td>${severityBadge(e.severity)}</td>
+                    <td>${indexBlock(e)}</td>
+                    <td class="small">${e.rainfall_mm != null ? e.rainfall_mm + ' mm' : '—'}
+                        ${e.water_deficit_mm != null ? `<br><span class="text-${e.water_deficit_mm < -80 ? 'danger' : 'muted'} small">${e.water_deficit_mm} mm deficit</span>` : ''}</td>
+                    <td>${eudrBadge(e)}</td>
+                </tr>
+                <tr id="fr-reason-${idx}" class="d-none">
+                    <td colspan="6" class="bg-light border-start border-4 border-${m.color} ps-3 py-2 small text-muted">
+                        <i class="bi bi-cpu me-1"></i><strong>4-Index Reasoning:</strong><br>${e.reasoning || '—'}
+                    </td>
+                </tr>`;
+            }).join('')
+            : '<tr><td colspan="6" class="text-center text-success py-3"><i class="bi bi-check-circle me-1"></i>No significant events — all 4 indices stable since Dec 2020.</td></tr>';
+
+        // Weather strip
+        const wxValid   = weather.filter(w => w.rainfall_mm != null);
+        const totalRain = wxValid.reduce((s, w) => s + (w.rainfall_mm || 0), 0);
+        const dqtrs     = weather.filter(w => w.drought_flag).length;
+        const wxStrip   = wxValid.length > 0
+            ? `<i class="bi bi-cloud-rain text-primary me-2"></i>
+               Total rainfall: <strong>${Math.round(totalRain).toLocaleString()} mm</strong> &nbsp;|&nbsp;
+               Drought quarters: <strong class="${dqtrs > 0 ? 'text-warning' : 'text-success'}">${dqtrs}/${weather.length}</strong> &nbsp;|&nbsp;
+               Location: <strong>${data.centroid_lat?.toFixed(4) ?? '?'}°, ${data.centroid_lon?.toFixed(4) ?? '?'}°</strong>
+               &nbsp;<span class="text-muted small">· Open-Meteo</span>`
+            : '<span class="text-muted small"><i class="bi bi-cloud-slash me-1"></i>Weather unavailable — using NDMI drought pattern only</span>';
+
+        const fusBase = data.baseline_fusion;
+        const fusCurr = data.current_fusion;
+        const fusChg  = data.fusion_change_total;
+
+        // Unique IDs for charts (support multiple instances)
+        const uid = `farm-${farmId}`;
+
+        container.innerHTML = `
+            <!-- EUDR verdict banner -->
+            <div class="alert ${compliant ? 'alert-success' : 'alert-danger'} d-flex align-items-start gap-3 mb-3">
+                <i class="bi bi-${compliant ? 'check-circle-fill' : 'x-circle-fill'} fs-3 mt-1 flex-shrink-0"></i>
+                <div class="flex-grow-1">
+                    <div class="fw-bold fs-6 mb-1">${compliant ? 'EUDR Compliant' : 'EUDR Non-Compliant'}</div>
+                    <div class="mb-2">${data.summary}</div>
+                    <div class="d-flex flex-wrap gap-3 small">
+                        <span>NDVI <strong>${fmtV(data.baseline_ndvi)}</strong>→<strong>${fmtV(data.current_ndvi)}</strong>
+                            <span class="text-${(data.ndvi_change_total??0)<-0.1?'danger':'success'}">(${(data.ndvi_change_total??0)>0?'+':''}${fmtV(data.ndvi_change_total)})</span>
+                        </span>
+                        ${fusBase != null ? `<span>Fusion <strong>${fmtV(fusBase)}</strong>→<strong>${fmtV(fusCurr)}</strong>
+                            <span class="text-${(fusChg??0)<-0.1?'danger':'success'}">(${(fusChg??0)>0?'+':''}${fmtV(fusChg)})</span>
+                        </span>` : ''}
+                        <span>Violations: <strong class="${violations.length?'text-danger':'text-success'}">${violations.length}</strong></span>
+                        ${droughtEvts.length ? `<span>Drought-mitigated: <strong class="text-warning">${droughtEvts.length}</strong></span>` : ''}
+                        ${canopyEvts.length  ? `<span>Canopy events: <strong class="text-info">${canopyEvts.length}</strong></span>` : ''}
+                        <span class="text-muted">${data.analysis_from} → ${data.analysis_to}</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Weather strip -->
+            <div class="d-flex align-items-center gap-2 p-2 rounded border bg-light small mb-3">${wxStrip}</div>
+
+            <!-- 4-Index chart -->
+            <div class="mb-1">
+                <div class="d-flex align-items-center gap-2 mb-1">
+                    <span class="fw-semibold small text-muted"><i class="bi bi-graph-up me-1"></i>4-Index Vegetation History (Dec 2020 → Today)</span>
+                    <span class="badge bg-secondary fw-normal small" title="NDVI×0.35 + EVI×0.25 + SAVI×0.20 + NDMI×0.20">Fusion Score</span>
+                </div>
+                <div id="multiIndexChart-${uid}"></div>
+            </div>
+
+            <!-- Rainfall chart -->
+            <div class="mb-3">
+                <div class="fw-semibold small text-muted mb-1">
+                    <i class="bi bi-bar-chart me-1"></i>Quarterly Rainfall &amp; Water Deficit
+                    <span class="fw-normal text-muted">(orange = drought quarter)</span>
+                </div>
+                <div id="rainfallChart-${uid}"></div>
+            </div>
+
+            <!-- Events table -->
+            <div>
+                <div class="fw-semibold small text-muted mb-2">
+                    <i class="bi bi-list-ul me-1"></i>Classified Events (${events.length})
+                    <span class="fw-normal ms-2">— click any row to expand reasoning</span>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover align-middle">
+                        <thead class="table-dark">
+                            <tr><th>Period</th><th>Event</th><th>Severity</th><th>Index Changes</th><th>Rainfall</th><th>EUDR</th></tr>
+                        </thead>
+                        <tbody>${eventRows}</tbody>
+                    </table>
+                </div>
+                <div class="d-flex flex-wrap gap-3 small text-muted mt-2">
+                    <span><span class="badge bg-danger me-1">VIOLATION</span>Post-2020 deforestation</span>
+                    <span><span class="badge bg-warning text-dark me-1">DROUGHT</span>Drought-induced, not a violation</span>
+                    <span><span class="badge bg-info text-dark me-1">CANOPY OK</span>Understory only, trees intact</span>
+                </div>
+            </div>`;
+
+        // ── Chart data ────────────────────────────────────────────────────────
+        const labels     = quarters.map(q => q.period_from);
+        const ndviVals   = quarters.map(q => q.ndvi         ?? null);
+        const eviVals    = quarters.map(q => q.evi          ?? null);
+        const saviVals   = quarters.map(q => q.savi         ?? null);
+        const ndmiVals   = quarters.map(q => q.ndmi         ?? null);
+        const fusionVals = quarters.map(q => q.fusion_score ?? null);
+
+        const droughtBands = weather.filter(w => w.drought_flag).map(w => ({
+            x: w.period_from, x2: w.period_to,
+            fillColor: '#fd7e14', opacity: 0.10,
+            label: { text: '☀ Drought', borderColor: '#fd7e14',
+                style: { color: '#fd7e14', background: 'rgba(255,255,255,0.85)', fontSize: '9px' }, position: 'top' }
+        }));
+
+        const eventAnnotations = events
+            .filter(e => !['SEASONAL_DIP'].includes(e.event_type))
+            .map(e => {
+                const col = e.eudr_violation ? '#dc3545'
+                    : e.drought_induced ? '#fd7e14'
+                    : e.event_type === 'CANOPY_DISTURBANCE' ? '#0dcaf0'
+                    : e.event_type === 'REGROWTH' ? '#198754' : '#6c757d';
+                return { x: e.period_from, borderColor: col, strokeDashArray: 3,
+                    label: { text: e.event_type.replace(/_/g,' '),
+                        style: { color:'#fff', background: col, fontSize:'9px' }, offsetY:-4 } };
+            });
+
+        const thresholdLines = [
+            { y: 0.35, borderColor: '#dc3545', strokeDashArray: 5,
+              label: { text: 'Deforestation threshold', style: { fontSize:'9px', color:'#dc3545' } } },
+            { y: 0.45, borderColor: '#fd7e14', strokeDashArray: 5,
+              label: { text: 'Vegetation loss threshold', style: { fontSize:'9px', color:'#fd7e14' } } },
+        ];
+
+        // 4-index chart
+        new ApexCharts(document.getElementById(`multiIndexChart-${uid}`), {
+            chart: { type:'line', height:280, toolbar:{ show:true, tools:{ download:true, zoom:true, reset:true, pan:true } }, animations:{ enabled:false }, zoom:{ enabled:true } },
+            series: [
+                { name:'Fusion Score', data: fusionVals },
+                { name:'NDVI',         data: ndviVals   },
+                { name:'EVI',          data: eviVals    },
+                { name:'SAVI',         data: saviVals   },
+                { name:'NDMI',         data: ndmiVals   },
+            ],
+            stroke:  { curve:'smooth', width:[3,2.5,1.5,1.5,1.5], dashArray:[6,0,0,0,0] },
+            colors:  ['#6f42c1','#198754','#0d6efd','#fd7e14','#0dcaf0'],
+            markers: { size:[5,4,2,2,2], hover:{ sizeOffset:3 } },
+            xaxis:   { categories:labels, labels:{ rotate:-45, style:{ fontSize:'10px' } } },
+            yaxis:   { min:-0.3, max:1.0, title:{ text:'Index Value' }, labels:{ formatter: v => v!=null ? v.toFixed(2):'' }, tickAmount:6 },
+            annotations: { xaxis:[...droughtBands,...eventAnnotations], yaxis:thresholdLines },
+            legend:  { show:true, position:'top', fontSize:'11px' },
+            tooltip: { shared:true, intersect:false, y:{ formatter: v => v!=null ? v.toFixed(3):'cloud gap' } },
+            grid:    { borderColor:'#e9ecef' },
+            noData:  { text:'No valid imagery' },
+        }).render();
+
+        // Rainfall chart
+        if (weather.length > 0) {
+            const wxLabels     = weather.map(w => w.period_from);
+            const rainfallVals = weather.map(w => w.rainfall_mm      ?? null);
+            const et0Vals      = weather.map(w => w.et0_mm           ?? null);
+            const deficitVals  = weather.map(w => w.water_deficit_mm ?? null);
+            const barColors    = weather.map(w => w.drought_flag ? '#fd7e14' : '#0d6efd');
+
+            new ApexCharts(document.getElementById(`rainfallChart-${uid}`), {
+                chart:   { type:'bar', height:160, toolbar:{ show:false }, animations:{ enabled:false } },
+                series:  [
+                    { name:'Rainfall (mm)',     type:'bar',  data:rainfallVals },
+                    { name:'ET₀ demand (mm)',   type:'line', data:et0Vals      },
+                    { name:'Water Deficit (mm)',type:'line', data:deficitVals  },
+                ],
+                xaxis:   { categories:wxLabels, labels:{ rotate:-45, style:{ fontSize:'10px' } } },
+                yaxis:   [
+                    { title:{ text:'mm' }, labels:{ formatter: v => v!=null?Math.round(v):'' } },
+                    { opposite:true, show:false },
+                    { opposite:true, show:false },
+                ],
+                colors:  ['#0d6efd','#adb5bd','#dc3545'],
+                fill:    { colors:barColors },
+                plotOptions: { bar:{ distributed:true, columnWidth:'65%' } },
+                stroke:  { width:[0,2,2], curve:'smooth', dashArray:[0,4,0] },
+                markers: { size:[0,3,3] },
+                legend:  { show:true, position:'top', fontSize:'11px' },
+                tooltip: { shared:true, intersect:false, y:[
+                    { formatter: v => v!=null?Math.round(v)+' mm':'no data' },
+                    { formatter: v => v!=null?Math.round(v)+' mm':'no data' },
+                    { formatter: v => v!=null?Math.round(v)+' mm':'no data' },
+                ] },
+                annotations: { yaxis:[{ y:0, borderColor:'#6c757d', strokeDashArray:4,
+                    label:{ text:'Balance = 0', style:{ fontSize:'9px', color:'#6c757d' } } }] },
+                grid:    { borderColor:'#e9ecef' },
+                noData:  { text:'No weather data' },
+            }).render();
+        } else {
+            const el = document.getElementById(`rainfallChart-${uid}`);
+            if (el) el.innerHTML = '<p class="text-muted small text-center py-2"><i class="bi bi-cloud-slash me-1"></i>Weather data unavailable.</p>';
+        }
+    }
+
+    _renderLegacyHistoricalCards(container, historicalData) {
+        if (!historicalData.historical_data || Object.keys(historicalData.historical_data).length === 0) {
+            container.innerHTML = '<div class="text-muted text-center py-3"><i class="bi bi-inbox me-2"></i>No historical analysis data available yet. Run an analysis to start building history.</div>';
+            return;
+        }
+        const allRecords = [];
+        Object.keys(historicalData.historical_data).sort().reverse()
+            .forEach(year => historicalData.historical_data[year].forEach(r => allRecords.push({ ...r, year })));
+
+        const ndviVals = allRecords.filter(r => r.ndvi_mean).map(r => r.ndvi_mean);
+        const avgNdvi  = ndviVals.length ? ndviVals.reduce((s,v) => s+v, 0) / ndviVals.length : 0;
+        const defoEvts = allRecords.filter(r => r.deforestation_detected).length;
+
+        let html = `
+            <div class="alert alert-info small mb-3">
+                <i class="bi bi-info-circle me-1"></i>
+                No boundary polygon found — showing ${allRecords.length} point-in-time analysis records.
+                Add a farm boundary to unlock quarterly deforestation history.
+            </div>
+            <div class="row g-2 mb-3">
+                <div class="col text-center"><div class="h5 mb-0">${allRecords.length}</div><small class="text-muted">Analyses</small></div>
+                <div class="col text-center"><div class="h5 mb-0 text-success">${avgNdvi.toFixed(3)}</div><small class="text-muted">Avg NDVI</small></div>
+                <div class="col text-center"><div class="h5 mb-0 ${defoEvts?'text-danger':'text-success'}">${defoEvts}</div><small class="text-muted">Deforestation</small></div>
+            </div>
+            <div class="table-responsive"><table class="table table-sm table-hover">
+                <thead class="table-dark"><tr><th>Date</th><th>NDVI</th><th>Canopy</th><th>Biomass</th><th>Risk</th><th>EUDR</th></tr></thead>
+                <tbody>`;
+        allRecords.slice(0, 20).forEach(r => {
+            const riskColor = (r.risk_level==='high')?'danger':(r.risk_level==='medium'?'warning':'success');
+            const eudrOk = r.analysis_metadata?.eudr_compliant !== false;
+            html += `<tr>
+                <td class="small">${new Date(r.analysis_date).toLocaleDateString('en-GB')}</td>
+                <td class="small">${(r.ndvi_mean||0).toFixed(3)}</td>
+                <td class="small">${(r.canopy_cover_percentage||0).toFixed(1)}%</td>
+                <td class="small">${(r.biomass_tons_hectare||0).toFixed(2)} t/ha</td>
+                <td><span class="badge bg-${riskColor}">${r.risk_level||'?'}</span></td>
+                <td><span class="badge bg-${eudrOk?'success':'danger'}">${eudrOk?'OK':'✗'}</span></td>
+            </tr>`;
+        });
+        html += '</tbody></table></div>';
+        container.innerHTML = html;
     }
 
     exportAnalysisReport() {
