@@ -8007,6 +8007,8 @@ class PlotraDashboard {
                         parcel_name: farmData.farm_name || 'Main Parcel',
                         boundary_geojson: {
                             type: 'Polygon',
+                            // GeoJSON requires [longitude, latitude] order (lon = X, lat = Y).
+                            // Our gpsPoints store {lat, lon} so we flip here before saving.
                             coordinates: [polygonPts.map(p => [p.lon, p.lat])]
                         },
                         area_hectares: farmData.calculated_area_ha || farmData.approximate_size_ha,
