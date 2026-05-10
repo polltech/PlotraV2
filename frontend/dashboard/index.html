@@ -994,24 +994,36 @@
                                         <h6 class="mb-3 text-primary"><i class="bi bi-globe"></i> 1.4 GPS Polygon Capture</h6>
                                         <div class="row g-3">
                                             <div class="col-12">
-                                                <label class="form-label">Farm Boundary <span class="text-muted fw-normal">(Optional — walk the perimeter)</span></label>
+                                                <label class="form-label">Farm Boundary <span class="text-muted fw-normal">(Optional — choose a capture method)</span></label>
                                                 <div class="card">
                                                     <div class="card-body p-0">
                                                         <div id="farmMap" style="height: 340px; width: 100%;"></div>
                                                         <div class="p-2 bg-light border-top">
-                                                            <!-- Mode toggle + stats -->
+                                                            <!-- Mode selector + stats -->
                                                             <div class="d-flex gap-2 flex-wrap align-items-center mb-2">
-                                                                <div class="btn-group btn-group-sm" role="group">
+                                                                <div class="btn-group btn-group-sm" role="group" aria-label="Capture mode">
                                                                     <input type="radio" class="btn-check" name="farmModeRadio" id="farmModeWalk" autocomplete="off" checked>
-                                                                    <label class="btn btn-outline-success" for="farmModeWalk"><i class="bi bi-person-walking me-1"></i>Walk</label>
+                                                                    <label class="btn btn-outline-success" for="farmModeWalk" title="Walk the farm perimeter — GPS points added every 5 m"><i class="bi bi-person-walking me-1"></i>Walk</label>
                                                                     <input type="radio" class="btn-check" name="farmModeRadio" id="farmModeClick" autocomplete="off">
-                                                                    <label class="btn btn-outline-primary" for="farmModeClick"><i class="bi bi-cursor-fill me-1"></i>Click</label>
+                                                                    <label class="btn btn-outline-primary" for="farmModeClick" title="Click on the map to place boundary points"><i class="bi bi-cursor-fill me-1"></i>Click</label>
+                                                                    <input type="radio" class="btn-check" name="farmModeRadio" id="farmModeDraw" autocomplete="off">
+                                                                    <label class="btn btn-outline-warning" for="farmModeDraw" title="Draw a polygon directly on the map"><i class="bi bi-vector-pen me-1"></i>Draw</label>
+                                                                    <input type="radio" class="btn-check" name="farmModeRadio" id="farmModeCoords" autocomplete="off">
+                                                                    <label class="btn btn-outline-secondary" for="farmModeCoords" title="Enter coordinates manually or paste GeoJSON"><i class="bi bi-list-ol me-1"></i>Coords</label>
                                                                 </div>
                                                                 <span class="ms-auto text-muted small">
                                                                     GPS: <strong id="gpsAccuracy">--</strong>m &nbsp;|&nbsp;
                                                                     Pts: <strong id="pointCount">0</strong> &nbsp;|&nbsp;
                                                                     Area: <strong id="calculatedArea">--</strong> ha
                                                                 </span>
+                                                            </div>
+                                                            <!-- Coords input panel (shown only in Coords mode) -->
+                                                            <div id="coordsInputPanel" style="display:none;" class="mb-2">
+                                                                <textarea id="coordsTextarea" class="form-control form-control-sm font-monospace" rows="4"
+                                                                    placeholder="One point per line: lat,lon  (e.g. -1.2921, 36.8219)&#10;Or paste a GeoJSON Polygon / FeatureCollection"></textarea>
+                                                                <button type="button" class="btn btn-sm btn-secondary mt-1" id="importCoordsBtn">
+                                                                    <i class="bi bi-download me-1"></i>Import Coordinates
+                                                                </button>
                                                             </div>
                                                             <!-- Action buttons -->
                                                             <div class="d-flex gap-2 flex-wrap align-items-center">
@@ -1029,7 +1041,7 @@
                                                                 </button>
                                                             </div>
                                                             <div class="mt-2 text-muted small" id="captureInstructions">
-                                                                Choose Walk or Click mode, then press Start Capture.
+                                                                Choose a capture method, then press Start Capture.
                                                             </div>
                                                         </div>
                                                     </div>

@@ -7186,11 +7186,41 @@ class PlotraDashboard {
         });
 
         // Read current mode from radio (Walk default)
-        this._farmCaptureMode = document.getElementById('farmModeClick')?.checked ? 'click' : 'walk';
-        const walkRadio  = document.getElementById('farmModeWalk');
-        const clickRadio = document.getElementById('farmModeClick');
-        if (walkRadio)  walkRadio.onchange  = () => { if (walkRadio.checked)  this._farmCaptureMode = 'walk'; };
-        if (clickRadio) clickRadio.onchange = () => { if (clickRadio.checked) this._farmCaptureMode = 'click'; };
+        this._farmCaptureMode = 'walk';
+        this._drawControl = null;
+        this._drawnItems = null;
+        const walkRadio   = document.getElementById('farmModeWalk');
+        const clickRadio  = document.getElementById('farmModeClick');
+        const drawRadio   = document.getElementById('farmModeDraw');
+        const coordsRadio = document.getElementById('farmModeCoords');
+        const coordsPanel = document.getElementById('coordsInputPanel');
+        const _setMode = (mode) => {
+            this._farmCaptureMode = mode;
+            if (coordsPanel) coordsPanel.style.display = mode === 'coords' ? '' : 'none';
+            // Stop any active draw session when switching away
+            if (mode !== 'draw' && this._drawControl && this.farmMap) {
+                try { this._drawControl.remove(); } catch(e) {}
+                this._drawControl = null;
+            }
+            const inst = document.getElementById('captureInstructions');
+            const startBtn = document.getElementById('startCaptureBtn');
+            if (mode === 'draw') {
+                if (inst) inst.textContent = 'Press "Start Capture" to activate the draw tool, then click the map to draw your farm boundary.';
+                if (startBtn) startBtn.disabled = false;
+            } else if (mode === 'coords') {
+                if (inst) inst.textContent = 'Enter lat,lon pairs (one per line) or paste GeoJSON, then click Import Coordinates.';
+                if (startBtn) startBtn.disabled = true;
+            } else {
+                if (inst) inst.textContent = mode === 'walk'
+                    ? 'Press Start Capture, then walk the farm perimeter — points auto-add every 5 m.'
+                    : 'Press Start Capture, then click the map to place boundary points.';
+                if (startBtn) startBtn.disabled = false;
+            }
+        };
+        if (walkRadio)   walkRadio.onchange   = () => { if (walkRadio.checked)   _setMode('walk'); };
+        if (clickRadio)  clickRadio.onchange  = () => { if (clickRadio.checked)  _setMode('click'); };
+        if (drawRadio)   drawRadio.onchange   = () => { if (drawRadio.checked)   _setMode('draw'); };
+        if (coordsRadio) coordsRadio.onchange = () => { if (coordsRadio.checked) _setMode('coords'); };
 
         try {
             this.farmMap = L.map('farmMap', { zoomControl: true });
@@ -7286,12 +7316,33 @@ class PlotraDashboard {
                 this._addFarmPoint(e.latlng.lat, e.latlng.lng, 0);
             });
 
+            // Leaflet.Draw layer for draw mode
+            this._drawnItems = new L.FeatureGroup().addTo(this.farmMap);
+            this.farmMap.on(L.Draw.Event.CREATED, (e) => {
+                const layer = e.layer;
+                const latlngs = layer.getLatLngs()[0]; // outer ring
+                this.gpsPoints = latlngs.map(ll => ({ lat: ll.lat, lon: ll.lng, accuracy: 0, timestamp: Date.now() }));
+                this._rebuildFarmOverlay();
+                this._farmIsCapturing = false;
+                const fb = document.getElementById('finishCaptureBtn');
+                const cb = document.getElementById('clearPointsBtn');
+                if (fb) fb.disabled = this.gpsPoints.length < 3;
+                if (cb) cb.disabled = false;
+                const inst = document.getElementById('captureInstructions');
+                if (inst) inst.textContent = `Polygon imported — ${this.gpsPoints.length} points. Press Finish to confirm or Clear to redo.`;
+            });
+
             // Wire up buttons
             const startBtn  = document.getElementById('startCaptureBtn');
             const addBtn    = document.getElementById('addPointBtn');
             const finishBtn = document.getElementById('finishCaptureBtn');
             const clearBtn  = document.getElementById('clearPointsBtn');
             if (startBtn) startBtn.onclick = () => this._startFarmCapture();
+
+            // Import Coordinates button (coords mode)
+            const importBtn = document.getElementById('importCoordsBtn');
+            if (importBtn) importBtn.onclick = () => this._importCoordinates();
+
             if (addBtn)   addBtn.onclick   = () => {
                 if (!this._farmMapCurrentPos) { this.showToast('Waiting for GPS fix…', 'warning'); return; }
                 if (!this._farmIsCapturing)   { this.showToast('Press Start Capture first', 'warning'); return; }
@@ -7307,6 +7358,8 @@ class PlotraDashboard {
             if (clearBtn) clearBtn.onclick = () => {
                 this.gpsPoints = [];
                 this._farmIsCapturing = false;
+                if (this._drawControl) { try { this._drawControl.disable(); } catch(e) {} this._drawControl = null; }
+                if (this._drawnItems)  this._drawnItems.clearLayers();
                 if (this.farmPolygon)    this.farmPolygon.setLatLngs([]);
                 if (this._farmPolyline)  this._farmPolyline.setLatLngs([]);
                 if (this._farmMarkers)   this._farmMarkers.clearLayers();
@@ -7314,12 +7367,15 @@ class PlotraDashboard {
                 const ca = document.getElementById('calculatedArea');
                 if (pc) pc.textContent = '0';
                 if (ca) ca.textContent = '--';
-                if (startBtn)  startBtn.disabled  = false;
+                const mode = this._farmCaptureMode;
+                if (startBtn)  startBtn.disabled  = mode === 'coords';
                 if (addBtn)    addBtn.disabled    = true;
                 if (finishBtn) finishBtn.disabled  = true;
                 if (clearBtn)  clearBtn.disabled  = true;
                 const inst = document.getElementById('captureInstructions');
-                if (inst) inst.textContent = 'Cleared. Press Start Capture to begin again.';
+                if (inst) inst.textContent = mode === 'coords'
+                    ? 'Cleared. Edit the coordinates and click Import again.'
+                    : 'Cleared. Press Start Capture to begin again.';
             };
 
             const inst = document.getElementById('captureInstructions');
@@ -7332,8 +7388,29 @@ class PlotraDashboard {
     }
 
     _startFarmCapture() {
-        this._farmIsCapturing = true;
         const mode = this._farmCaptureMode || 'walk';
+
+        // Draw mode: activate Leaflet.Draw polygon tool
+        if (mode === 'draw') {
+            if (!this.farmMap || !this._drawnItems) return;
+            if (this._drawControl) { try { this._drawControl.remove(); } catch(e) {} }
+            this._drawControl = new L.Draw.Polygon(this.farmMap, {
+                shapeOptions: { color: '#40916c', fillColor: '#52b788', fillOpacity: 0.3, weight: 2 },
+                showArea: true,
+                metric: true,
+                repeatMode: false,
+            });
+            this._drawControl.enable();
+            const startBtn = document.getElementById('startCaptureBtn');
+            const clearBtn = document.getElementById('clearPointsBtn');
+            if (startBtn) startBtn.disabled = true;
+            if (clearBtn) clearBtn.disabled = false;
+            const inst = document.getElementById('captureInstructions');
+            if (inst) inst.textContent = 'Click on the map to place polygon corners. Double-click or click the first point to close the shape.';
+            return;
+        }
+
+        this._farmIsCapturing = true;
         const startBtn  = document.getElementById('startCaptureBtn');
         const addBtn    = document.getElementById('addPointBtn');
         const finishBtn = document.getElementById('finishCaptureBtn');
@@ -7344,16 +7421,95 @@ class PlotraDashboard {
         if (finishBtn) finishBtn.disabled  = this.gpsPoints.length < 3;
         if (clearBtn)  clearBtn.disabled  = false;
 
-        // Always auto-place Point 1 at current GPS location (both walk and click mode)
+        // Auto-place Point 1 at current GPS (walk and click modes)
         if (this._farmMapCurrentPos) {
             this._addFarmPoint(this._farmMapCurrentPos.latitude, this._farmMapCurrentPos.longitude, this._farmMapCurrentPos.accuracy);
             if (inst) inst.textContent = mode === 'walk'
-                ? 'Point 1 placed. Walking… points auto-add every 5 m. Press Add Point at key corners.'
-                : 'Point 1 placed at your location. Tap the map to add boundary corners.';
+                ? 'Point 1 placed. Walk the perimeter — points auto-add every 5 m. Press Add Point at key corners.'
+                : 'Point 1 placed at your location. Click the map to add boundary corners.';
         } else {
             this._farmAutoAddPoint1 = true;
             if (inst) inst.textContent = 'Waiting for GPS fix… Point 1 will be placed when location is found.';
         }
+    }
+
+    _importCoordinates() {
+        const ta = document.getElementById('coordsTextarea');
+        if (!ta || !ta.value.trim()) { this.showToast('Paste coordinates or GeoJSON first', 'warning'); return; }
+        const raw = ta.value.trim();
+        let points = [];
+        try {
+            // Try parsing as GeoJSON
+            const geojson = JSON.parse(raw);
+            let ring = null;
+            if (geojson.type === 'FeatureCollection') {
+                const feat = geojson.features.find(f => f.geometry?.type === 'Polygon' || f.geometry?.type === 'MultiPolygon');
+                if (feat) ring = feat.geometry.type === 'Polygon' ? feat.geometry.coordinates[0] : feat.geometry.coordinates[0][0];
+            } else if (geojson.type === 'Feature') {
+                ring = geojson.geometry?.type === 'Polygon' ? geojson.geometry.coordinates[0] : null;
+            } else if (geojson.type === 'Polygon') {
+                ring = geojson.coordinates[0];
+            } else if (geojson.type === 'MultiPolygon') {
+                ring = geojson.coordinates[0][0];
+            }
+            if (!ring || ring.length < 3) throw new Error('No valid polygon ring found in GeoJSON');
+            // GeoJSON coords are [lon, lat]
+            points = ring.map(c => ({ lat: c[1], lon: c[0], accuracy: 0, timestamp: Date.now() }));
+        } catch (jsonErr) {
+            // Try parsing as plain lat,lon lines
+            const lines = raw.split('\n').map(l => l.trim()).filter(Boolean);
+            for (const line of lines) {
+                const parts = line.split(/[\s,;]+/);
+                if (parts.length >= 2) {
+                    const lat = parseFloat(parts[0]);
+                    const lon = parseFloat(parts[1]);
+                    if (!isNaN(lat) && !isNaN(lon) && lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180) {
+                        points.push({ lat, lon, accuracy: 0, timestamp: Date.now() });
+                    }
+                }
+            }
+        }
+        if (points.length < 3) { this.showToast('Need at least 3 valid points', 'danger'); return; }
+        // Remove closing duplicate if present (GeoJSON polygons repeat first point)
+        const first = points[0], last = points[points.length - 1];
+        if (first.lat === last.lat && first.lon === last.lon) points.pop();
+        this.gpsPoints = points;
+        this._rebuildFarmOverlay();
+        if (this.farmMap && points.length > 0) {
+            const bounds = L.latLngBounds(points.map(p => [p.lat, p.lon]));
+            this.farmMap.fitBounds(bounds, { padding: [30, 30] });
+        }
+        const clearBtn = document.getElementById('clearPointsBtn');
+        const finishBtn = document.getElementById('finishCaptureBtn');
+        if (clearBtn) clearBtn.disabled = false;
+        if (finishBtn) finishBtn.disabled = false;
+        const inst = document.getElementById('captureInstructions');
+        if (inst) inst.textContent = `${points.length} points imported. Press Finish to confirm or Clear to redo.`;
+        this.showToast(`${points.length} coordinates imported`, 'success');
+    }
+
+    _rebuildFarmOverlay() {
+        const coords = this.gpsPoints.map(p => [p.lat, p.lon]);
+        if (this._farmMarkers) {
+            this._farmMarkers.clearLayers();
+            coords.forEach((c, i) => {
+                const icon = L.divIcon({
+                    className: '',
+                    html: `<div style="background:#40916c;color:#fff;border-radius:50%;width:26px;height:26px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,0.5);">${i + 1}</div>`,
+                    iconSize: [26, 26], iconAnchor: [13, 13]
+                });
+                L.marker(c, { icon }).addTo(this._farmMarkers);
+            });
+        }
+        if (this._farmPolyline) this._farmPolyline.setLatLngs(coords);
+        if (coords.length >= 3 && this.farmPolygon) {
+            this.farmPolygon.setLatLngs(coords);
+            const area = this._calcArea(coords);
+            const ca = document.getElementById('calculatedArea');
+            if (ca) ca.textContent = area.toFixed(2);
+        }
+        const pc = document.getElementById('pointCount');
+        if (pc) pc.textContent = this.gpsPoints.length;
     }
 
     _addFarmPoint(lat, lng, accuracy) {
