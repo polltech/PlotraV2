@@ -130,6 +130,34 @@ class BiomassTrend(BaseModel):
     observation = relationship("SatelliteObservation", back_populates="biomass_trends")
 
 
+class WeatherObservation(BaseModel):
+    """
+    Quarterly weather aggregates for a parcel, sourced from Open-Meteo Historical API.
+    Stored alongside satellite observations to enable drought vs deforestation discrimination.
+    """
+
+    __tablename__ = "weather_observations"
+
+    parcel_id = Column(String(36), ForeignKey("land_parcels.id"), nullable=False, index=True)
+
+    # Quarter dates (matches satellite quarter windows)
+    period_from = Column(String(10), nullable=False)   # "2021-03-01"
+    period_to   = Column(String(10), nullable=False)   # "2021-05-31"
+
+    # Aggregated weather for the quarter
+    rainfall_mm       = Column(Float, nullable=True)   # total precipitation (mm)
+    et0_mm            = Column(Float, nullable=True)   # total reference evapotranspiration (mm)
+    water_deficit_mm  = Column(Float, nullable=True)   # rainfall - ET0 (negative = drought stress)
+    temp_max_avg_c    = Column(Float, nullable=True)   # average daily max temperature (°C)
+
+    # Drought flag: 1 if quarter exhibits drought-level water stress
+    drought_flag = Column(Integer, default=0)
+
+    data_source = Column(String(50), default="open-meteo")
+
+    parcel = relationship("LandParcel")
+
+
 class SatelliteTask(BaseModel):
     """
     Background task for satellite data processing.

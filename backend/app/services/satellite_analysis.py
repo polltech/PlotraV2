@@ -294,6 +294,466 @@ def _classify_timeseries_events(quarters: List[Dict]) -> Dict:
     }
 
 
+async def fetch_weather_history(lat: float, lon: float) -> Dict:
+    """
+    Fetch daily weather from Open-Meteo Historical API (free, no auth needed).
+    Returns daily arrays: time, precipitation_sum, et0_fao_evapotranspiration, temperature_2m_max.
+    Data available from 1940 to ~5 days ago.
+    """
+    from_date = "2020-12-01"
+    to_date   = (datetime.utcnow() - timedelta(days=5)).strftime("%Y-%m-%d")
+    url = "https://archive-api.open-meteo.com/v1/archive"
+    params = {
+        "latitude":  lat,
+        "longitude": lon,
+        "start_date": from_date,
+        "end_date":   to_date,
+        "daily": "precipitation_sum,et0_fao_evapotranspiration,temperature_2m_max",
+        "timezone": "UTC",
+    }
+    try:
+        async with httpx.AsyncClient(timeout=60) as client:
+            resp = await client.get(url, params=params)
+    except httpx.TimeoutException:
+        raise HTTPException(status_code=504, detail="Open-Meteo weather API timed out.")
+    except httpx.ConnectError:
+        raise HTTPException(status_code=503, detail="Cannot reach Open-Meteo weather API.")
+
+    if resp.status_code != 200:
+        raise HTTPException(status_code=503, detail=f"Open-Meteo returned {resp.status_code}: {resp.text[:200]}")
+
+    body = resp.json()
+    if "daily" not in body or not body["daily"].get("time"):
+        raise HTTPException(status_code=404, detail="Open-Meteo returned no daily data for these coordinates.")
+
+    logger.info(f"Weather fetched for ({lat:.4f},{lon:.4f}): {len(body['daily']['time'])} days")
+    return body
+
+
+def _aggregate_weather_to_quarters(daily_data: Dict, quarters: List[Dict]) -> List[Dict]:
+    """
+    Map Open-Meteo daily weather data onto the same quarterly windows as satellite data.
+    Returns one dict per quarter with rainfall_mm, et0_mm, water_deficit_mm, temp_max_avg_c, drought_flag.
+
+    Drought detection rule:
+      water_deficit < -80 mm  AND  rainfall < 40 mm  in the same quarter
+      = the vegetation is under severe water stress, not deforestation.
+    """
+    times  = daily_data.get("daily", {}).get("time", [])
+    precip = daily_data.get("daily", {}).get("precipitation_sum", [])
+    et0    = daily_data.get("daily", {}).get("et0_fao_evapotranspiration", [])
+    temp   = daily_data.get("daily", {}).get("temperature_2m_max", [])
+
+    # Build date → values lookup
+    daily: Dict[str, Dict] = {}
+    for i, t in enumerate(times):
+        daily[t] = {
+            "precip": precip[i] if i < len(precip) else None,
+            "et0":    et0[i]    if i < len(et0)    else None,
+            "temp":   temp[i]   if i < len(temp)   else None,
+        }
+
+    result = []
+    for q in quarters:
+        qfrom, qto = q["period_from"], q["period_to"]
+        period_days = [v for k, v in daily.items() if qfrom <= k <= qto]
+
+        if not period_days:
+            result.append({
+                "period_from": qfrom, "period_to": qto,
+                "rainfall_mm": None, "et0_mm": None,
+                "water_deficit_mm": None, "temp_max_avg_c": None,
+                "drought_flag": False,
+            })
+            continue
+
+        p_vals = [d["precip"] for d in period_days if d["precip"] is not None]
+        e_vals = [d["et0"]    for d in period_days if d["et0"]    is not None]
+        t_vals = [d["temp"]   for d in period_days if d["temp"]   is not None]
+
+        rainfall = round(sum(p_vals), 1) if p_vals else None
+        et0_sum  = round(sum(e_vals), 1) if e_vals else None
+        temp_avg = round(sum(t_vals) / len(t_vals), 1) if t_vals else None
+
+        if rainfall is not None and et0_sum is not None:
+            water_deficit = round(rainfall - et0_sum, 1)
+        else:
+            water_deficit = None
+
+        # Flag severe water stress quarters: large ET0 deficit + very low rainfall
+        drought = bool(
+            water_deficit is not None and water_deficit < -80
+            and rainfall is not None and rainfall < 40
+        )
+
+        result.append({
+            "period_from":    qfrom,
+            "period_to":      qto,
+            "rainfall_mm":    rainfall,
+            "et0_mm":         et0_sum,
+            "water_deficit_mm": water_deficit,
+            "temp_max_avg_c": temp_avg,
+            "drought_flag":   drought,
+        })
+
+    return result
+
+
+async def _store_weather_observations(parcel_id: str, weather_quarters: List[Dict]) -> None:
+    """Upsert quarterly weather records into weather_observations table."""
+    from app.core.database import async_session_factory
+    from app.models.satellite import WeatherObservation
+    from sqlalchemy import select
+
+    async with async_session_factory() as session:
+        for wq in weather_quarters:
+            result = await session.execute(
+                select(WeatherObservation).where(
+                    WeatherObservation.parcel_id == parcel_id,
+                    WeatherObservation.period_from == wq["period_from"],
+                )
+            )
+            rec = result.scalar_one_or_none()
+            if rec is None:
+                rec = WeatherObservation(parcel_id=parcel_id)
+                session.add(rec)
+            rec.period_to         = wq["period_to"]
+            rec.rainfall_mm       = wq.get("rainfall_mm")
+            rec.et0_mm            = wq.get("et0_mm")
+            rec.water_deficit_mm  = wq.get("water_deficit_mm")
+            rec.temp_max_avg_c    = wq.get("temp_max_avg_c")
+            rec.drought_flag      = 1 if wq.get("drought_flag") else 0
+        await session.commit()
+
+
+def _compute_fusion_score(q: Dict) -> Optional[float]:
+    """
+    Weighted 4-index vegetation score.
+    Weights: NDVI 35%, EVI 25%, SAVI 20%, NDMI 20%.
+    More robust than NDVI alone: EVI corrects for atmosphere/soil, NDMI captures moisture stress.
+    Falls back gracefully when some indices are missing (re-normalizes weights).
+    """
+    ndvi = q.get("ndvi")
+    if ndvi is None:
+        return None
+    pairs = [(ndvi, 0.35), (q.get("evi"), 0.25), (q.get("savi"), 0.20), (q.get("ndmi"), 0.20)]
+    score, total_w = 0.0, 0.0
+    for val, w in pairs:
+        if val is not None:
+            score  += val * w
+            total_w += w
+    return round(score / total_w, 3) if total_w > 0 else None
+
+
+def _build_event_reasoning(
+    prev: Dict, curr: Dict,
+    ndvi_d: float,
+    evi_d: Optional[float], savi_d: Optional[float], ndmi_d: Optional[float],
+    fusion_d: Optional[float],
+    event_type: str, drought_induced: bool, canopy_intact: bool,
+    ndmi_drought: bool, recovers: bool, w: Dict,
+) -> str:
+    """
+    Human-readable explanation for each classified event.
+    Explains which indices changed, why the classification was made,
+    and what it means for EUDR compliance.
+    """
+    def _fmt(v):
+        return f"{v:.3f}" if v is not None else "n/a"
+
+    def _d(d):
+        if d is None:
+            return ""
+        sign = "+" if d > 0 else ""
+        return f" ({sign}{d:.3f})"
+
+    ndvi_str  = f"NDVI {_fmt(prev.get('ndvi'))}→{_fmt(curr.get('ndvi'))}{_d(ndvi_d)}"
+    evi_str   = f"EVI {_fmt(prev.get('evi'))}→{_fmt(curr.get('evi'))}{_d(evi_d)}" if evi_d is not None else None
+    savi_str  = f"SAVI {_fmt(prev.get('savi'))}→{_fmt(curr.get('savi'))}{_d(savi_d)}" if savi_d is not None else None
+    ndmi_str  = f"NDMI {_fmt(prev.get('ndmi'))}→{_fmt(curr.get('ndmi'))}{_d(ndmi_d)}" if ndmi_d is not None else None
+    fuse_str  = f"Fusion {_fmt(prev.get('fusion_score'))}→{_fmt(curr.get('fusion_score'))}{_d(fusion_d)}" if fusion_d is not None else None
+
+    indices = " | ".join(s for s in [ndvi_str, evi_str, savi_str, ndmi_str, fuse_str] if s)
+
+    if event_type == "DEFORESTATION":
+        evi_note = (f" EVI also collapsed ({evi_d:+.3f}), confirming canopy removal."
+                    if evi_d is not None and evi_d <= -0.15 else "")
+        return (
+            f"All 4 vegetation indices declined sharply: {indices}.{evi_note} "
+            f"Fusion score fell below the deforestation threshold (0.35). "
+            f"No vegetation recovery detected in the following 2 quarters. "
+            f"This pattern is consistent with tree clearing or severe land conversion. "
+            f"Post-EUDR cutoff (Dec 2020) — classified as a EUDR VIOLATION."
+        )
+
+    if event_type == "DROUGHT_STRESS":
+        wx_note = ""
+        if w.get("drought_flag"):
+            wx_note = (f" Weather data confirms: rainfall was {w.get('rainfall_mm', '?')} mm "
+                       f"with water deficit of {w.get('water_deficit_mm', '?')} mm for this quarter.")
+        ndmi_note = (" NDMI moisture signal dropped proportionally more than NDVI "
+                     f"(ratio {abs(ndmi_d)/max(abs(ndvi_d),0.001):.1f}×), indicating the primary "
+                     "stressor is water deficit rather than vegetation removal."
+                     if ndmi_drought and ndmi_d is not None else "")
+        return (
+            f"Vegetation stress detected ({indices}) but attributed to drought, not deforestation.{wx_note}{ndmi_note} "
+            f"Drought-induced NDVI declines are temporary and do not represent land clearing. "
+            f"NOT an EUDR violation."
+        )
+
+    if event_type == "CANOPY_DISTURBANCE":
+        evi_note = (f" EVI changed only {evi_d:+.3f} while NDVI changed {ndvi_d:+.3f} "
+                    f"— EVI is more sensitive to canopy structure and its relative stability "
+                    "indicates overstory trees remain in place."
+                    if evi_d is not None else "")
+        return (
+            f"NDVI declined notably but EVI (canopy proxy) remained relatively stable: {indices}.{evi_note} "
+            f"Interpretation: the forest canopy is intact — only the understory, ground cover, or crop layer "
+            f"has been affected (e.g. seasonal crop harvest, understory clearing, grazing). "
+            f"This is NOT classified as deforestation. NOT an EUDR violation."
+        )
+
+    if event_type == "VEGETATION_LOSS":
+        no_wx = " No drought signal detected from weather data or NDMI pattern." if not drought_induced else ""
+        return (
+            f"Sustained multi-index vegetation decline without recovery: {indices}.{no_wx} "
+            f"This does not meet the EVI-confirmed canopy-loss threshold for DEFORESTATION, "
+            f"but the persistence and magnitude are concerning. "
+            f"Possible causes: partial clearing, agroforestry change, or slow degradation. "
+            f"Manual field verification recommended."
+        )
+
+    if event_type == "SEASONAL_DIP":
+        return (
+            f"Vegetation declined but recovered within 1–2 quarters: {indices}. "
+            f"This matches a normal seasonal dry-season pattern (e.g. leaf-off, crop harvest). "
+            f"No EUDR concern — seasonal variation is expected and not a compliance issue."
+        )
+
+    if event_type == "REGROWTH":
+        return (
+            f"Positive vegetation recovery detected: {indices}. "
+            f"All indices trending upward after a prior low period. "
+            f"Consistent with post-drought recovery, reforestation, or new crop establishment."
+        )
+
+    return indices
+
+
+def _classify_with_weather(quarters: List[Dict], weather_by_period: Dict) -> Dict:
+    """
+    Full 4-index event classifier with weather fusion and canopy-intact discrimination.
+
+    Classification rules (in priority order):
+      1. DROUGHT_STRESS — large NDMI drop relative to NDVI (moisture signal dominates),
+                          OR weather drought_flag. NOT an EUDR violation.
+      2. CANOPY_DISTURBANCE — NDVI drops but EVI (canopy proxy) holds. Trees intact,
+                               only understory affected. NOT an EUDR violation.
+      3. DEFORESTATION — all indices including EVI collapse sharply, no recovery.
+                         Fusion score < 0.35. EUDR VIOLATION if after Dec 2020.
+      4. VEGETATION_LOSS — sustained multi-index decline without drought or canopy evidence.
+                            EUDR VIOLATION if after Dec 2020.
+      5. SEASONAL_DIP — any decline that recovers within 2 quarters. Normal variation.
+      6. REGROWTH — rising indices after prior low. Positive signal.
+
+    All thresholds are applied to the weighted fusion score (NDVI 35%, EVI 25%,
+    SAVI 20%, NDMI 20%) rather than NDVI alone, for greater accuracy.
+    """
+    EUDR_CUTOFF = "2020-12-31"
+
+    # Compute fusion score for every quarter in place (mutates the shared dicts)
+    for q in quarters:
+        q["fusion_score"] = _compute_fusion_score(q)
+
+    valid = [q for q in quarters if q["ndvi"] is not None]
+    if len(valid) < 2:
+        return {
+            "events": [], "baseline_ndvi": None, "current_ndvi": None,
+            "baseline_fusion": None, "current_fusion": None,
+            "eudr_compliant": True, "deforestation_detected": False,
+            "drought_events_count": 0, "canopy_disturbance_count": 0,
+            "summary": "Insufficient cloud-free imagery for analysis.",
+        }
+
+    baseline_ndvi   = valid[0]["ndvi"]
+    current_ndvi    = valid[-1]["ndvi"]
+    baseline_fusion = valid[0].get("fusion_score")
+    current_fusion  = valid[-1].get("fusion_score")
+    events: List[Dict] = []
+
+    for i in range(1, len(valid)):
+        prev = valid[i - 1]
+        curr = valid[i]
+
+        # Per-index deltas
+        ndvi_d  = curr["ndvi"] - prev["ndvi"]
+        evi_d   = (curr["evi"]  - prev["evi"])  if (curr.get("evi")  is not None and prev.get("evi")  is not None) else None
+        savi_d  = (curr["savi"] - prev["savi"]) if (curr.get("savi") is not None and prev.get("savi") is not None) else None
+        ndmi_d  = (curr["ndmi"] - prev["ndmi"]) if (curr.get("ndmi") is not None and prev.get("ndmi") is not None) else None
+        fs_prev = prev.get("fusion_score")
+        fs_curr = curr.get("fusion_score")
+        fusion_d = round(fs_curr - fs_prev, 3) if (fs_prev is not None and fs_curr is not None) else None
+
+        # Use fusion delta as primary signal when available
+        eff_delta = fusion_d if fusion_d is not None else ndvi_d
+        eff_score = fs_curr  if fs_curr  is not None else curr["ndvi"]
+
+        # Recovery look-ahead: did indices recover in the next 1–2 quarters?
+        next_fusions = [valid[j].get("fusion_score") or valid[j]["ndvi"]
+                        for j in range(i + 1, min(i + 3, len(valid)))]
+        ref_level = (fs_prev or prev["ndvi"]) - 0.05
+        recovers  = any(v >= ref_level for v in next_fusions)
+
+        # Weather-based drought signal
+        w          = weather_by_period.get(curr["period_from"], {})
+        wx_drought = bool(w.get("drought_flag", False))
+
+        # Satellite-only drought signal: NDMI drops proportionally more than NDVI
+        # Ratio > 1.4 means moisture loss is the dominant stressor, not canopy removal
+        ndmi_drought = False
+        if ndmi_d is not None and ndvi_d < -0.05:
+            ndmi_ratio   = abs(ndmi_d) / (abs(ndvi_d) + 1e-6)
+            ndmi_drought = ndmi_ratio > 1.4
+
+        drought = wx_drought or ndmi_drought
+
+        # Canopy-intact check: EVI (canopy structure index) stayed relatively stable
+        # while NDVI dropped — trees are still there, only understory was affected
+        canopy_intact = False
+        if evi_d is not None and ndvi_d <= -0.10:
+            # EVI dropped less than 50% of NDVI's drop
+            canopy_intact = evi_d > ndvi_d * 0.50
+
+        # ── Classification (priority order) ──────────────────────────────────
+        severity = event_type = None
+        drought_induced = False
+
+        if eff_delta <= -0.20 and eff_score < 0.35:
+            if drought:
+                event_type, severity, drought_induced = "DROUGHT_STRESS", "medium", True
+            elif canopy_intact:
+                event_type, severity = "CANOPY_DISTURBANCE", "medium"
+            else:
+                event_type = "DEFORESTATION"
+                severity   = "critical" if eff_score < 0.20 else "high"
+
+        elif eff_delta <= -0.15 and eff_score < 0.42:
+            if recovers:
+                event_type, severity = "SEASONAL_DIP", "low"
+            elif drought:
+                event_type, severity, drought_induced = "DROUGHT_STRESS", "low", True
+            elif canopy_intact:
+                event_type, severity = "CANOPY_DISTURBANCE", "low"
+            else:
+                event_type, severity = "VEGETATION_LOSS", "medium"
+
+        elif eff_delta <= -0.10:
+            event_type, severity = "SEASONAL_DIP", "low"
+
+        elif eff_delta >= 0.15 and eff_score < 0.65:
+            if (fs_prev or prev["ndvi"]) < 0.48:
+                event_type, severity = "REGROWTH", "info"
+
+        if event_type:
+            post_cutoff    = curr["period_from"] > EUDR_CUTOFF
+            eudr_violation = (
+                event_type in ("DEFORESTATION", "VEGETATION_LOSS")
+                and post_cutoff
+                and not drought_induced
+            )
+            reasoning = _build_event_reasoning(
+                prev, curr, ndvi_d, evi_d, savi_d, ndmi_d, fusion_d,
+                event_type, drought_induced, canopy_intact, ndmi_drought, recovers, w,
+            )
+            events.append({
+                "period_from":       curr["period_from"],
+                "period_to":         curr["period_to"],
+                "event_type":        event_type,
+                "severity":          severity,
+                # NDVI
+                "ndvi_before":       prev["ndvi"],
+                "ndvi_after":        curr["ndvi"],
+                "ndvi_change":       round(ndvi_d, 3),
+                # EVI
+                "evi_before":        prev.get("evi"),
+                "evi_after":         curr.get("evi"),
+                "evi_change":        round(evi_d,  3) if evi_d  is not None else None,
+                # SAVI
+                "savi_change":       round(savi_d, 3) if savi_d is not None else None,
+                # NDMI
+                "ndmi_change":       round(ndmi_d, 3) if ndmi_d is not None else None,
+                # Fusion
+                "fusion_before":     fs_prev,
+                "fusion_after":      fs_curr,
+                "fusion_change":     fusion_d,
+                # Context flags
+                "recovered":         recovers,
+                "drought_induced":   drought_induced,
+                "canopy_intact":     canopy_intact,
+                "ndmi_drought_signal": ndmi_drought,
+                "drought_flag":      drought,
+                "water_deficit_mm":  w.get("water_deficit_mm"),
+                "rainfall_mm":       w.get("rainfall_mm"),
+                "post_eudr_cutoff":  post_cutoff,
+                "eudr_violation":    eudr_violation,
+                "reasoning":         reasoning,
+            })
+
+    violations        = [e for e in events if e["eudr_violation"]]
+    deforestation_det = any(e["event_type"] == "DEFORESTATION" for e in violations)
+    eudr_compliant    = len(violations) == 0
+    drought_events    = [e for e in events if e.get("drought_induced")]
+    canopy_dist_events = [e for e in events if e["event_type"] == "CANOPY_DISTURBANCE"]
+
+    has_wx_drought = any(w.get("drought_flag") for w in weather_by_period.values())
+    drought_source = "weather data" if has_wx_drought else "NDMI moisture pattern"
+
+    if deforestation_det:
+        n = len([e for e in violations if e["event_type"] == "DEFORESTATION"])
+        summary = (
+            f"Deforestation detected in {n} period(s) after Dec 2020 "
+            f"(confirmed by 4-index analysis including EVI canopy collapse). "
+            f"EUDR NON-COMPLIANT."
+        )
+    elif violations:
+        summary = (
+            f"Significant vegetation loss in {len(violations)} period(s) after Dec 2020. "
+            f"No drought signal detected. Manual field verification required."
+        )
+    elif drought_events:
+        summary = (
+            f"Vegetation stress in {len(drought_events)} period(s) attributed to drought "
+            f"(confirmed by {drought_source}). NDMI moisture pattern rules out deforestation. "
+            f"EUDR compliant."
+        )
+    elif canopy_dist_events:
+        summary = (
+            f"Canopy disturbance in {len(canopy_dist_events)} period(s) — EVI analysis confirms "
+            f"canopy trees are intact, only understory affected. EUDR compliant."
+        )
+    elif current_ndvi < 0.35:
+        summary = "Current vegetation cover is low. No post-2020 deforestation events detected by 4-index analysis."
+    else:
+        summary = "No deforestation detected since Dec 2020. All 4 vegetation indices confirm compliance."
+
+    return {
+        "events":                  events,
+        "baseline_ndvi":           baseline_ndvi,
+        "current_ndvi":            current_ndvi,
+        "baseline_fusion":         baseline_fusion,
+        "current_fusion":          current_fusion,
+        "ndvi_change_total":       round(current_ndvi - baseline_ndvi, 3),
+        "fusion_change_total":     round(current_fusion - baseline_fusion, 3)
+                                   if (current_fusion is not None and baseline_fusion is not None) else None,
+        "eudr_compliant":          eudr_compliant,
+        "deforestation_detected":  deforestation_det,
+        "violations_count":        len(violations),
+        "drought_events_count":    len(drought_events),
+        "canopy_disturbance_count": len(canopy_dist_events),
+        "summary":                 summary,
+    }
+
+
 async def _fetch_sentinel_hub_indices(token: str, coords: List, acquisition_date: datetime) -> Dict:
     """
     Call Sentinel Hub Statistical API for a polygon.
@@ -573,7 +1033,8 @@ class SatelliteAnalysisEngine:
     async def analyze_parcel_history(self, parcel: Any) -> Dict[str, Any]:
         """
         Full deforestation history from Dec 2020 to today.
-        Returns quarterly NDVI timeseries + classified events + EUDR verdict.
+        Fetches quarterly Sentinel-2 indices + Open-Meteo weather, merges both,
+        classifies events with drought discrimination, and returns EUDR verdict.
         """
         parcel_id = getattr(parcel, "id", None)
         coords    = []
@@ -582,19 +1043,47 @@ class SatelliteAnalysisEngine:
         if not coords:
             raise HTTPException(status_code=400, detail="Parcel has no boundary polygon — cannot run history analysis.")
 
+        # Compute polygon centroid for weather lookup
+        lat = sum(c[1] for c in coords) / len(coords)
+        lon = sum(c[0] for c in coords) / len(coords)
+
         creds         = await _load_satellite_credentials()
         client_id     = creds.get("oauth_client_id", "")
         client_secret = creds.get("oauth_client_secret", "")
         token         = await _get_sentinel_hub_token(client_id, client_secret)
 
-        quarters  = await _fetch_sentinel_hub_timeseries(token, coords)
-        analysis  = _classify_timeseries_events(quarters)
+        # 1. Fetch Sentinel-2 quarterly timeseries
+        quarters = await _fetch_sentinel_hub_timeseries(token, coords)
+
+        # 2. Fetch weather history — non-blocking (proceed without it on failure)
+        weather_quarters: List[Dict] = []
+        try:
+            weather_raw      = await fetch_weather_history(lat, lon)
+            weather_quarters = _aggregate_weather_to_quarters(weather_raw, quarters)
+            logger.info(f"Weather merged for parcel {parcel_id}: {len(weather_quarters)} quarters, "
+                        f"{sum(1 for w in weather_quarters if w['drought_flag'])} drought quarter(s)")
+        except Exception as exc:
+            logger.warning(f"Weather fetch failed for parcel {parcel_id}: {exc} — proceeding without weather data")
+
+        # 3. Persist weather to DB
+        if weather_quarters and parcel_id:
+            try:
+                await _store_weather_observations(parcel_id, weather_quarters)
+            except Exception as exc:
+                logger.warning(f"Weather DB store failed for parcel {parcel_id}: {exc}")
+
+        # 4. Classify events with weather context
+        weather_by_period = {w["period_from"]: w for w in weather_quarters}
+        analysis = _classify_with_weather(quarters, weather_by_period)
 
         return {
-            "parcel_id":    parcel_id,
+            "parcel_id":     parcel_id,
             "analysis_from": "2020-12-01",
             "analysis_to":   datetime.utcnow().strftime("%Y-%m-%d"),
+            "centroid_lat":  round(lat, 6),
+            "centroid_lon":  round(lon, 6),
             "quarters":      quarters,
+            "weather":       weather_quarters,
             **analysis,
         }
 

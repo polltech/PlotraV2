@@ -5686,13 +5686,16 @@ class PlotraDashboard {
     }
 
     _renderDeforestationHistory(data, farmName) {
-        const quarters  = data.quarters || [];
-        const events    = data.events   || [];
-        const compliant = data.eudr_compliant;
-        const violations = events.filter(e => e.eudr_violation);
+        const quarters    = data.quarters || [];
+        const events      = data.events   || [];
+        const weather     = data.weather  || [];
+        const compliant   = data.eudr_compliant;
+        const violations  = events.filter(e => e.eudr_violation);
+        const droughtEvts = events.filter(e => e.drought_induced);
+        const canopyEvts  = events.filter(e => e.event_type === 'CANOPY_DISTURBANCE');
 
-        // Severity badge helper
-        const severityBadge = (s) => ({
+        // ── helpers ───────────────────────────────────────────────────────────
+        const severityBadge = s => ({
             critical: '<span class="badge bg-danger">Critical</span>',
             high:     '<span class="badge bg-danger">High</span>',
             medium:   '<span class="badge bg-warning text-dark">Medium</span>',
@@ -5700,93 +5703,313 @@ class PlotraDashboard {
             info:     '<span class="badge bg-success">Info</span>',
         }[s] || `<span class="badge bg-secondary">${s}</span>`);
 
-        const eventIcon = (t) => ({
-            DEFORESTATION:   '<i class="bi bi-tree text-danger me-1"></i>',
-            VEGETATION_LOSS: '<i class="bi bi-exclamation-triangle text-warning me-1"></i>',
-            SEASONAL_DIP:    '<i class="bi bi-arrow-down text-info me-1"></i>',
-            REGROWTH:        '<i class="bi bi-arrow-up text-success me-1"></i>',
-        }[t] || '<i class="bi bi-dot me-1"></i>');
+        const eventMeta = t => ({
+            DEFORESTATION:      { icon: 'bi-tree',                color: 'danger', label: 'Deforestation' },
+            VEGETATION_LOSS:    { icon: 'bi-exclamation-triangle', color: 'warning', label: 'Vegetation Loss' },
+            DROUGHT_STRESS:     { icon: 'bi-droplet-half',         color: 'warning', label: 'Drought Stress' },
+            CANOPY_DISTURBANCE: { icon: 'bi-tree',                color: 'info',    label: 'Canopy Disturbance' },
+            SEASONAL_DIP:       { icon: 'bi-arrow-down',           color: 'secondary', label: 'Seasonal Dip' },
+            REGROWTH:           { icon: 'bi-arrow-up',             color: 'success', label: 'Regrowth' },
+        }[t] || { icon: 'bi-dot', color: 'secondary', label: t });
 
-        // Events table rows
-        const eventRows = events.length ? events.map(e => `
-            <tr class="${e.eudr_violation ? 'table-danger' : ''}">
-                <td>${e.period_from} → ${e.period_to}</td>
-                <td>${eventIcon(e.event_type)}<strong>${e.event_type.replace(/_/g,' ')}</strong></td>
-                <td>${severityBadge(e.severity)}</td>
-                <td>${e.ndvi_before?.toFixed(3) ?? '—'} → ${e.ndvi_after?.toFixed(3) ?? '—'}
-                    <small class="text-${e.ndvi_change < 0 ? 'danger' : 'success'}">(${e.ndvi_change > 0 ? '+' : ''}${e.ndvi_change?.toFixed(3)})</small></td>
-                <td>${e.recovered ? '<span class="text-success">Yes</span>' : '<span class="text-danger">No</span>'}</td>
-                <td>${e.eudr_violation ? '<span class="badge bg-danger">VIOLATION</span>' : '<span class="badge bg-success">OK</span>'}</td>
-            </tr>`).join('') :
-            '<tr><td colspan="6" class="text-center text-success py-3"><i class="bi bi-check-circle me-1"></i>No significant events detected</td></tr>';
+        const fmtV  = v  => v  != null ? (+v).toFixed(3) : '—';
+        const fmtD  = d  => d  != null
+            ? `<span class="text-${d < 0 ? 'danger' : 'success'} fw-semibold">${d > 0 ? '+' : ''}${(+d).toFixed(3)}</span>`
+            : '';
+
+        // Index change mini-block used in the events table
+        const indexBlock = e => {
+            const rows = [
+                `<span class="text-success">NDVI</span> ${fmtV(e.ndvi_before)}→${fmtV(e.ndvi_after)} ${fmtD(e.ndvi_change)}`,
+                e.evi_change  != null ? `<span class="text-primary">EVI</span>  ${fmtV(e.evi_before)}→${fmtV(e.evi_after)} ${fmtD(e.evi_change)}` : null,
+                e.savi_change != null ? `<span class="text-warning">SAVI</span> ${fmtD(e.savi_change)}` : null,
+                e.ndmi_change != null ? `<span class="text-info">NDMI</span> ${fmtD(e.ndmi_change)}` : null,
+                e.fusion_change != null ? `<span class="text-purple" style="color:#6f42c1">Fusion</span> ${fmtV(e.fusion_before)}→${fmtV(e.fusion_after)} ${fmtD(e.fusion_change)}` : null,
+            ].filter(Boolean);
+            return rows.map(r => `<div class="text-nowrap small font-monospace">${r}</div>`).join('');
+        };
+
+        // EUDR status badge per event
+        const eudrBadge = e => {
+            if (e.eudr_violation)    return '<span class="badge bg-danger">VIOLATION</span>';
+            if (e.drought_induced)   return '<span class="badge bg-warning text-dark">DROUGHT</span>';
+            if (e.event_type === 'CANOPY_DISTURBANCE') return '<span class="badge bg-info text-dark">CANOPY OK</span>';
+            if (e.event_type === 'SEASONAL_DIP')       return '<span class="badge bg-secondary">SEASONAL</span>';
+            if (e.event_type === 'REGROWTH')           return '<span class="badge bg-success">RECOVERY</span>';
+            return '<span class="badge bg-success">OK</span>';
+        };
+
+        // Row + collapsible reasoning sub-row
+        const eventRows = events.length
+            ? events.map((e, idx) => {
+                const m   = eventMeta(e.event_type);
+                const rowClass = e.eudr_violation ? 'table-danger'
+                    : e.drought_induced ? 'table-warning'
+                    : e.event_type === 'CANOPY_DISTURBANCE' ? 'table-info bg-opacity-25'
+                    : '';
+                return `
+                <tr class="${rowClass}" style="cursor:pointer"
+                    onclick="document.getElementById('reason-${idx}').classList.toggle('d-none')">
+                    <td class="small fw-semibold">${e.period_from}</td>
+                    <td>
+                        <i class="bi ${m.icon} text-${m.color} me-1"></i>
+                        <strong>${m.label}</strong>
+                        ${e.drought_induced ? '<span class="badge bg-warning text-dark ms-1" title="Drought confirmed">Drought</span>' : ''}
+                        ${e.canopy_intact   ? '<span class="badge bg-info text-dark ms-1" title="EVI confirms canopy trees intact">Canopy OK</span>' : ''}
+                        ${e.ndmi_drought_signal ? '<span class="badge bg-secondary ms-1" title="NDMI moisture signal detected">NDMI</span>' : ''}
+                    </td>
+                    <td>${severityBadge(e.severity)}</td>
+                    <td>${indexBlock(e)}</td>
+                    <td class="small">${e.rainfall_mm != null ? `${e.rainfall_mm} mm` : '—'}${e.water_deficit_mm != null
+                        ? `<br><span class="text-${e.water_deficit_mm < -80 ? 'danger' : 'muted'}">${e.water_deficit_mm} mm deficit</span>`
+                        : ''}</td>
+                    <td>${eudrBadge(e)}</td>
+                </tr>
+                <tr id="reason-${idx}" class="d-none">
+                    <td colspan="6" class="bg-light border-start border-4 border-${m.color} ps-3 py-2">
+                        <div class="small text-muted mb-1"><i class="bi bi-cpu me-1"></i><strong>4-Index Analysis Reasoning:</strong></div>
+                        <div class="small">${e.reasoning || 'No reasoning available.'}</div>
+                    </td>
+                </tr>`;
+            }).join('')
+            : '<tr><td colspan="6" class="text-center text-success py-3"><i class="bi bi-check-circle me-1"></i>No significant events detected — all 4 indices stable.</td></tr>';
+
+        // ── weather summary ───────────────────────────────────────────────────
+        const wxValid       = weather.filter(w => w.rainfall_mm != null);
+        const totalRainfall = wxValid.reduce((s, w) => s + (w.rainfall_mm || 0), 0);
+        const droughtQtrs   = weather.filter(w => w.drought_flag).length;
+        const wxSummary = wxValid.length > 0
+            ? `Total rainfall: <strong>${Math.round(totalRainfall).toLocaleString()} mm</strong>
+               &nbsp;|&nbsp; Drought quarters: <strong class="${droughtQtrs > 0 ? 'text-warning' : 'text-success'}">${droughtQtrs}/${weather.length}</strong>
+               &nbsp;|&nbsp; Avg deficit: <strong>${weather.filter(w=>w.water_deficit_mm!=null).length
+                   ? Math.round(weather.filter(w=>w.water_deficit_mm!=null).reduce((s,w)=>s+(w.water_deficit_mm||0),0)/weather.filter(w=>w.water_deficit_mm!=null).length)
+                   : '—'} mm/qtr</strong>
+               &nbsp;|&nbsp; Location: <strong>${data.centroid_lat?.toFixed(4) ?? '?'}°, ${data.centroid_lon?.toFixed(4) ?? '?'}°</strong>
+               &nbsp;|&nbsp; <span class="text-muted">Source: Open-Meteo Historical API</span>`
+            : '<span class="text-muted"><i class="bi bi-cloud-slash me-1"></i>Weather data unavailable — drought discrimination uses NDMI pattern only.</span>';
+
+        // ── fusion stats for banner ───────────────────────────────────────────
+        const fusBase = data.baseline_fusion;
+        const fusCurr = data.current_fusion;
+        const fusChg  = data.fusion_change_total;
 
         document.getElementById('histModalBody').innerHTML = `
             <!-- EUDR verdict banner -->
-            <div class="alert ${compliant ? 'alert-success' : 'alert-danger'} d-flex align-items-center gap-2 m-3">
-                <i class="bi bi-${compliant ? 'check-circle-fill' : 'x-circle-fill'} fs-4"></i>
-                <div>
-                    <strong>${compliant ? 'EUDR Compliant' : 'EUDR Non-Compliant'}</strong> &mdash; ${data.summary}
-                    <div class="small mt-1">
-                        Baseline NDVI (Dec 2020): <strong>${data.baseline_ndvi?.toFixed(3) ?? '—'}</strong> &nbsp;|&nbsp;
-                        Current NDVI: <strong>${data.current_ndvi?.toFixed(3) ?? '—'}</strong> &nbsp;|&nbsp;
-                        Total change: <strong class="text-${data.ndvi_change_total < -0.1 ? 'danger' : 'success'}">${data.ndvi_change_total > 0 ? '+' : ''}${data.ndvi_change_total?.toFixed(3) ?? '—'}</strong> &nbsp;|&nbsp;
-                        Violations: <strong class="${violations.length ? 'text-danger' : 'text-success'}">${violations.length}</strong>
+            <div class="alert ${compliant ? 'alert-success' : 'alert-danger'} d-flex align-items-start gap-3 m-3 mb-2">
+                <i class="bi bi-${compliant ? 'check-circle-fill' : 'x-circle-fill'} fs-3 mt-1 flex-shrink-0"></i>
+                <div class="flex-grow-1">
+                    <div class="fw-bold fs-6 mb-1">${compliant ? 'EUDR Compliant' : 'EUDR Non-Compliant'}</div>
+                    <div class="mb-2">${data.summary}</div>
+                    <div class="d-flex flex-wrap gap-3 small">
+                        <span>NDVI: <strong>${fmtV(data.baseline_ndvi)}</strong> → <strong>${fmtV(data.current_ndvi)}</strong>
+                            <span class="text-${(data.ndvi_change_total??0)<-0.1?'danger':'success'}">(${(data.ndvi_change_total??0)>0?'+':''}${fmtV(data.ndvi_change_total)})</span>
+                        </span>
+                        ${fusBase != null ? `<span>Fusion: <strong>${fmtV(fusBase)}</strong> → <strong>${fmtV(fusCurr)}</strong>
+                            <span class="text-${(fusChg??0)<-0.1?'danger':'success'}">(${(fusChg??0)>0?'+':''}${fmtV(fusChg)})</span>
+                        </span>` : ''}
+                        <span>Violations: <strong class="${violations.length?'text-danger':'text-success'}">${violations.length}</strong></span>
+                        ${droughtEvts.length ? `<span>Drought-mitigated: <strong class="text-warning">${droughtEvts.length}</strong></span>` : ''}
+                        ${canopyEvts.length  ? `<span>Canopy disturbance: <strong class="text-info">${canopyEvts.length}</strong></span>` : ''}
+                        <span class="text-muted">Analysis: ${data.analysis_from} → ${data.analysis_to}</span>
                     </div>
                 </div>
             </div>
 
-            <!-- NDVI Timeline Chart -->
+            <!-- Weather summary strip -->
+            <div class="px-3 mb-2">
+                <div class="d-flex align-items-center gap-2 p-2 rounded bg-light border small">
+                    <i class="bi bi-cloud-rain text-primary fs-5 flex-shrink-0"></i>
+                    <span>${wxSummary}</span>
+                </div>
+            </div>
+
+            <!-- 4-Index Timeline Chart -->
+            <div class="px-3 mb-1">
+                <h6 class="text-muted mb-1 d-flex align-items-center gap-2">
+                    <i class="bi bi-graph-up"></i>4-Index Vegetation Analysis — Dec 2020 to Today (quarterly)
+                    <span class="badge bg-secondary fw-normal" title="Fusion = NDVI×0.35 + EVI×0.25 + SAVI×0.20 + NDMI×0.20">Fusion Score</span>
+                    <span class="ms-auto text-muted fw-normal small"><i class="bi bi-hand-index me-1"></i>Click events below to see reasoning</span>
+                </h6>
+                <div id="multiIndexChart"></div>
+            </div>
+
+            <!-- Rainfall / Water Deficit Chart -->
             <div class="px-3 mb-3">
-                <h6 class="text-muted mb-2"><i class="bi bi-graph-up me-1"></i>NDVI Timeline — Dec 2020 to Today (quarterly)</h6>
-                <div id="ndviTimelineChart"></div>
+                <h6 class="text-muted mb-1"><i class="bi bi-bar-chart me-1"></i>Rainfall &amp; Water Deficit
+                    <span class="fw-normal small text-muted">(quarterly — orange bars = drought quarters)</span>
+                </h6>
+                <div id="rainfallChart"></div>
             </div>
 
             <!-- Events table -->
-            <div class="px-3">
-                <h6 class="text-muted mb-2"><i class="bi bi-list-ul me-1"></i>Classified Events (${events.length})</h6>
+            <div class="px-3 mb-3">
+                <h6 class="text-muted mb-2"><i class="bi bi-list-ul me-1"></i>Classified Events (${events.length})
+                    <span class="fw-normal small text-muted ms-2">— click any row to expand 4-index reasoning</span>
+                </h6>
                 <div class="table-responsive">
-                    <table class="table table-sm table-hover">
+                    <table class="table table-sm table-hover align-middle">
                         <thead class="table-dark">
-                            <tr><th>Period</th><th>Event</th><th>Severity</th><th>NDVI Change</th><th>Recovered</th><th>EUDR</th></tr>
+                            <tr>
+                                <th>Period</th><th>Event</th><th>Severity</th>
+                                <th>Index Changes</th><th>Rainfall / Deficit</th><th>EUDR</th>
+                            </tr>
                         </thead>
                         <tbody>${eventRows}</tbody>
                     </table>
                 </div>
-                <p class="text-muted small mt-2">
-                    <i class="bi bi-info-circle me-1"></i>
-                    Quarters with no data (heavy cloud cover) are shown as gaps. EUDR cutoff: 31 Dec 2020.
-                    Analysis period: ${data.analysis_from} → ${data.analysis_to}.
-                </p>
+                <div class="d-flex flex-wrap gap-3 small text-muted mt-2">
+                    <span><span class="badge bg-danger me-1">VIOLATION</span>Post-2020 deforestation or vegetation loss</span>
+                    <span><span class="badge bg-warning text-dark me-1">DROUGHT</span>Drought-induced, not a violation</span>
+                    <span><span class="badge bg-info text-dark me-1">CANOPY OK</span>Understory change, canopy trees intact</span>
+                    <span><i class="bi bi-info-circle me-1"></i>Cloud-gap quarters appear as null (gaps) in chart.</span>
+                </div>
             </div>`;
 
-        // Render ApexCharts NDVI line chart
-        const labels  = quarters.map(q => q.period_from);
-        const ndviVals = quarters.map(q => q.ndvi);  // null = cloud gap
+        // ── chart data ────────────────────────────────────────────────────────
+        const labels      = quarters.map(q => q.period_from);
+        const ndviVals    = quarters.map(q => q.ndvi    ?? null);
+        const eviVals     = quarters.map(q => q.evi     ?? null);
+        const saviVals    = quarters.map(q => q.savi    ?? null);
+        const ndmiVals    = quarters.map(q => q.ndmi    ?? null);
+        const fusionVals  = quarters.map(q => q.fusion_score ?? null);
 
-        // Mark event periods with annotations
-        const annotations = events
-            .filter(e => e.event_type !== 'SEASONAL_DIP')
-            .map(e => ({
-                x: e.period_from,
-                borderColor: e.eudr_violation ? '#dc3545' : e.event_type === 'REGROWTH' ? '#198754' : '#fd7e14',
-                label: {
-                    text: e.event_type.replace(/_/g,' '),
-                    style: { color: '#fff', background: e.eudr_violation ? '#dc3545' : e.event_type === 'REGROWTH' ? '#198754' : '#fd7e14' }
-                }
-            }));
+        // Drought shaded bands on both charts
+        const droughtBands = weather.filter(w => w.drought_flag).map(w => ({
+            x: w.period_from, x2: w.period_to,
+            fillColor: '#fd7e14', opacity: 0.10,
+            label: {
+                text: '☀ Drought',
+                borderColor: '#fd7e14',
+                style: { color: '#fd7e14', background: 'rgba(255,255,255,0.85)', fontSize: '9px' },
+                position: 'top', offsetY: 0,
+            }
+        }));
 
-        new ApexCharts(document.getElementById('ndviTimelineChart'), {
-            chart:  { type: 'line', height: 280, toolbar: { show: false }, animations: { enabled: false } },
-            series: [{ name: 'NDVI', data: ndviVals }],
-            xaxis:  { categories: labels, labels: { rotate: -45, style: { fontSize: '11px' } } },
-            yaxis:  { min: 0, max: 1, title: { text: 'NDVI' }, decimalsInFloat: 2 },
-            stroke: { curve: 'smooth', width: 2 },
-            markers: { size: 4 },
-            colors: ['#198754'],
-            annotations: { xaxis: annotations },
-            tooltip: { y: { formatter: v => v != null ? v.toFixed(3) : 'No data (cloud)' } },
+        // Event vertical annotations (exclude seasonal dips to reduce noise)
+        const eventAnnotations = events
+            .filter(e => !['SEASONAL_DIP'].includes(e.event_type))
+            .map(e => {
+                const col = e.eudr_violation ? '#dc3545'
+                    : e.drought_induced ? '#fd7e14'
+                    : e.event_type === 'CANOPY_DISTURBANCE' ? '#0dcaf0'
+                    : e.event_type === 'REGROWTH' ? '#198754'
+                    : '#6c757d';
+                return {
+                    x: e.period_from,
+                    borderColor: col,
+                    strokeDashArray: 3,
+                    label: {
+                        text: e.event_type.replace(/_/g, ' '),
+                        style: { color: '#fff', background: col, fontSize: '9px' },
+                        offsetY: -4,
+                    }
+                };
+            });
+
+        // Reference line at deforestation threshold
+        const thresholdLines = [
+            { y: 0.35, borderColor: '#dc3545', strokeDashArray: 5,
+              label: { text: 'Deforestation threshold', style: { fontSize: '9px', color: '#dc3545' } } },
+            { y: 0.45, borderColor: '#fd7e14', strokeDashArray: 5,
+              label: { text: 'Vegetation loss threshold', style: { fontSize: '9px', color: '#fd7e14' } } },
+        ];
+
+        // ── 4-index multi-line chart ──────────────────────────────────────────
+        new ApexCharts(document.getElementById('multiIndexChart'), {
+            chart: {
+                type: 'line', height: 300,
+                toolbar: { show: true, tools: { download: true, zoom: true, reset: true, pan: true } },
+                animations: { enabled: false },
+                zoom: { enabled: true },
+            },
+            series: [
+                { name: 'Fusion Score', data: fusionVals },
+                { name: 'NDVI',         data: ndviVals  },
+                { name: 'EVI',          data: eviVals   },
+                { name: 'SAVI',         data: saviVals  },
+                { name: 'NDMI',         data: ndmiVals  },
+            ],
+            // Fusion: thick purple dashed. NDVI: solid green. Others: thinner.
+            stroke: { curve: 'smooth', width: [3, 2.5, 1.5, 1.5, 1.5], dashArray: [6, 0, 0, 0, 0] },
+            colors: ['#6f42c1', '#198754', '#0d6efd', '#fd7e14', '#0dcaf0'],
+            markers: { size: [5, 4, 2, 2, 2], hover: { sizeOffset: 3 } },
+            xaxis: { categories: labels, labels: { rotate: -45, style: { fontSize: '10px' } } },
+            yaxis: {
+                min: -0.3, max: 1.0,
+                title: { text: 'Index Value' },
+                labels: { formatter: v => v != null ? v.toFixed(2) : '' },
+                tickAmount: 6,
+            },
+            annotations: {
+                xaxis: [...droughtBands, ...eventAnnotations],
+                yaxis: thresholdLines,
+            },
+            legend: {
+                show: true, position: 'top', fontSize: '11px',
+                markers: { width: 12, height: 3 },
+                tooltipHoverFormatter: (n, opts) => {
+                    const v = opts.w.globals.series[opts.seriesIndex][opts.dataPointIndex];
+                    return v != null ? n + ': <b>' + v.toFixed(3) + '</b>' : n + ': no data';
+                },
+            },
+            tooltip: {
+                shared: true, intersect: false,
+                y: { formatter: v => v != null ? v.toFixed(3) : 'cloud gap' },
+            },
             noData: { text: 'No valid imagery' },
+            grid:   { borderColor: '#e9ecef' },
         }).render();
+
+        // ── rainfall + water deficit chart ────────────────────────────────────
+        if (weather.length > 0) {
+            const wxLabels     = weather.map(w => w.period_from);
+            const rainfallVals = weather.map(w => w.rainfall_mm       ?? null);
+            const et0Vals      = weather.map(w => w.et0_mm            ?? null);
+            const deficitVals  = weather.map(w => w.water_deficit_mm  ?? null);
+            // Orange for drought quarters, blue otherwise
+            const barColors    = weather.map(w => w.drought_flag ? '#fd7e14' : '#0d6efd');
+
+            new ApexCharts(document.getElementById('rainfallChart'), {
+                chart: {
+                    type: 'bar', height: 200,
+                    toolbar: { show: false }, animations: { enabled: false },
+                },
+                series: [
+                    { name: 'Rainfall (mm)',      type: 'bar',  data: rainfallVals },
+                    { name: 'ET₀ demand (mm)',     type: 'line', data: et0Vals      },
+                    { name: 'Water Deficit (mm)', type: 'line', data: deficitVals  },
+                ],
+                xaxis: { categories: wxLabels, labels: { rotate: -45, style: { fontSize: '10px' } } },
+                yaxis: [
+                    { title: { text: 'mm' }, labels: { formatter: v => v != null ? Math.round(v) : '' } },
+                    { opposite: true, show: false },
+                    { opposite: true, show: false },
+                ],
+                colors:  ['#0d6efd', '#adb5bd', '#dc3545'],
+                fill:    { colors: barColors },   // overrides bar colour per drought flag
+                plotOptions: { bar: { distributed: true, columnWidth: '65%' } },
+                stroke:  { width: [0, 2, 2], curve: 'smooth', dashArray: [0, 4, 0] },
+                markers: { size: [0, 3, 3] },
+                legend:  { show: true, position: 'top', fontSize: '11px' },
+                tooltip: {
+                    shared: true, intersect: false,
+                    y: [
+                        { formatter: v => v != null ? Math.round(v) + ' mm' : 'no data' },
+                        { formatter: v => v != null ? Math.round(v) + ' mm' : 'no data' },
+                        { formatter: v => v != null ? Math.round(v) + ' mm' : 'no data' },
+                    ],
+                },
+                annotations: {
+                    yaxis: [{ y: 0, borderColor: '#6c757d', strokeDashArray: 4,
+                        label: { text: 'Balance = 0', style: { fontSize: '9px', color: '#6c757d' } } }],
+                },
+                noData: { text: 'No weather data' },
+                grid:   { borderColor: '#e9ecef' },
+            }).render();
+        } else {
+            document.getElementById('rainfallChart').innerHTML =
+                '<p class="text-muted small text-center py-3"><i class="bi bi-cloud-slash me-1"></i>Weather data unavailable — drought discrimination uses NDMI satellite pattern only.</p>';
+        }
     }
 
     async analyzeSingleFarm(farmId) {

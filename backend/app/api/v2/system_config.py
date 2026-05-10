@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.auth import get_current_user, require_platform_admin
-from app.models.user import User
+from app.models.user import User, Cooperative
 from app.models.system import SystemConfig
 
 router = APIRouter(prefix="/admin/config", tags=["System Configuration"])

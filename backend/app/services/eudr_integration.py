@@ -8,12 +8,9 @@ import httpx
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
+import logging
 
-try:
-    from app.core.logging import logger
-except ImportError:
-    import logging
-    logger = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
