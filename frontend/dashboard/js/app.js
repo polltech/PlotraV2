@@ -5923,13 +5923,13 @@ class PlotraDashboard {
                 zoom: { enabled: true },
             },
             series: [
-                { name: 'Fusion Score', data: fusionVals },
-                { name: 'NDVI',         data: ndviVals  },
-                { name: 'EVI',          data: eviVals   },
-                { name: 'SAVI',         data: saviVals  },
-                { name: 'NDMI',         data: ndmiVals  },
+                { name: 'Fusion Score', type: 'line', data: fusionVals },
+                { name: 'NDVI',         type: 'line', data: ndviVals  },
+                { name: 'EVI',          type: 'line', data: eviVals   },
+                { name: 'SAVI',         type: 'line', data: saviVals  },
+                { name: 'NDMI',         type: 'line', data: ndmiVals  },
             ],
-            // Fusion: thick purple dashed. NDVI: solid green. Others: thinner.
+            fill:   { type: ['solid','solid','solid','solid','solid'], opacity: [0,0,0,0,0] },
             stroke: { curve: 'smooth', width: [3, 2.5, 1.5, 1.5, 1.5], dashArray: [6, 0, 0, 0, 0] },
             colors: ['#6f42c1', '#198754', '#0d6efd', '#fd7e14', '#0dcaf0'],
             markers: { size: [5, 4, 2, 2, 2], hover: { sizeOffset: 3 } },
@@ -5966,8 +5966,11 @@ class PlotraDashboard {
             const rainfallVals = weather.map(w => w.rainfall_mm       ?? null);
             const et0Vals      = weather.map(w => w.et0_mm            ?? null);
             const deficitVals  = weather.map(w => w.water_deficit_mm  ?? null);
-            // Orange for drought quarters, blue otherwise
-            const barColors    = weather.map(w => w.drought_flag ? '#fd7e14' : '#0d6efd');
+            const wxDroughtBands = weather.filter(w => w.drought_flag).map(w => ({
+                x: w.period_from, x2: w.period_to,
+                fillColor: '#fd7e14', opacity: 0.18,
+                label: { text: '☀ Drought', style: { color: '#fd7e14', fontSize: '9px' }, position: 'top' }
+            }));
 
             new ApexCharts(document.getElementById('rainfallChart'), {
                 chart: {
@@ -5979,6 +5982,7 @@ class PlotraDashboard {
                     { name: 'ET₀ demand (mm)',     type: 'line', data: et0Vals      },
                     { name: 'Water Deficit (mm)', type: 'line', data: deficitVals  },
                 ],
+                fill:    { type: ['solid','solid','solid'], opacity: [0.85, 1, 1] },
                 xaxis: { categories: wxLabels, labels: { rotate: -45, style: { fontSize: '10px' } } },
                 yaxis: [
                     { title: { text: 'mm' }, labels: { formatter: v => v != null ? Math.round(v) : '' } },
@@ -5986,8 +5990,7 @@ class PlotraDashboard {
                     { opposite: true, show: false },
                 ],
                 colors:  ['#0d6efd', '#adb5bd', '#dc3545'],
-                fill:    { colors: barColors },   // overrides bar colour per drought flag
-                plotOptions: { bar: { distributed: true, columnWidth: '65%' } },
+                plotOptions: { bar: { columnWidth: '65%' } },
                 stroke:  { width: [0, 2, 2], curve: 'smooth', dashArray: [0, 4, 0] },
                 markers: { size: [0, 3, 3] },
                 legend:  { show: true, position: 'top', fontSize: '11px' },
@@ -6000,6 +6003,7 @@ class PlotraDashboard {
                     ],
                 },
                 annotations: {
+                    xaxis: wxDroughtBands,
                     yaxis: [{ y: 0, borderColor: '#6c757d', strokeDashArray: 4,
                         label: { text: 'Balance = 0', style: { fontSize: '9px', color: '#6c757d' } } }],
                 },
@@ -11604,14 +11608,15 @@ class PlotraDashboard {
 
         // 4-index chart
         new ApexCharts(document.getElementById(`multiIndexChart-${uid}`), {
-            chart: { type:'line', height:280, toolbar:{ show:true, tools:{ download:true, zoom:true, reset:true, pan:true } }, animations:{ enabled:false }, zoom:{ enabled:true } },
+            chart:  { type:'line', height:280, toolbar:{ show:true, tools:{ download:true, zoom:true, reset:true, pan:true } }, animations:{ enabled:false }, zoom:{ enabled:true } },
             series: [
-                { name:'Fusion Score', data: fusionVals },
-                { name:'NDVI',         data: ndviVals   },
-                { name:'EVI',          data: eviVals    },
-                { name:'SAVI',         data: saviVals   },
-                { name:'NDMI',         data: ndmiVals   },
+                { name:'Fusion Score', type:'line', data: fusionVals },
+                { name:'NDVI',         type:'line', data: ndviVals   },
+                { name:'EVI',          type:'line', data: eviVals    },
+                { name:'SAVI',         type:'line', data: saviVals   },
+                { name:'NDMI',         type:'line', data: ndmiVals   },
             ],
+            fill:    { type:['solid','solid','solid','solid','solid'], opacity:[0,0,0,0,0] },
             stroke:  { curve:'smooth', width:[3,2.5,1.5,1.5,1.5], dashArray:[6,0,0,0,0] },
             colors:  ['#6f42c1','#198754','#0d6efd','#fd7e14','#0dcaf0'],
             markers: { size:[5,4,2,2,2], hover:{ sizeOffset:3 } },
@@ -11630,7 +11635,11 @@ class PlotraDashboard {
             const rainfallVals = weather.map(w => w.rainfall_mm      ?? null);
             const et0Vals      = weather.map(w => w.et0_mm           ?? null);
             const deficitVals  = weather.map(w => w.water_deficit_mm ?? null);
-            const barColors    = weather.map(w => w.drought_flag ? '#fd7e14' : '#0d6efd');
+            const wxDroughtBands = weather.filter(w => w.drought_flag).map(w => ({
+                x: w.period_from, x2: w.period_to,
+                fillColor: '#fd7e14', opacity: 0.18,
+                label: { text: '☀ Drought', style: { color:'#fd7e14', fontSize:'9px' }, position:'top' }
+            }));
 
             new ApexCharts(document.getElementById(`rainfallChart-${uid}`), {
                 chart:   { type:'bar', height:160, toolbar:{ show:false }, animations:{ enabled:false } },
@@ -11639,6 +11648,7 @@ class PlotraDashboard {
                     { name:'ET₀ demand (mm)',   type:'line', data:et0Vals      },
                     { name:'Water Deficit (mm)',type:'line', data:deficitVals  },
                 ],
+                fill:    { type:['solid','solid','solid'], opacity:[0.85,1,1] },
                 xaxis:   { categories:wxLabels, labels:{ rotate:-45, style:{ fontSize:'10px' } } },
                 yaxis:   [
                     { title:{ text:'mm' }, labels:{ formatter: v => v!=null?Math.round(v):'' } },
@@ -11646,8 +11656,7 @@ class PlotraDashboard {
                     { opposite:true, show:false },
                 ],
                 colors:  ['#0d6efd','#adb5bd','#dc3545'],
-                fill:    { colors:barColors },
-                plotOptions: { bar:{ distributed:true, columnWidth:'65%' } },
+                plotOptions: { bar:{ columnWidth:'65%' } },
                 stroke:  { width:[0,2,2], curve:'smooth', dashArray:[0,4,0] },
                 markers: { size:[0,3,3] },
                 legend:  { show:true, position:'top', fontSize:'11px' },
@@ -11656,8 +11665,11 @@ class PlotraDashboard {
                     { formatter: v => v!=null?Math.round(v)+' mm':'no data' },
                     { formatter: v => v!=null?Math.round(v)+' mm':'no data' },
                 ] },
-                annotations: { yaxis:[{ y:0, borderColor:'#6c757d', strokeDashArray:4,
-                    label:{ text:'Balance = 0', style:{ fontSize:'9px', color:'#6c757d' } } }] },
+                annotations: {
+                    xaxis: wxDroughtBands,
+                    yaxis: [{ y:0, borderColor:'#6c757d', strokeDashArray:4,
+                        label:{ text:'Balance = 0', style:{ fontSize:'9px', color:'#6c757d' } } }]
+                },
                 grid:    { borderColor:'#e9ecef' },
                 noData:  { text:'No weather data' },
             }).render();
