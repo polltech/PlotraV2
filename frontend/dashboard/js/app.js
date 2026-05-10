@@ -5645,9 +5645,12 @@ class PlotraDashboard {
                         </td>
                         <td><span class="badge ${f.compliance_status === 'Compliant' ? 'bg-soft-success text-success' : 'bg-soft-warning text-warning'}">${f.compliance_status}</span></td>
                         <td class="small">${f.last_analysis ? new Date(f.last_analysis).toLocaleString() : 'Never'}</td>
-                        <td>
+                        <td class="d-flex gap-1 flex-wrap">
                             <button class="btn btn-sm btn-outline-primary" onclick="app.analyzeSingleFarm('${f.id}')">
                                 <i class="bi bi-play-fill"></i> Analyze
+                            </button>
+                            <button class="btn btn-sm btn-outline-success" onclick="app.viewDeforestationHistory('${f.id}', '${(f.farm_name||'').replace(/'/g,"\\'")}')">
+                                <i class="bi bi-clock-history"></i> History
                             </button>
                         </td>
                     </tr>
@@ -5659,6 +5662,131 @@ class PlotraDashboard {
             console.error(error);
             list.innerHTML = `<tr><td colspan="5" class="text-center py-4 text-danger">Error: ${error.message}</td></tr>`;
         }
+    }
+
+    async viewDeforestationHistory(farmId, farmName) {
+        // Open modal immediately with spinner
+        document.getElementById('histParcelName').textContent = farmName || farmId;
+        document.getElementById('histModalBody').innerHTML = `
+            <div class="text-center py-5">
+                <span class="spinner-border text-primary"></span>
+                <p class="mt-3 text-muted">Fetching quarterly satellite data from Dec 2020 to today…<br>
+                <small>This may take 20–40 seconds — Sentinel-2 processes ~22 quarters in one call.</small></p>
+            </div>`;
+        const modal = new bootstrap.Modal(document.getElementById('deforestationHistoryModal'));
+        modal.show();
+
+        try {
+            const data = await api.request(`/admin/satellite/history/farm/${farmId}`);
+            this._renderDeforestationHistory(data, farmName);
+        } catch (err) {
+            document.getElementById('histModalBody').innerHTML = `
+                <div class="alert alert-danger m-3"><i class="bi bi-exclamation-triangle me-2"></i>${err.message}</div>`;
+        }
+    }
+
+    _renderDeforestationHistory(data, farmName) {
+        const quarters  = data.quarters || [];
+        const events    = data.events   || [];
+        const compliant = data.eudr_compliant;
+        const violations = events.filter(e => e.eudr_violation);
+
+        // Severity badge helper
+        const severityBadge = (s) => ({
+            critical: '<span class="badge bg-danger">Critical</span>',
+            high:     '<span class="badge bg-danger">High</span>',
+            medium:   '<span class="badge bg-warning text-dark">Medium</span>',
+            low:      '<span class="badge bg-info text-dark">Low</span>',
+            info:     '<span class="badge bg-success">Info</span>',
+        }[s] || `<span class="badge bg-secondary">${s}</span>`);
+
+        const eventIcon = (t) => ({
+            DEFORESTATION:   '<i class="bi bi-tree text-danger me-1"></i>',
+            VEGETATION_LOSS: '<i class="bi bi-exclamation-triangle text-warning me-1"></i>',
+            SEASONAL_DIP:    '<i class="bi bi-arrow-down text-info me-1"></i>',
+            REGROWTH:        '<i class="bi bi-arrow-up text-success me-1"></i>',
+        }[t] || '<i class="bi bi-dot me-1"></i>');
+
+        // Events table rows
+        const eventRows = events.length ? events.map(e => `
+            <tr class="${e.eudr_violation ? 'table-danger' : ''}">
+                <td>${e.period_from} → ${e.period_to}</td>
+                <td>${eventIcon(e.event_type)}<strong>${e.event_type.replace(/_/g,' ')}</strong></td>
+                <td>${severityBadge(e.severity)}</td>
+                <td>${e.ndvi_before?.toFixed(3) ?? '—'} → ${e.ndvi_after?.toFixed(3) ?? '—'}
+                    <small class="text-${e.ndvi_change < 0 ? 'danger' : 'success'}">(${e.ndvi_change > 0 ? '+' : ''}${e.ndvi_change?.toFixed(3)})</small></td>
+                <td>${e.recovered ? '<span class="text-success">Yes</span>' : '<span class="text-danger">No</span>'}</td>
+                <td>${e.eudr_violation ? '<span class="badge bg-danger">VIOLATION</span>' : '<span class="badge bg-success">OK</span>'}</td>
+            </tr>`).join('') :
+            '<tr><td colspan="6" class="text-center text-success py-3"><i class="bi bi-check-circle me-1"></i>No significant events detected</td></tr>';
+
+        document.getElementById('histModalBody').innerHTML = `
+            <!-- EUDR verdict banner -->
+            <div class="alert ${compliant ? 'alert-success' : 'alert-danger'} d-flex align-items-center gap-2 m-3">
+                <i class="bi bi-${compliant ? 'check-circle-fill' : 'x-circle-fill'} fs-4"></i>
+                <div>
+                    <strong>${compliant ? 'EUDR Compliant' : 'EUDR Non-Compliant'}</strong> &mdash; ${data.summary}
+                    <div class="small mt-1">
+                        Baseline NDVI (Dec 2020): <strong>${data.baseline_ndvi?.toFixed(3) ?? '—'}</strong> &nbsp;|&nbsp;
+                        Current NDVI: <strong>${data.current_ndvi?.toFixed(3) ?? '—'}</strong> &nbsp;|&nbsp;
+                        Total change: <strong class="text-${data.ndvi_change_total < -0.1 ? 'danger' : 'success'}">${data.ndvi_change_total > 0 ? '+' : ''}${data.ndvi_change_total?.toFixed(3) ?? '—'}</strong> &nbsp;|&nbsp;
+                        Violations: <strong class="${violations.length ? 'text-danger' : 'text-success'}">${violations.length}</strong>
+                    </div>
+                </div>
+            </div>
+
+            <!-- NDVI Timeline Chart -->
+            <div class="px-3 mb-3">
+                <h6 class="text-muted mb-2"><i class="bi bi-graph-up me-1"></i>NDVI Timeline — Dec 2020 to Today (quarterly)</h6>
+                <div id="ndviTimelineChart"></div>
+            </div>
+
+            <!-- Events table -->
+            <div class="px-3">
+                <h6 class="text-muted mb-2"><i class="bi bi-list-ul me-1"></i>Classified Events (${events.length})</h6>
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover">
+                        <thead class="table-dark">
+                            <tr><th>Period</th><th>Event</th><th>Severity</th><th>NDVI Change</th><th>Recovered</th><th>EUDR</th></tr>
+                        </thead>
+                        <tbody>${eventRows}</tbody>
+                    </table>
+                </div>
+                <p class="text-muted small mt-2">
+                    <i class="bi bi-info-circle me-1"></i>
+                    Quarters with no data (heavy cloud cover) are shown as gaps. EUDR cutoff: 31 Dec 2020.
+                    Analysis period: ${data.analysis_from} → ${data.analysis_to}.
+                </p>
+            </div>`;
+
+        // Render ApexCharts NDVI line chart
+        const labels  = quarters.map(q => q.period_from);
+        const ndviVals = quarters.map(q => q.ndvi);  // null = cloud gap
+
+        // Mark event periods with annotations
+        const annotations = events
+            .filter(e => e.event_type !== 'SEASONAL_DIP')
+            .map(e => ({
+                x: e.period_from,
+                borderColor: e.eudr_violation ? '#dc3545' : e.event_type === 'REGROWTH' ? '#198754' : '#fd7e14',
+                label: {
+                    text: e.event_type.replace(/_/g,' '),
+                    style: { color: '#fff', background: e.eudr_violation ? '#dc3545' : e.event_type === 'REGROWTH' ? '#198754' : '#fd7e14' }
+                }
+            }));
+
+        new ApexCharts(document.getElementById('ndviTimelineChart'), {
+            chart:  { type: 'line', height: 280, toolbar: { show: false }, animations: { enabled: false } },
+            series: [{ name: 'NDVI', data: ndviVals }],
+            xaxis:  { categories: labels, labels: { rotate: -45, style: { fontSize: '11px' } } },
+            yaxis:  { min: 0, max: 1, title: { text: 'NDVI' }, decimalsInFloat: 2 },
+            stroke: { curve: 'smooth', width: 2 },
+            markers: { size: 4 },
+            colors: ['#198754'],
+            annotations: { xaxis: annotations },
+            tooltip: { y: { formatter: v => v != null ? v.toFixed(3) : 'No data (cloud)' } },
+            noData: { text: 'No valid imagery' },
+        }).render();
     }
 
     async analyzeSingleFarm(farmId) {

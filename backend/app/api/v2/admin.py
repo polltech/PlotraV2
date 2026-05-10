@@ -188,6 +188,45 @@ async def get_all_users(
     }
 
 
+@router.get("/satellite/history/farm/{farm_id}")
+async def get_farm_deforestation_history(
+    farm_id: str,
+    current_user: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Fetch quarterly NDVI timeseries from Dec 2020 to today for a farm's first parcel.
+    Returns EUDR compliance verdict + classified events.
+    """
+    from app.models.farm import LandParcel
+    result = await db.execute(
+        select(LandParcel).where(LandParcel.farm_id == farm_id).limit(1)
+    )
+    parcel = result.scalar_one_or_none()
+    if not parcel:
+        raise HTTPException(status_code=404, detail="No parcels found for this farm — add a boundary polygon first.")
+    return await satellite_engine.analyze_parcel_history(parcel)
+
+
+@router.get("/satellite/history/{parcel_id}")
+async def get_parcel_deforestation_history(
+    parcel_id: str,
+    current_user: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Fetch quarterly NDVI timeseries from Dec 2020 to today for a specific parcel.
+    Classifies each period as DEFORESTATION, VEGETATION_LOSS, SEASONAL_DIP, REGROWTH, or stable.
+    Returns EUDR compliance verdict.
+    """
+    from app.models.farm import LandParcel
+    result = await db.execute(select(LandParcel).where(LandParcel.id == parcel_id))
+    parcel = result.scalar_one_or_none()
+    if not parcel:
+        raise HTTPException(status_code=404, detail="Parcel not found")
+    return await satellite_engine.analyze_parcel_history(parcel)
+
+
 @router.post("/satellite/analyze", response_model=List[AnalysisResponse])
 async def trigger_satellite_analysis(
     request: AnalysisRequest,

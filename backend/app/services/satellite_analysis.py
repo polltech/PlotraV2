@@ -5,17 +5,14 @@ The Sentinel Hub dashboard is deprecated — authenticate directly with your Pla
 """
 import math
 import uuid
+import logging
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
 import httpx
 from fastapi import HTTPException
 
-try:
-    from app.core.logging import logger
-except ImportError:
-    import logging
-    logger = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -129,6 +126,172 @@ function evaluatePixel(s) {
   };
 }
 """
+
+
+async def _fetch_sentinel_hub_timeseries(token: str, coords: List) -> List[Dict]:
+    """
+    Fetch quarterly NDVI from 2020-12-01 to today in a single Stats API call.
+    Returns a list of dicts, one per quarter, ordered oldest → newest.
+    Each dict: {period_from, period_to, ndvi, evi, savi, ndmi, cloud_cover_pct, valid_pixels}
+    Quarters with 0 valid pixels (all cloud) are included with ndvi=None so gaps are visible.
+    """
+    if not coords:
+        raise HTTPException(status_code=400, detail="Parcel has no boundary coordinates.")
+
+    from_date = "2020-12-01T00:00:00Z"
+    to_date   = datetime.utcnow().strftime("%Y-%m-%dT23:59:59Z")
+
+    payload = {
+        "input": {
+            "bounds": {"geometry": {"type": "Polygon", "coordinates": [coords]}},
+            "data": [{
+                "type": "sentinel-2-l2a",
+                "dataFilter": {"timeRange": {"from": from_date, "to": to_date}, "maxCloudCoverage": 90}
+            }]
+        },
+        "aggregation": {
+            "timeRange": {"from": from_date, "to": to_date},
+            "aggregationInterval": {"of": "P3M"},   # quarterly
+            "evalscript": _EVALSCRIPT,
+            "resx": 20,
+            "resy": 20
+        }
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=120) as client:
+            resp = await client.post(
+                _CDSE_STATS_URL,
+                headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+                json=payload
+            )
+    except httpx.TimeoutException:
+        raise HTTPException(status_code=504, detail="Copernicus Statistics API timed out during history fetch.")
+    except httpx.ConnectError:
+        raise HTTPException(status_code=503, detail="Cannot reach Copernicus Data Space Statistics API.")
+
+    if resp.status_code == 401:
+        raise HTTPException(status_code=503, detail="Copernicus 401 — check OAuth credentials in Admin → System → Satellite.")
+    if resp.status_code not in (200, 206):
+        raise HTTPException(status_code=503, detail=f"Sentinel Hub returned {resp.status_code}: {resp.text[:300]}")
+
+    intervals = resp.json().get("data", [])
+    if not intervals:
+        raise HTTPException(status_code=404, detail="No Sentinel-2 imagery found from Dec 2020 to today for this parcel.")
+
+    def _s(outputs, name, key, default=None):
+        try:
+            v = float(outputs.get(name, {}).get("bands", {}).get("B0", {}).get("stats", {}).get(key, default))
+            return None if (math.isnan(v) or math.isinf(v)) else v
+        except (TypeError, ValueError):
+            return default
+
+    results = []
+    for iv in intervals:
+        outputs      = iv.get("outputs", {})
+        sample_count = _s(outputs, "ndvi", "sampleCount", 0) or 0
+        nodata_count = _s(outputs, "ndvi", "noDataCount", 0) or 0
+        valid        = int(sample_count - nodata_count)
+        ndvi         = _s(outputs, "ndvi", "mean") if valid > 0 else None
+        results.append({
+            "period_from":        iv.get("interval", {}).get("from", "")[:10],
+            "period_to":          iv.get("interval", {}).get("to",   "")[:10],
+            "ndvi":               round(ndvi, 3) if ndvi is not None else None,
+            "evi":                round(_s(outputs, "evi",  "mean", 0), 3) if valid > 0 else None,
+            "savi":               round(_s(outputs, "savi", "mean", 0), 3) if valid > 0 else None,
+            "ndmi":               round(_s(outputs, "ndmi", "mean", 0), 3) if valid > 0 else None,
+            "cloud_cover_pct":    round(nodata_count / max(1, sample_count) * 100, 1),
+            "valid_pixels":       valid,
+        })
+
+    logger.info(f"Timeseries fetched: {len(results)} quarters, {sum(1 for r in results if r['ndvi'] is not None)} with valid NDVI")
+    return results
+
+
+def _classify_timeseries_events(quarters: List[Dict]) -> Dict:
+    """
+    Walk through quarterly NDVI values and classify events.
+
+    Rules:
+      - Baseline = first quarter with valid NDVI (≥ Dec 2020)
+      - DEFORESTATION: sudden drop > 0.20 AND result NDVI < 0.35, no recovery within 2 quarters
+      - VEGETATION_LOSS: drop > 0.15 AND result NDVI < 0.45, partial or no recovery
+      - SEASONAL_DIP: drop > 0.10 but recovers within next 1–2 quarters
+      - REGROWTH: gain > 0.15 after a prior loss
+      EUDR cutoff = 2020-12-31: only events whose period_from > that date are non-compliant.
+    """
+    EUDR_CUTOFF = "2020-12-31"
+    valid = [q for q in quarters if q["ndvi"] is not None]
+    if len(valid) < 2:
+        return {"events": [], "baseline_ndvi": None, "current_ndvi": None, "eudr_compliant": True,
+                "deforestation_detected": False, "summary": "Insufficient cloud-free imagery for analysis."}
+
+    baseline_ndvi  = valid[0]["ndvi"]
+    current_ndvi   = valid[-1]["ndvi"]
+    events         = []
+
+    for i in range(1, len(valid)):
+        prev = valid[i - 1]
+        curr = valid[i]
+        delta = curr["ndvi"] - prev["ndvi"]
+
+        # Check if next quarter recovers (look ahead 1–2 quarters)
+        next_vals = [valid[j]["ndvi"] for j in range(i + 1, min(i + 3, len(valid)))]
+        recovers  = any(v >= prev["ndvi"] - 0.05 for v in next_vals)
+
+        severity = event_type = None
+
+        if delta <= -0.20 and curr["ndvi"] < 0.35:
+            event_type = "DEFORESTATION"
+            severity   = "critical" if curr["ndvi"] < 0.20 else "high"
+        elif delta <= -0.15 and curr["ndvi"] < 0.45:
+            if recovers:
+                event_type, severity = "SEASONAL_DIP", "low"
+            else:
+                event_type, severity = "VEGETATION_LOSS", "medium"
+        elif delta <= -0.10:
+            event_type, severity = "SEASONAL_DIP", "low"
+        elif delta >= 0.15 and prev["ndvi"] < 0.45:
+            event_type, severity = "REGROWTH", "info"
+
+        if event_type:
+            post_cutoff = curr["period_from"] > EUDR_CUTOFF
+            events.append({
+                "period_from":    curr["period_from"],
+                "period_to":      curr["period_to"],
+                "event_type":     event_type,
+                "severity":       severity,
+                "ndvi_before":    prev["ndvi"],
+                "ndvi_after":     curr["ndvi"],
+                "ndvi_change":    round(delta, 3),
+                "recovered":      recovers,
+                "post_eudr_cutoff": post_cutoff,
+                "eudr_violation": event_type in ("DEFORESTATION", "VEGETATION_LOSS") and post_cutoff,
+            })
+
+    violations         = [e for e in events if e["eudr_violation"]]
+    deforestation_det  = any(e["event_type"] == "DEFORESTATION" for e in violations)
+    eudr_compliant     = len(violations) == 0
+
+    if deforestation_det:
+        summary = f"Deforestation detected in {len([e for e in violations if e['event_type']=='DEFORESTATION'])} period(s) after Dec 2020. EUDR NON-COMPLIANT."
+    elif violations:
+        summary = f"Significant vegetation loss in {len(violations)} period(s) after Dec 2020. Review required."
+    elif current_ndvi < 0.35:
+        summary = "Low current vegetation cover. No post-2020 deforestation events detected."
+    else:
+        summary = "No deforestation detected since Dec 2020. EUDR compliant."
+
+    return {
+        "events":                events,
+        "baseline_ndvi":         baseline_ndvi,
+        "current_ndvi":          current_ndvi,
+        "ndvi_change_total":     round(current_ndvi - baseline_ndvi, 3),
+        "eudr_compliant":        eudr_compliant,
+        "deforestation_detected": deforestation_det,
+        "violations_count":      len(violations),
+        "summary":               summary,
+    }
 
 
 async def _fetch_sentinel_hub_indices(token: str, coords: List, acquisition_date: datetime) -> Dict:
@@ -405,6 +568,34 @@ class SatelliteAnalysisEngine:
             **result,
             **crop_analysis,
             **risk_assessment,
+        }
+
+    async def analyze_parcel_history(self, parcel: Any) -> Dict[str, Any]:
+        """
+        Full deforestation history from Dec 2020 to today.
+        Returns quarterly NDVI timeseries + classified events + EUDR verdict.
+        """
+        parcel_id = getattr(parcel, "id", None)
+        coords    = []
+        if getattr(parcel, "boundary_geojson", None):
+            coords = parcel.boundary_geojson.get("coordinates", [[]])[0]
+        if not coords:
+            raise HTTPException(status_code=400, detail="Parcel has no boundary polygon — cannot run history analysis.")
+
+        creds         = await _load_satellite_credentials()
+        client_id     = creds.get("oauth_client_id", "")
+        client_secret = creds.get("oauth_client_secret", "")
+        token         = await _get_sentinel_hub_token(client_id, client_secret)
+
+        quarters  = await _fetch_sentinel_hub_timeseries(token, coords)
+        analysis  = _classify_timeseries_events(quarters)
+
+        return {
+            "parcel_id":    parcel_id,
+            "analysis_from": "2020-12-01",
+            "analysis_to":   datetime.utcnow().strftime("%Y-%m-%d"),
+            "quarters":      quarters,
+            **analysis,
         }
 
     async def analyze_parcels_batch(self, parcels: List[Any], acquisition_date: Optional[datetime] = None) -> List[Dict[str, Any]]:
