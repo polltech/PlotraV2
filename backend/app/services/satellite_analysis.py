@@ -405,20 +405,24 @@ async def _store_weather_observations(parcel_id: str, weather_quarters: List[Dic
     from app.models.satellite import WeatherObservation
     from sqlalchemy import select
 
+    logger.info(f"[WX-STORE] parcel={parcel_id} quarters={len(weather_quarters)} periods={[q.get('period_from') for q in weather_quarters]}")
     async with async_session_factory() as session:
         for wq in weather_quarters:
+            pfrom = wq.get("period_from") or ""
+            pto   = wq.get("period_to")   or ""
+            if not pfrom or not pto:
+                continue  # skip malformed quarters — period_from/to are NOT NULL
             result = await session.execute(
                 select(WeatherObservation).where(
                     WeatherObservation.parcel_id == parcel_id,
-                    WeatherObservation.period_from == wq["period_from"],
+                    WeatherObservation.period_from == pfrom,
                 )
             )
             rec = result.scalar_one_or_none()
             if rec is None:
-                rec = WeatherObservation(parcel_id=parcel_id)
-                rec.period_from = wq["period_from"]
+                rec = WeatherObservation(parcel_id=parcel_id, period_from=pfrom)
                 session.add(rec)
-            rec.period_to         = wq["period_to"]
+            rec.period_to         = pto
             rec.rainfall_mm       = wq.get("rainfall_mm")
             rec.et0_mm            = wq.get("et0_mm")
             rec.water_deficit_mm  = wq.get("water_deficit_mm")
