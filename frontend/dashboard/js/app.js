@@ -10300,19 +10300,6 @@ class PlotraDashboard {
                     </div>
                 </div>
 
-                <!-- Crop Analysis Results -->
-                <div class="col-12">
-                    <div class="card border-0 shadow-sm">
-                        <div class="card-header" style="background-color: #daa520; color: #3d2515;">
-                            <h6 class="mb-0"><i class="bi bi-seedling me-2"></i>Crop Differentiation Analysis</h6>
-                        </div>
-                        <div class="card-body">
-                            <div id="cropAnalysis">
-                                <div class="text-muted text-center py-3"><i class="bi bi-seedling me-2"></i>No farm selected</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
             </div>
 
             <!-- Farm Details Modal -->
@@ -10447,7 +10434,6 @@ class PlotraDashboard {
                     const runBtn = document.getElementById('runSelectedFarmAnalysisBtn');
                     if (runBtn) runBtn.disabled = false;
                     this.loadHistoricalAnalysis(targetId);
-                    this.loadCropAnalysis(targetId);
                 }
             }
         } catch (error) {
@@ -10472,10 +10458,8 @@ class PlotraDashboard {
         };
         setLoading('historicalAnalysis', 'Loading historical data...');
         setLoading('satelliteImagePanel', 'Loading satellite image...');
-        setLoading('cropAnalysis', 'Loading crop analysis...');
         this.loadHistoricalAnalysis(farmId);
         this.loadSatelliteImage(farmId, date);
-        this.loadCropAnalysis(farmId);
     }
 
     async runAnalysisForSelectedFarm() {
