@@ -279,6 +279,31 @@ async def login_form(
         )
 
 
+@router.post("/refresh", response_model=Token)
+async def refresh_token(
+    current_user: User = Depends(get_current_user),
+):
+    """Issue a fresh token for an authenticated user (sliding-window refresh)."""
+    access_token_expires = timedelta(minutes=settings.app.access_token_expire_minutes)
+    role_value = current_user.role.value if hasattr(current_user.role, 'value') else str(current_user.role)
+    access_token = create_access_token(
+        data={
+            "sub": str(current_user.id),
+            "email": current_user.email,
+            "phone": current_user.phone,
+            "role": role_value,
+            "page_permissions": getattr(current_user, 'page_permissions', None),
+            "cooperative_id": getattr(current_user, 'cooperative_id', None),
+        },
+        expires_delta=access_token_expires,
+    )
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "expires_in": settings.app.access_token_expire_minutes * 60,
+    }
+
+
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 async def register_user(
     user_data: UserCreate,

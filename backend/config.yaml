@@ -7,7 +7,7 @@ app:
   debug: true
   secret_key: "your-secret-key-change-in-production"
   algorithm: "HS256"
-  access_token_expire_minutes: 30
+  access_token_expire_minutes: 480
 
 database:
   host: "localhost"

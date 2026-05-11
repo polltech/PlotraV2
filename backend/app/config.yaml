@@ -8,7 +8,7 @@ app:
   env: "production"
   secret_key: "dev-secret-change-in-production-use-PLOTRA_APP__SECRET_KEY-env-var"
   algorithm: "HS256"
-  access_token_expire_minutes: 60
+  access_token_expire_minutes: 480
   frontend_base_url: "https://dev.plotra.eu"
 
 auth:
