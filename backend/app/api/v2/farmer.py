@@ -343,8 +343,8 @@ async def update_farm(
     if boundary_geojson:
         from sqlalchemy.orm.attributes import flag_modified
         if farm.parcels:
-            # Replace the polygon on the first (primary) parcel
-            parcel = farm.parcels[0]
+            # Replace the polygon on the primary parcel (earliest created, i.e. parcel number 1)
+            parcel = sorted(farm.parcels, key=lambda p: p.created_at or p.id)[0]
             parcel.boundary_geojson = boundary_geojson
             flag_modified(parcel, "boundary_geojson")
             if area_ha:
@@ -2173,11 +2173,12 @@ async def get_farm_deforestation_history(
     if not farm:
         raise HTTPException(status_code=404, detail="Farm not found or access denied.")
 
-    # Get first parcel with a boundary polygon
+    # Get primary parcel with a boundary polygon (oldest = parcel 1)
     parcel_result = await db.execute(
         select(LandParcel)
         .where(LandParcel.farm_id == farm_id)
         .where(LandParcel.boundary_geojson.isnot(None))
+        .order_by(LandParcel.created_at.asc())
         .limit(1)
     )
     parcel = parcel_result.scalar_one_or_none()

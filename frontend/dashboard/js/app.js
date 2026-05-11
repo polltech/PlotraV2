@@ -9731,14 +9731,16 @@ class PlotraDashboard {
             // (admin users don't own the farms they manage so the farmer endpoint returns 404)
             let farm = await api.getFarmById(farmId);
             if (!farm) farm = await api.getFarm(farmId).catch(() => null);
-            const parcels = (farm?.parcels || []).filter(p => p.boundary_geojson);
+            const allParcels    = farm?.parcels || [];
+            const parcels       = allParcels.filter(p => p.boundary_geojson);
+            const totalParcels  = allParcels.length;
             if (!parcels.length) {
                 this.showToast('Please capture the farm polygon first before running satellite analysis.', 'warning');
                 return;
             }
 
             // Show a progress modal so the user sees parcel-by-parcel progress
-            this._showAnalysisProgressModal(farm.farm_name || 'Farm', parcels.length);
+            this._showAnalysisProgressModal(farm.farm_name || 'Farm', parcels.length, totalParcels);
 
             let completed = 0;
             let failed = 0;
@@ -9789,7 +9791,7 @@ class PlotraDashboard {
         }
     }
 
-    _showAnalysisProgressModal(farmName, totalParcels) {
+    _showAnalysisProgressModal(farmName, totalParcels, allParcelsCount) {
         let modal = document.getElementById('analysisProgressModal');
         if (!modal) {
             modal = document.createElement('div');
@@ -9804,7 +9806,7 @@ class PlotraDashboard {
                     Satellite Analysis — ${farmName}
                 </div>
                 <div class="card-body">
-                    <p class="text-muted small mb-3">Analysing ${totalParcels} parcel(s) one by one…</p>
+                    <p class="text-muted small mb-3">Analysing ${totalParcels} mapped parcel(s)${allParcelsCount > totalParcels ? ` of ${allParcelsCount} total (only mapped parcels can be analysed)` : ''}…</p>
                     <div id="analysisParcelList" class="d-flex flex-column gap-2"></div>
                 </div>
                 <div class="card-footer text-muted small" id="analysisProgressFooter">Starting…</div>
