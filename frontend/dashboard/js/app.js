@@ -9724,13 +9724,13 @@ class PlotraDashboard {
         const selectedDate = new Date().toISOString().slice(0, 10);
 
         const btn = document.querySelector(`[onclick*="requestSatelliteAnalysis('${farmId}')"]`);
-        if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Analysing…'; }
 
         try {
             // Fetch farm details — try farmer endpoint first, fall back to admin endpoint
             // (admin users don't own the farms they manage so the farmer endpoint returns 404)
             let farm = await api.getFarmById(farmId);
             if (!farm) farm = await api.getFarm(farmId).catch(() => null);
+            const farmName      = farm?.farm_name || 'Farm';
             const allParcels    = farm?.parcels || [];
             const parcels       = allParcels.filter(p => p.boundary_geojson);
             const totalParcels  = allParcels.length;
@@ -9739,8 +9739,16 @@ class PlotraDashboard {
                 return;
             }
 
+            // Show farm name in button so user can see which farm is running
+            if (btn) { btn.disabled = true; btn.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span>${farmName}…`; }
+
+            // Immediately switch the history panel to this farm so the user sees it loading
+            const selector = document.getElementById('analysisFarmSelector');
+            if (selector) selector.value = farmId;
+            this.switchAnalysisFarm(farmId);
+
             // Show a progress modal so the user sees parcel-by-parcel progress
-            this._showAnalysisProgressModal(farm.farm_name || 'Farm', parcels.length, totalParcels);
+            this._showAnalysisProgressModal(farmName, parcels.length, totalParcels);
 
             let completed = 0;
             let failed = 0;
@@ -9777,9 +9785,7 @@ class PlotraDashboard {
             this._finaliseAnalysisProgress(completed, failed);
 
             if (completed > 0) {
-                // Update selector to this farm and reload analysis + image for the selected date
-                const selector = document.getElementById('analysisFarmSelector');
-                if (selector) selector.value = farmId;
+                // Reload history now that fresh analysis data is stored
                 this.switchAnalysisFarm(farmId, selectedDate);
             }
 
@@ -11389,12 +11395,16 @@ class PlotraDashboard {
         const container = document.getElementById('historicalAnalysis');
         if (!container) return;
 
-        // Populate parcel selector for this farm
+        // Fetch farm info to get names for the loading banner and parcel selector
+        let farmName   = 'Farm';
+        let parcelName = null;
         const parcelSel = document.getElementById('analysisParcelSelector');
-        if (parcelSel) {
-            try {
-                const farm = await api.getFarmById(farmId);
-                const mappedParcels = (farm?.parcels || []).filter(p => p.boundary_geojson);
+        try {
+            const farm = await api.getFarmById(farmId);
+            farmName = farm?.farm_name || 'Farm';
+            const mappedParcels = (farm?.parcels || []).filter(p => p.boundary_geojson);
+
+            if (parcelSel) {
                 if (mappedParcels.length > 1) {
                     parcelSel.innerHTML = mappedParcels.map((p, i) =>
                         `<option value="${p.id}" ${p.id === parcelId ? 'selected' : ''}>
@@ -11402,23 +11412,29 @@ class PlotraDashboard {
                         </option>`
                     ).join('');
                     parcelSel.style.display = '';
-                    // Default to first if none specified
-                    if (!parcelId) parcelId = mappedParcels[0].id;
+                    if (!parcelId) parcelId = mappedParcels[0]?.id || null;
                 } else {
                     parcelSel.style.display = 'none';
                     parcelSel.innerHTML = '';
-                    if (!parcelId && mappedParcels[0]) parcelId = mappedParcels[0].id;
+                    if (!parcelId) parcelId = mappedParcels[0]?.id || null;
                 }
-            } catch (_) { parcelSel.style.display = 'none'; }
+            }
+
+            const active = mappedParcels.find(p => p.id === parcelId) || mappedParcels[0];
+            parcelName = active?.parcel_name || (mappedParcels.indexOf(active) >= 0
+                ? `Parcel ${mappedParcels.indexOf(active) + 1}` : null);
+        } catch (_) {
+            if (parcelSel) parcelSel.style.display = 'none';
         }
 
         container.innerHTML = `
             <div class="text-center py-5">
-                <span class="spinner-border text-success" style="color:#6f4e37!important;"></span>
-                <p class="mt-3 text-muted small">
+                <span class="spinner-border" style="color:#6f4e37;"></span>
+                <p class="mt-3 fw-semibold" style="color:#6f4e37;">${farmName}${parcelName ? ` — ${parcelName}` : ''}</p>
+                <p class="text-muted small mb-0">
                     Fetching quarterly satellite data Dec 2020 → today…<br>
                     Fetching weather history from Open-Meteo…<br>
-                    Running 4-index fusion analysis (NDVI · EVI · SAVI · NDMI)…
+                    Running 5-index fusion + XGBoost classification…
                 </p>
             </div>`;
 
