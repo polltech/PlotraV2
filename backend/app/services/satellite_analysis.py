@@ -196,12 +196,15 @@ _S1_EVALSCRIPT = """
 function setup() {
   return {
     input: [{bands: ["VV","VH"], units: "LINEAR_POWER"}],
-    output: [{id: "rvi", bands: 1, sampleType: "FLOAT32"}]
+    output: [
+      {id: "rvi",      bands: 1, sampleType: "FLOAT32"},
+      {id: "dataMask", bands: 1}
+    ]
   };
 }
 function evaluatePixel(s) {
   var rvi = 4.0 * s.VH / (s.VV + s.VH + 1e-6);
-  return { rvi: [Math.max(0, Math.min(1, rvi))] };
+  return { rvi: [Math.max(0, Math.min(1, rvi))], dataMask: [1] };
 }
 """
 
