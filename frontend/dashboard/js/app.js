@@ -11479,15 +11479,25 @@ class PlotraDashboard {
                     <td>${indexBlock(e)}</td>
                     <td class="small">${e.rainfall_mm != null ? e.rainfall_mm + ' mm' : '—'}
                         ${e.water_deficit_mm != null ? `<br><span class="text-${e.water_deficit_mm < -80 ? 'danger' : 'muted'} small">${e.water_deficit_mm} mm deficit</span>` : ''}</td>
+                    <td class="small text-center">
+                        ${e.confidence != null
+                            ? `<span class="fw-semibold ${e.confidence >= 0.70 ? 'text-success' : e.confidence >= 0.50 ? 'text-warning' : 'text-muted'}">${(e.confidence * 100).toFixed(0)}%</span>`
+                            : '<span class="text-muted">—</span>'}
+                        ${e.is_breakpoint ? '<br><span class="badge bg-danger" style="font-size:8px">CUSUM ⚑</span>' : ''}
+                    </td>
                     <td>${eudrBadge(e)}</td>
                 </tr>
                 <tr id="fr-reason-${idx}" class="d-none">
-                    <td colspan="6" class="bg-light border-start border-4 border-${m.color} ps-3 py-2 small text-muted">
-                        <i class="bi bi-cpu me-1"></i><strong>4-Index Reasoning:</strong><br>${e.reasoning || '—'}
+                    <td colspan="7" class="bg-light border-start border-4 border-${m.color} ps-3 py-2 small text-muted">
+                        <i class="bi bi-cpu me-1"></i><strong>AI Analysis:</strong>
+                        ${e.confidence != null ? `<span class="badge bg-secondary ms-1">${(e.confidence * 100).toFixed(0)}% confident</span>` : ''}
+                        ${e.is_breakpoint ? '<span class="badge bg-danger ms-1">CUSUM Structural Break</span>' : ''}
+                        <br>${e.reasoning || '—'}
+                        ${e.ndvi_std != null ? `<br><span class="text-info">Spatial heterogeneity: σ=${(+e.ndvi_std).toFixed(4)} · ${(((+e.ndvi_pct_below_035) || 0) * 100).toFixed(1)}% pixels below NDVI 0.35</span>` : ''}
                     </td>
                 </tr>`;
             }).join('')
-            : '<tr><td colspan="6" class="text-center text-success py-3"><i class="bi bi-check-circle me-1"></i>No significant events — all 4 indices stable since Dec 2020.</td></tr>';
+            : '<tr><td colspan="7" class="text-center text-success py-3"><i class="bi bi-check-circle me-1"></i>No significant events — all 5 indices stable since Dec 2020.</td></tr>';
 
         // Weather strip
         const wxValid   = weather.filter(w => w.rainfall_mm != null);
@@ -11533,11 +11543,12 @@ class PlotraDashboard {
             <!-- Weather strip -->
             <div class="d-flex align-items-center gap-2 p-2 rounded border bg-light small mb-3">${wxStrip}</div>
 
-            <!-- 4-Index chart -->
+            <!-- 5-Index chart -->
             <div class="mb-1">
                 <div class="d-flex align-items-center gap-2 mb-1">
-                    <span class="fw-semibold small text-muted"><i class="bi bi-graph-up me-1"></i>4-Index Vegetation History (Dec 2020 → Today)</span>
-                    <span class="badge bg-secondary fw-normal small" title="NDVI×0.35 + EVI×0.25 + SAVI×0.20 + NDMI×0.20">Fusion Score</span>
+                    <span class="fw-semibold small text-muted"><i class="bi bi-graph-up me-1"></i>5-Index Vegetation History (Dec 2020 → Today)</span>
+                    <span class="badge bg-secondary fw-normal small" title="NDVI×0.28 + EVI×0.22 + SAVI×0.16 + NDMI×0.16 + RVI×0.18">Fusion Score</span>
+                    <span class="badge bg-dark fw-normal small">incl. S1 SAR</span>
                 </div>
                 <div id="multiIndexChart-${uid}"></div>
             </div>
@@ -11551,6 +11562,19 @@ class PlotraDashboard {
                 <div id="rainfallChart-${uid}"></div>
             </div>
 
+            <!-- Satellite image strip -->
+            <div class="mb-3">
+                <div class="fw-semibold small text-muted mb-2">
+                    <i class="bi bi-images me-1"></i>Quarterly Satellite Images
+                    <span class="fw-normal">(S2 optical · S1 SAR radar fallback when cloudy)</span>
+                </div>
+                <div id="imgStrip-${uid}" class="d-flex gap-2 overflow-auto pb-1" style="min-height:160px">
+                    <div class="text-muted small d-flex align-items-center px-3">
+                        <span class="spinner-border spinner-border-sm me-2"></span>Loading images…
+                    </div>
+                </div>
+            </div>
+
             <!-- Events table -->
             <div>
                 <div class="fw-semibold small text-muted mb-2">
@@ -11560,7 +11584,7 @@ class PlotraDashboard {
                 <div class="table-responsive">
                     <table class="table table-sm table-hover align-middle">
                         <thead class="table-dark">
-                            <tr><th>Period</th><th>Event</th><th>Severity</th><th>Index Changes</th><th>Rainfall</th><th>EUDR</th></tr>
+                            <tr><th>Period</th><th>Event</th><th>Severity</th><th>Index Changes</th><th>Rainfall</th><th>Confidence</th><th>EUDR</th></tr>
                         </thead>
                         <tbody>${eventRows}</tbody>
                     </table>
@@ -11578,7 +11602,17 @@ class PlotraDashboard {
         const eviVals    = quarters.map(q => q.evi          ?? null);
         const saviVals   = quarters.map(q => q.savi         ?? null);
         const ndmiVals   = quarters.map(q => q.ndmi         ?? null);
+        const rviVals    = quarters.map(q => q.rvi          ?? null);
         const fusionVals = quarters.map(q => q.fusion_score ?? null);
+
+        // CUSUM structural breakpoints — vertical markers where ML detected a regime change
+        const cusumBreakpoints = quarters
+            .filter(q => q.is_breakpoint)
+            .map(q => ({
+                x: q.period_from, borderColor: '#b02a37', strokeDashArray: 0, borderWidth: 2,
+                label: { text: '⚑ Breakpoint', borderColor: '#b02a37',
+                    style: { color:'#fff', background:'#b02a37', fontSize:'8px' } }
+            }));
 
         const droughtBands = weather.filter(w => w.drought_flag).map(w => ({
             x: w.period_from, x2: w.period_to,
@@ -11606,25 +11640,26 @@ class PlotraDashboard {
               label: { text: 'Vegetation loss threshold', style: { fontSize:'9px', color:'#fd7e14' } } },
         ];
 
-        // 4-index chart
+        // 5-index chart (S2 optical + S1 SAR RVI)
         new ApexCharts(document.getElementById(`multiIndexChart-${uid}`), {
-            chart:  { type:'line', height:280, toolbar:{ show:true, tools:{ download:true, zoom:true, reset:true, pan:true } }, animations:{ enabled:false }, zoom:{ enabled:true } },
+            chart:  { type:'line', height:300, toolbar:{ show:true, tools:{ download:true, zoom:true, reset:true, pan:true } }, animations:{ enabled:false }, zoom:{ enabled:true } },
             series: [
                 { name:'Fusion Score', type:'line', data: fusionVals },
                 { name:'NDVI',         type:'line', data: ndviVals   },
                 { name:'EVI',          type:'line', data: eviVals    },
                 { name:'SAVI',         type:'line', data: saviVals   },
                 { name:'NDMI',         type:'line', data: ndmiVals   },
+                { name:'RVI (SAR)',    type:'line', data: rviVals    },
             ],
-            fill:    { type:['solid','solid','solid','solid','solid'], opacity:[0,0,0,0,0] },
-            stroke:  { curve:'smooth', width:[3,2.5,1.5,1.5,1.5], dashArray:[6,0,0,0,0] },
-            colors:  ['#6f42c1','#198754','#0d6efd','#fd7e14','#0dcaf0'],
-            markers: { size:[5,4,2,2,2], hover:{ sizeOffset:3 } },
+            fill:    { type:['solid','solid','solid','solid','solid','solid'], opacity:[0,0,0,0,0,0] },
+            stroke:  { curve:'smooth', width:[3,2.5,1.5,1.5,1.5,1.5], dashArray:[6,0,0,0,0,4] },
+            colors:  ['#6f42c1','#198754','#0d6efd','#fd7e14','#0dcaf0','#6c757d'],
+            markers: { size:[5,4,2,2,2,3], hover:{ sizeOffset:3 } },
             xaxis:   { categories:labels, labels:{ rotate:-45, style:{ fontSize:'10px' } } },
             yaxis:   { min:-0.3, max:1.0, title:{ text:'Index Value' }, labels:{ formatter: v => v!=null ? v.toFixed(2):'' }, tickAmount:6 },
-            annotations: { xaxis:[...droughtBands,...eventAnnotations], yaxis:thresholdLines },
+            annotations: { xaxis:[...droughtBands,...eventAnnotations,...cusumBreakpoints], yaxis:thresholdLines },
             legend:  { show:true, position:'top', fontSize:'11px' },
-            tooltip: { shared:true, intersect:false, y:{ formatter: v => v!=null ? v.toFixed(3):'cloud gap' } },
+            tooltip: { shared:true, intersect:false, y:{ formatter: v => v!=null ? v.toFixed(3):'no data' } },
             grid:    { borderColor:'#e9ecef' },
             noData:  { text:'No valid imagery' },
         }).render();
@@ -11676,6 +11711,88 @@ class PlotraDashboard {
         } else {
             const el = document.getElementById(`rainfallChart-${uid}`);
             if (el) el.innerHTML = '<p class="text-muted small text-center py-2"><i class="bi bi-cloud-slash me-1"></i>Weather data unavailable.</p>';
+        }
+
+        // ── Satellite image strip ─────────────────────────────────────────────
+        // Key quarters: first + last + all event quarters (deduplicated by period_from)
+        const eventPeriods = new Set(events.map(e => e.period_from));
+        const keyQuarters  = quarters.filter((q, i) =>
+            i === 0 || i === quarters.length - 1 || eventPeriods.has(q.period_from)
+        ).filter((q, i, arr) => arr.findIndex(x => x.period_from === q.period_from) === i);
+
+        const stripEl = document.getElementById(`imgStrip-${uid}`);
+        if (!stripEl || keyQuarters.length === 0) {
+            if (stripEl) stripEl.innerHTML = '<p class="text-muted small px-2">No quarters to display.</p>';
+        } else {
+            const eventMeta2 = t => ({
+                DEFORESTATION:      { badge:'bg-danger',    label:'Deforestation' },
+                VEGETATION_LOSS:    { badge:'bg-warning text-dark', label:'Veg. Loss' },
+                DROUGHT_STRESS:     { badge:'bg-warning text-dark', label:'Drought'  },
+                CANOPY_DISTURBANCE: { badge:'bg-info text-dark',    label:'Canopy'   },
+                SEASONAL_DIP:       { badge:'bg-secondary', label:'Seasonal'  },
+                REGROWTH:           { badge:'bg-success',   label:'Regrowth'  },
+            }[t] || { badge:'bg-secondary', label: t });
+
+            // Fetch images one-by-one (sequential to avoid rate limits)
+            // Each tile is added to the strip as soon as its image arrives
+            stripEl.innerHTML = '';  // clear spinner
+
+            (async () => {
+                for (const q of keyQuarters) {
+                    const isFirst = q === keyQuarters[0];
+                    const isLast  = q === keyQuarters[keyQuarters.length - 1];
+                    const evt     = events.find(e => e.period_from === q.period_from);
+                    const label   = isFirst ? 'Baseline' : isLast && !evt ? 'Current' : null;
+
+                    // Placeholder tile while loading
+                    const tileId = `tile-${uid}-${q.period_from}`;
+                    const tileBadge = evt ? eventMeta2(evt.event_type) : null;
+                    stripEl.insertAdjacentHTML('beforeend', `
+                        <div id="${tileId}" class="flex-shrink-0 border rounded overflow-hidden bg-light"
+                             style="width:160px;min-height:150px;display:flex;flex-direction:column">
+                            <div class="d-flex align-items-center justify-content-center flex-grow-1">
+                                <span class="spinner-border spinner-border-sm text-secondary"></span>
+                            </div>
+                            <div class="p-1 bg-dark text-white" style="font-size:10px;line-height:1.3">
+                                <div class="fw-semibold">${q.period_from}</div>
+                                ${label ? `<span class="badge bg-primary me-1" style="font-size:9px">${label}</span>` : ''}
+                                ${tileBadge ? `<span class="badge ${tileBadge.badge}" style="font-size:9px">${tileBadge.label}</span>` : ''}
+                            </div>
+                        </div>`);
+
+                    try {
+                        const params = new URLSearchParams({ date: q.period_to, from_date: q.period_from });
+                        const imgData = await api.request(`/farmer/farm/${farmId}/satellite-image?${params}`);
+                        const tileEl  = document.getElementById(tileId);
+                        if (tileEl && imgData?.image_base64) {
+                            const sensor = imgData.sensor === 'S1-SAR'
+                                ? '<span class="badge bg-secondary" style="font-size:8px">SAR</span>'
+                                : '<span class="badge bg-success"  style="font-size:8px">S2</span>';
+                            tileEl.innerHTML = `
+                                <div class="flex-grow-1 position-relative" style="min-height:110px">
+                                    <img src="data:${imgData.format};base64,${imgData.image_base64}"
+                                         style="width:100%;height:110px;object-fit:cover;display:block"
+                                         title="${imgData.source}" />
+                                </div>
+                                <div class="p-1 bg-dark text-white" style="font-size:10px;line-height:1.3">
+                                    <div class="fw-semibold">${q.period_from}</div>
+                                    <div class="d-flex flex-wrap gap-1 mt-1">
+                                        ${label ? `<span class="badge bg-primary" style="font-size:9px">${label}</span>` : ''}
+                                        ${tileBadge ? `<span class="badge ${tileBadge.badge}" style="font-size:9px">${tileBadge.label}</span>` : ''}
+                                        ${sensor}
+                                    </div>
+                                    <div class="text-muted mt-1" style="font-size:9px">${imgData.scene_date}</div>
+                                </div>`;
+                        }
+                    } catch (e) {
+                        const tileEl = document.getElementById(tileId);
+                        if (tileEl) {
+                            tileEl.querySelector('.flex-grow-1').innerHTML =
+                                '<div class="text-muted text-center p-2" style="font-size:10px"><i class="bi bi-cloud-slash"></i><br>No image</div>';
+                        }
+                    }
+                }
+            })();
         }
     }
 

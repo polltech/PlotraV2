@@ -95,9 +95,71 @@ async def _get_sentinel_hub_token(client_id: str, client_secret: str) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Statistics API evalscript
+# Pixel-level helper: normal CDF approximation (Abramowitz & Stegun)
+# Used to estimate % pixels below an index threshold from mean + stDev.
 # ---------------------------------------------------------------------------
 
+def _normal_cdf(x: float, mean: float, std: float) -> float:
+    """Approximate P(X < x) for X ~ N(mean, std²). No scipy needed."""
+    if std <= 0:
+        return 1.0 if x > mean else 0.0
+    z = (x - mean) / std
+    t = 1.0 / (1.0 + 0.2316419 * abs(z))
+    poly = t * (0.319381530 + t * (-0.356563782 + t * (1.781477937 + t * (-1.821255978 + t * 1.330274429))))
+    p = 1.0 - 0.3989422804014327 * math.exp(-z * z / 2) * poly
+    return round(p if z >= 0 else 1.0 - p, 4)
+
+
+# ---------------------------------------------------------------------------
+# CUSUM time-series segmentation (pure Python, no external deps)
+# Detects structural breakpoints in index time series.
+# ---------------------------------------------------------------------------
+
+def _cusum_detect(values: List[Optional[float]], threshold: float = 3.0) -> tuple:
+    """
+    Sequential CUSUM change detection.
+    Returns (cusum_scores: List[float], is_breakpoint: List[bool]).
+    Scores are normalized cumulative deviations from the series mean.
+    A breakpoint is flagged when the score exceeds `threshold` standard deviations.
+    """
+    valid = [v for v in values if v is not None]
+    n_valid = len(valid)
+    if n_valid < 3:
+        return [0.0] * len(values), [False] * len(values)
+
+    mean_v = sum(valid) / n_valid
+    var_v  = sum((v - mean_v) ** 2 for v in valid) / max(n_valid - 1, 1)
+    std_v  = math.sqrt(var_v)
+    if std_v < 0.001:
+        return [0.0] * len(values), [False] * len(values)
+
+    cusum_pos = cusum_neg = 0.0
+    scores: List[float] = []
+    breakpoints: List[bool] = []
+
+    for v in values:
+        if v is None:
+            scores.append(0.0)
+            breakpoints.append(False)
+            continue
+        z = (v - mean_v) / std_v
+        cusum_pos = max(0.0, cusum_pos + z)
+        cusum_neg = min(0.0, cusum_neg + z)
+        score = max(abs(cusum_pos), abs(cusum_neg))
+        is_bp = score > threshold
+        if is_bp:
+            cusum_pos = cusum_neg = 0.0   # reset after detection
+        scores.append(round(score, 3))
+        breakpoints.append(is_bp)
+
+    return scores, breakpoints
+
+
+# ---------------------------------------------------------------------------
+# Statistics API evalscripts
+# ---------------------------------------------------------------------------
+
+# Sentinel-2 L2A — optical vegetation indices
 _EVALSCRIPT = """
 //VERSION=3
 function setup() {
@@ -114,7 +176,6 @@ function setup() {
   };
 }
 function evaluatePixel(s) {
-  // Accept all pixels regardless of cloud cover (diagnostic mode)
   let ndvi = (s.B08 - s.B04) / (s.B08 + s.B04 + 1e-6);
   let evi  = 2.5 * (s.B08 - s.B04) / (s.B08 + 6*s.B04 - 7.5*s.B02 + 1 + 1e-6);
   let savi = 1.5 * (s.B08 - s.B04) / (s.B08 + s.B04 + 0.5 + 1e-6);
@@ -124,6 +185,23 @@ function evaluatePixel(s) {
     ndvi: [ndvi], evi: [evi], savi: [savi],
     ndmi: [ndmi], ndwi: [ndwi], dataMask: [1]
   };
+}
+"""
+
+# Sentinel-1 GRD — SAR Radar Vegetation Index (RVI)
+# RVI = 4*VH / (VV+VH): ranges 0–1, higher = denser vegetation canopy.
+# Cloud-proof: radar penetrates clouds/smoke. Sensitive to canopy structure.
+_S1_EVALSCRIPT = """
+//VERSION=3
+function setup() {
+  return {
+    input: [{bands: ["VV","VH"], units: "LINEAR_POWER"}],
+    output: [{id: "rvi", bands: 1, sampleType: "FLOAT32"}]
+  };
+}
+function evaluatePixel(s) {
+  var rvi = 4.0 * s.VH / (s.VV + s.VH + 1e-6);
+  return { rvi: [Math.max(0, Math.min(1, rvi))] };
 }
 """
 
@@ -192,20 +270,88 @@ async def _fetch_sentinel_hub_timeseries(token: str, coords: List) -> List[Dict]
         sample_count = _s(outputs, "ndvi", "sampleCount", 0) or 0
         nodata_count = _s(outputs, "ndvi", "noDataCount", 0) or 0
         valid        = int(sample_count - nodata_count)
-        ndvi         = _s(outputs, "ndvi", "mean") if valid > 0 else None
+        ndvi_mean    = _s(outputs, "ndvi", "mean")   if valid > 0 else None
+        ndvi_std_raw = _s(outputs, "ndvi", "stDev")  if valid > 0 else None
+        ndvi_std     = round(ndvi_std_raw, 4) if ndvi_std_raw is not None else None
+
+        # Pixel-level: estimated % of pixels below deforestation threshold (NDVI < 0.35)
+        # Uses normal distribution approximation from mean + stDev.
+        ndvi_pct_below = None
+        if ndvi_mean is not None and ndvi_std is not None and ndvi_std > 0:
+            ndvi_pct_below = round(_normal_cdf(0.35, ndvi_mean, ndvi_std) * 100, 1)
+
         results.append({
-            "period_from":        iv.get("interval", {}).get("from", "")[:10],
-            "period_to":          iv.get("interval", {}).get("to",   "")[:10],
-            "ndvi":               round(ndvi, 3) if ndvi is not None else None,
-            "evi":                round(_s(outputs, "evi",  "mean", 0), 3) if valid > 0 else None,
-            "savi":               round(_s(outputs, "savi", "mean", 0), 3) if valid > 0 else None,
-            "ndmi":               round(_s(outputs, "ndmi", "mean", 0), 3) if valid > 0 else None,
-            "cloud_cover_pct":    round(nodata_count / max(1, sample_count) * 100, 1),
-            "valid_pixels":       valid,
+            "period_from":           iv.get("interval", {}).get("from", "")[:10],
+            "period_to":             iv.get("interval", {}).get("to",   "")[:10],
+            "ndvi":                  round(ndvi_mean, 3) if ndvi_mean is not None else None,
+            "evi":                   round(_s(outputs, "evi",  "mean", 0), 3) if valid > 0 else None,
+            "savi":                  round(_s(outputs, "savi", "mean", 0), 3) if valid > 0 else None,
+            "ndmi":                  round(_s(outputs, "ndmi", "mean", 0), 3) if valid > 0 else None,
+            # Pixel-level stats
+            "ndvi_std":              ndvi_std,
+            "ndvi_pct_below_035":    ndvi_pct_below,
+            "cloud_cover_pct":       round(nodata_count / max(1, sample_count) * 100, 1),
+            "valid_pixels":          valid,
         })
 
-    logger.info(f"Timeseries fetched: {len(results)} quarters, {sum(1 for r in results if r['ndvi'] is not None)} with valid NDVI")
+    logger.info(f"S2 timeseries: {len(results)} quarters, {sum(1 for r in results if r['ndvi'] is not None)} with valid NDVI")
     return results
+
+
+async def _fetch_s1_rvi_timeseries(token: str, coords: List, from_date: str, to_date: str) -> Dict[str, float]:
+    """
+    Fetch Sentinel-1 SAR Radar Vegetation Index (RVI) quarterly aggregates.
+    Returns {period_from: rvi_mean} mapping to merge into S2 quarter dicts.
+    Cloud-proof — uses radar backscatter so all quarters have valid data.
+    """
+    payload = {
+        "input": {
+            "bounds": {"geometry": {"type": "Polygon", "coordinates": [coords]}},
+            "data": [{
+                "type": "sentinel-1-grd",
+                "dataFilter": {
+                    "timeRange": {"from": f"{from_date}T00:00:00Z", "to": f"{to_date}T23:59:59Z"},
+                    "acquisitionMode": "IW",
+                    "polarization": "DV",
+                    "orbitDirection": "ASCENDING",
+                },
+            }]
+        },
+        "aggregation": {
+            "timeRange": {"from": f"{from_date}T00:00:00Z", "to": f"{to_date}T23:59:59Z"},
+            "aggregationInterval": {"of": "P3M"},
+            "evalscript": _S1_EVALSCRIPT,
+            "resx": 10,
+            "resy": 10,
+        },
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=120) as client:
+            resp = await client.post(
+                _CDSE_STATS_URL,
+                headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+                json=payload,
+            )
+    except Exception as e:
+        logger.warning(f"[S1-RVI] Request failed: {e}")
+        return {}
+
+    if resp.status_code not in (200, 206):
+        logger.warning(f"[S1-RVI] API returned {resp.status_code}: {resp.text[:200]}")
+        return {}
+
+    rvi_by_period: Dict[str, float] = {}
+    for iv in resp.json().get("data", []):
+        pfrom  = iv.get("interval", {}).get("from", "")[:10]
+        stats  = iv.get("outputs", {}).get("rvi", {}).get("bands", {}).get("B0", {}).get("stats", {})
+        mean_v = stats.get("mean")
+        count  = stats.get("sampleCount", 0)
+        if pfrom and mean_v is not None and count and not math.isnan(float(mean_v)):
+            rvi_by_period[pfrom] = round(float(mean_v), 3)
+
+    logger.info(f"[S1-RVI] {len(rvi_by_period)} quarters with valid SAR RVI")
+    return rvi_by_period
 
 
 def _classify_timeseries_events(quarters: List[Dict]) -> Dict:
@@ -433,15 +579,21 @@ async def _store_weather_observations(parcel_id: str, weather_quarters: List[Dic
 
 def _compute_fusion_score(q: Dict) -> Optional[float]:
     """
-    Weighted 4-index vegetation score.
-    Weights: NDVI 35%, EVI 25%, SAVI 20%, NDMI 20%.
-    More robust than NDVI alone: EVI corrects for atmosphere/soil, NDMI captures moisture stress.
-    Falls back gracefully when some indices are missing (re-normalizes weights).
+    Weighted 5-index vegetation score (S2 optical + S1 SAR).
+    Weights: NDVI 28%, EVI 22%, SAVI 16%, NDMI 16%, RVI(SAR) 18%.
+    RVI from Sentinel-1 is cloud-proof and sensitive to canopy structure.
+    Re-normalizes weights when indices are absent.
     """
     ndvi = q.get("ndvi")
     if ndvi is None:
         return None
-    pairs = [(ndvi, 0.35), (q.get("evi"), 0.25), (q.get("savi"), 0.20), (q.get("ndmi"), 0.20)]
+    pairs = [
+        (ndvi,          0.28),
+        (q.get("evi"),  0.22),
+        (q.get("savi"), 0.16),
+        (q.get("ndmi"), 0.16),
+        (q.get("rvi"),  0.18),  # SAR RVI — cloud-proof
+    ]
     score, total_w = 0.0, 0.0
     for val, w in pairs:
         if val is not None:
@@ -545,7 +697,7 @@ def _build_event_reasoning(
     return indices
 
 
-def _classify_with_weather(quarters: List[Dict], weather_by_period: Dict) -> Dict:
+def _classify_with_weather(quarters: List[Dict], weather_by_period: Dict, xgb_classify_fn=None) -> Dict:
     """
     Full 4-index event classifier with weather fusion and canopy-intact discrimination.
 
@@ -613,6 +765,20 @@ def _classify_with_weather(quarters: List[Dict], weather_by_period: Dict) -> Dic
         w          = weather_by_period.get(curr["period_from"], {})
         wx_drought = bool(w.get("drought_flag", False))
 
+        # CUSUM and pixel-level stats (pre-computed by analyze_parcel_history)
+        cusum_score   = curr.get("cusum_score",        0.0) or 0.0
+        is_breakpoint = bool(curr.get("is_breakpoint", False))
+        ndvi_std      = curr.get("ndvi_std")
+        ndvi_pct_b035 = curr.get("ndvi_pct_below_035")
+
+        # XGBoost classification — runs in parallel with rule-based logic
+        xgb_result = None
+        if xgb_classify_fn is not None:
+            try:
+                xgb_result = xgb_classify_fn(prev, curr, w, cusum_score, is_breakpoint)
+            except Exception:
+                pass
+
         # Satellite-only drought signal: NDMI drops proportionally more than NDVI
         # Ratio > 1.4 means moisture loss is the dominant stressor, not canopy removal
         ndmi_drought = False
@@ -659,6 +825,12 @@ def _classify_with_weather(quarters: List[Dict], weather_by_period: Dict) -> Dic
             if (fs_prev or prev["ndvi"]) < 0.48:
                 event_type, severity = "REGROWTH", "info"
 
+        # XGBoost override: if confident and not NO_CHANGE, prefer ML label
+        if xgb_result and event_type and xgb_result["confidence"] >= 0.60:
+            xgb_type = xgb_result["event_type"]
+            if xgb_type not in ("NO_CHANGE",):
+                event_type = xgb_type
+
         if event_type:
             post_cutoff    = curr["period_from"] > EUDR_CUTOFF
             eudr_violation = (
@@ -702,6 +874,13 @@ def _classify_with_weather(quarters: List[Dict], weather_by_period: Dict) -> Dic
                 "post_eudr_cutoff":  post_cutoff,
                 "eudr_violation":    eudr_violation,
                 "reasoning":         reasoning,
+                # ML / CUSUM enrichment
+                "confidence":        xgb_result["confidence"] if xgb_result else None,
+                "probabilities":     xgb_result["probabilities"] if xgb_result else None,
+                "cusum_score":       round(cusum_score, 3),
+                "is_breakpoint":     is_breakpoint,
+                "ndvi_std":          round(ndvi_std,      4) if ndvi_std      is not None else None,
+                "ndvi_pct_below_035": round(ndvi_pct_b035, 3) if ndvi_pct_b035 is not None else None,
             })
 
     violations        = [e for e in events if e["eudr_violation"]]
@@ -1038,9 +1217,17 @@ class SatelliteAnalysisEngine:
     async def analyze_parcel_history(self, parcel: Any) -> Dict[str, Any]:
         """
         Full deforestation history from Dec 2020 to today.
-        Fetches quarterly Sentinel-2 indices + Open-Meteo weather, merges both,
-        classifies events with drought discrimination, and returns EUDR verdict.
+        Pipeline:
+          1. Sentinel-2 quarterly optical indices (NDVI/EVI/SAVI/NDMI) + pixel stats
+          2. Sentinel-1 SAR RVI (cloud-proof, parallel fetch)
+          3. Open-Meteo weather aggregation + drought detection
+          4. CUSUM time-series segmentation (structural breakpoint detection)
+          5. 5-index fusion score (S2 optical + S1 SAR)
+          6. XGBoost event classification with calibrated probabilities
+             (rule-based fallback if XGBoost unavailable)
         """
+        from app.services.ml_classifier import classify_event as xgb_classify
+
         parcel_id = getattr(parcel, "id", None)
         coords    = []
         if getattr(parcel, "boundary_geojson", None):
@@ -1048,7 +1235,6 @@ class SatelliteAnalysisEngine:
         if not coords:
             raise HTTPException(status_code=400, detail="Parcel has no boundary polygon — cannot run history analysis.")
 
-        # Compute polygon centroid for weather lookup
         lat = sum(c[1] for c in coords) / len(coords)
         lon = sum(c[0] for c in coords) / len(coords)
 
@@ -1057,34 +1243,57 @@ class SatelliteAnalysisEngine:
         client_secret = creds.get("oauth_client_secret", "")
         token         = await _get_sentinel_hub_token(client_id, client_secret)
 
-        # 1. Fetch Sentinel-2 quarterly timeseries
+        # 1. Sentinel-2 optical timeseries (with pixel-level stDev + pct_below_035)
         quarters = await _fetch_sentinel_hub_timeseries(token, coords)
 
-        # 2. Fetch weather history — non-blocking (proceed without it on failure)
+        # 2. Sentinel-1 SAR RVI — cloud-proof parallel fetch
+        from_date = "2020-12-01"
+        to_date   = datetime.utcnow().strftime("%Y-%m-%d")
+        try:
+            rvi_by_period = await _fetch_s1_rvi_timeseries(token, coords, from_date, to_date)
+            for q in quarters:
+                q["rvi"] = rvi_by_period.get(q["period_from"])
+            logger.info(f"[S1-RVI] Merged SAR RVI for {sum(1 for q in quarters if q.get('rvi') is not None)} quarters")
+        except Exception as exc:
+            logger.warning(f"[S1-RVI] Fetch failed: {exc} — proceeding without SAR data")
+
+        # 3. CUSUM segmentation on fusion score series
+        # Run after indices are populated so fusion_score can be computed first
+        for q in quarters:
+            q["fusion_score"] = _compute_fusion_score(q)
+
+        fusion_series = [q.get("fusion_score") for q in quarters]
+        cusum_scores, breakpoints = _cusum_detect(fusion_series)
+        for i, q in enumerate(quarters):
+            q["cusum_score"]   = cusum_scores[i]
+            q["is_breakpoint"] = breakpoints[i]
+
+        # 4. Weather history — non-blocking
         weather_quarters: List[Dict] = []
         try:
             weather_raw      = await fetch_weather_history(lat, lon)
             weather_quarters = _aggregate_weather_to_quarters(weather_raw, quarters)
-            logger.info(f"Weather merged for parcel {parcel_id}: {len(weather_quarters)} quarters, "
+            logger.info(f"Weather merged: {len(weather_quarters)} quarters, "
                         f"{sum(1 for w in weather_quarters if w['drought_flag'])} drought quarter(s)")
         except Exception as exc:
-            logger.warning(f"Weather fetch failed for parcel {parcel_id}: {exc} — proceeding without weather data")
+            logger.warning(f"Weather fetch failed for parcel {parcel_id}: {exc}")
 
-        # 3. Persist weather to DB
         if weather_quarters and parcel_id:
             try:
                 await _store_weather_observations(parcel_id, weather_quarters)
             except Exception as exc:
                 logger.warning(f"Weather DB store failed for parcel {parcel_id}: {exc}")
 
-        # 4. Classify events with weather context
+        # 5. Classify events (XGBoost + rule-based fallback)
         weather_by_period = {w["period_from"]: w for w in weather_quarters}
-        analysis = _classify_with_weather(quarters, weather_by_period)
+        analysis = _classify_with_weather(
+            quarters, weather_by_period, xgb_classify_fn=xgb_classify
+        )
 
         return {
             "parcel_id":     parcel_id,
-            "analysis_from": "2020-12-01",
-            "analysis_to":   datetime.utcnow().strftime("%Y-%m-%d"),
+            "analysis_from": from_date,
+            "analysis_to":   to_date,
             "centroid_lat":  round(lat, 6),
             "centroid_lon":  round(lon, 6),
             "quarters":      quarters,

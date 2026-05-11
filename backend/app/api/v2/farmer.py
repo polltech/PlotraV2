@@ -722,17 +722,26 @@ async def request_satellite_analysis(
 async def get_farm_satellite_image(
     farm_id: str,
     date: Optional[str] = None,
+    from_date: Optional[str] = None,
     current_user: User = Depends(require_farmer),
     db: AsyncSession = Depends(get_db)
 ):
     """
-    Fetch a real true-colour Sentinel-2 image for the farm from CDSE Process API.
-    Returns a base64-encoded PNG.
+    Fetch a satellite image for the farm from CDSE Process API.
+    Tries Sentinel-2 L2A (optical, true colour) first; falls back to
+    Sentinel-1 GRD (SAR radar, cloud-proof false colour) when S2 is too cloudy.
+    Returns a base64-encoded PNG plus metadata (source, cloud_pct, scene_date).
+
+    Query params:
+      date      – end of search window (YYYY-MM-DD). Defaults to today.
+      from_date – start of search window (YYYY-MM-DD). Defaults to 365 days before date.
+                  Pass the quarter start for quarterly image strips.
     """
     import base64
+    from datetime import timedelta
     from app.services.satellite_analysis import _load_satellite_credentials, _get_sentinel_hub_token
 
-    # Load farm + first parcel boundary
+    # ── Farm + parcel boundary ────────────────────────────────────────────────
     result = await db.execute(
         select(Farm).where(Farm.id == farm_id, Farm.owner_id == current_user.id)
     )
@@ -740,10 +749,7 @@ async def get_farm_satellite_image(
     if not farm:
         raise HTTPException(status_code=404, detail="Farm not found")
 
-    from sqlalchemy.orm import selectinload
-    parcel_result = await db.execute(
-        select(LandParcel).where(LandParcel.farm_id == farm_id)
-    )
+    parcel_result = await db.execute(select(LandParcel).where(LandParcel.farm_id == farm_id))
     parcels = parcel_result.scalars().all()
     coords = None
     for p in parcels:
@@ -755,138 +761,184 @@ async def get_farm_satellite_image(
     if not coords:
         raise HTTPException(status_code=404, detail="No parcel boundary found for this farm")
 
-    # Bounding box — 0.015° (~1.65km) each side: farm in landscape context.
-    # Sentinel-2 is 10m/pixel native; zooming in too tight makes pixels huge.
-    # A ~3km wide view at 1024px → ~3m/output-pixel → each S2 pixel ≈ 3px → smooth.
     lons = [c[0] for c in coords]
     lats = [c[1] for c in coords]
-    buf = 0.015
+    buf  = 0.015
     bbox = [min(lons) - buf, min(lats) - buf, max(lons) + buf, max(lats) + buf]
 
-    # Get CDSE token
-    creds = await _load_satellite_credentials()
-    client_id = creds.get("oauth_client_id", "")
-    client_secret = creds.get("oauth_client_secret", "")
-    token = await _get_sentinel_hub_token(client_id, client_secret)
-
-    # Use caller-supplied date if provided, otherwise today; search the 365-day window ending on that date
-    from datetime import timedelta
-    if date:
-        try:
-            to_dt = datetime.strptime(date[:10], "%Y-%m-%d").replace(hour=23, minute=59, second=59)
-        except ValueError:
-            to_dt = datetime.utcnow()
-    else:
-        to_dt = datetime.utcnow()
-    from_dt = to_dt - timedelta(days=365)
-
-    # Step 1: SH Catalog API — find the single least-cloudy Sentinel-2 scene in the window.
-    # Using a single 24-hour window eliminates multi-scene colour noise entirely.
-    best_date = None
+    # ── Search window ─────────────────────────────────────────────────────────
     try:
-        async with httpx.AsyncClient(timeout=30) as client:
-            cat_resp = await client.post(
-                "https://sh.dataspace.copernicus.eu/api/v1/catalog/1.0.0/search",
-                headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
-                json={
-                    "bbox": bbox,
-                    "datetime": f"{from_dt.strftime('%Y-%m-%dT%H:%M:%SZ')}/{to_dt.strftime('%Y-%m-%dT%H:%M:%SZ')}",
-                    "collections": ["sentinel-2-l2a"],
-                    "limit": 100,
-                },
-            )
-        print(f"[SAT-IMG] Catalog API status={cat_resp.status_code} body={cat_resp.text[:300]}", flush=True)
-        if cat_resp.status_code == 200:
-            features = cat_resp.json().get("features", [])
-            # Sort by cloud cover ascending in Python
-            features.sort(key=lambda f: f.get("properties", {}).get("eo:cloud_cover", 100))
-            if features:
-                best_props = features[0].get("properties", {})
-                best_dt_str = best_props.get("datetime", "")
-                cloud = best_props.get("eo:cloud_cover", "?")
-                if best_dt_str:
-                    best_date = datetime.fromisoformat(best_dt_str.replace("Z", "+00:00")).replace(tzinfo=None)
-                    print(f"[SAT-IMG] Best scene: {best_date.date()}  cloud={cloud}%  total_scenes={len(features)}", flush=True)
-    except Exception as cat_err:
-        print(f"[SAT-IMG] Catalog lookup failed: {cat_err}", flush=True)
+        to_dt = datetime.strptime(date[:10], "%Y-%m-%d").replace(hour=23, minute=59, second=59) if date else datetime.utcnow()
+    except ValueError:
+        to_dt = datetime.utcnow()
 
-    if best_date:
-        img_from_str = (best_date - timedelta(hours=12)).strftime("%Y-%m-%dT%H:%M:%SZ")
-        img_to_str   = (best_date + timedelta(hours=12)).strftime("%Y-%m-%dT%H:%M:%SZ")
-        label_from   = best_date.strftime("%Y-%m-%d")
-        label_to     = best_date.strftime("%Y-%m-%d")
-        mosaic_order = None  # single scene — no mosaicking needed
+    if from_date:
+        try:
+            from_dt = datetime.strptime(from_date[:10], "%Y-%m-%d").replace(hour=0, minute=0, second=0)
+        except ValueError:
+            from_dt = to_dt - timedelta(days=365)
     else:
-        # Fallback: use leastCC across the full window
-        img_from_str = from_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
-        img_to_str   = to_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
-        label_from   = from_dt.strftime("%Y-%m-%d")
-        label_to     = to_dt.strftime("%Y-%m-%d")
-        mosaic_order = "leastCC"
-        print("[SAT-IMG] No STAC result — falling back to leastCC over full window", flush=True)
+        from_dt = to_dt - timedelta(days=365)
 
-    evalscript = """
-//VERSION=3
-function setup() {
-  return { input: [{bands: ["B04","B03","B02"]}], output: {bands:3, sampleType:"AUTO"} };
-}
-function evaluatePixel(s) {
-  return [2.5*s.B04, 2.5*s.B03, 2.5*s.B02];
-}
-"""
+    window_str = f"{from_dt.strftime('%Y-%m-%dT%H:%M:%SZ')}/{to_dt.strftime('%Y-%m-%dT%H:%M:%SZ')}"
 
-    # Maintain correct aspect ratio so the farm isn't stretched
+    # ── CDSE token ────────────────────────────────────────────────────────────
+    creds = await _load_satellite_credentials()
+    token = await _get_sentinel_hub_token(
+        creds.get("oauth_client_id", ""), creds.get("oauth_client_secret", "")
+    )
+
+    # ── Image size (preserve aspect ratio) ────────────────────────────────────
     lon_span = bbox[2] - bbox[0]
     lat_span = bbox[3] - bbox[1]
-    max_px = 1024
+    max_px   = 512   # smaller for strip tiles; current-view endpoint can use 1024
     if lon_span >= lat_span:
         img_w, img_h = max_px, max(64, round(max_px * lat_span / lon_span))
     else:
         img_w, img_h = max(64, round(max_px * lon_span / lat_span)), max_px
 
-    data_filter = {"timeRange": {"from": img_from_str, "to": img_to_str}, "maxCloudCoverage": 100}
-    if mosaic_order:
-        data_filter["mosaickingOrder"] = mosaic_order
+    CATALOG_URL = "https://sh.dataspace.copernicus.eu/api/v1/catalog/1.0.0/search"
+    PROCESS_URL = "https://sh.dataspace.copernicus.eu/api/v1/process"
+    S2_CLOUD_THRESHOLD = 60   # switch to S1 SAR above this cloud %
 
-    payload = {
-        "input": {
-            "bounds": {
-                "bbox": bbox,
-                "properties": {"crs": "http://www.opengis.net/def/crs/OGC/1.3/CRS84"}
+    # ── Helper: STAC catalog search ───────────────────────────────────────────
+    async def _stac_best(collection: str) -> tuple:
+        """Return (best_datetime, cloud_pct) or (None, None) on failure."""
+        try:
+            async with httpx.AsyncClient(timeout=30) as c:
+                r = await c.post(
+                    CATALOG_URL,
+                    headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+                    json={"bbox": bbox, "datetime": window_str,
+                          "collections": [collection], "limit": 100},
+                )
+            if r.status_code != 200:
+                return None, None
+            feats = r.json().get("features", [])
+            if not feats:
+                return None, None
+            feats.sort(key=lambda f: f.get("properties", {}).get("eo:cloud_cover", 0))
+            best = feats[0].get("properties", {})
+            dt_str = best.get("datetime", "")
+            cloud  = best.get("eo:cloud_cover", 0)
+            if not dt_str:
+                return None, None
+            best_dt = datetime.fromisoformat(dt_str.replace("Z", "+00:00")).replace(tzinfo=None)
+            print(f"[SAT-IMG] {collection} best={best_dt.date()} cloud={cloud}% scenes={len(feats)}", flush=True)
+            return best_dt, float(cloud)
+        except Exception as e:
+            print(f"[SAT-IMG] STAC {collection} failed: {e}", flush=True)
+            return None, None
+
+    # ── Helper: render via Process API ───────────────────────────────────────
+    async def _render(data_type: str, img_from: str, img_to: str,
+                      evalscript: str, mosaic_order: str | None) -> bytes:
+        df = {"timeRange": {"from": img_from, "to": img_to}}
+        if data_type == "sentinel-2-l2a":
+            df["maxCloudCoverage"] = 100
+        if mosaic_order:
+            df["mosaickingOrder"] = mosaic_order
+        payload = {
+            "input": {
+                "bounds": {"bbox": bbox,
+                           "properties": {"crs": "http://www.opengis.net/def/crs/OGC/1.3/CRS84"}},
+                "data": [{"type": data_type, "dataFilter": df}]
             },
-            "data": [{
-                "type": "sentinel-2-l2a",
-                "dataFilter": data_filter,
-            }]
-        },
-        "output": {
-            "width": img_w, "height": img_h,
-            "responses": [{"identifier": "default", "format": {"type": "image/png"}}]
-        },
-        "evalscript": evalscript
-    }
+            "output": {
+                "width": img_w, "height": img_h,
+                "responses": [{"identifier": "default", "format": {"type": "image/png"}}]
+            },
+            "evalscript": evalscript,
+        }
+        async with httpx.AsyncClient(timeout=60) as c:
+            r = await c.post(PROCESS_URL,
+                             headers={"Authorization": f"Bearer {token}",
+                                      "Content-Type": "application/json"},
+                             json=payload)
+        if r.status_code != 200:
+            raise HTTPException(status_code=503,
+                                detail=f"CDSE Process API {r.status_code}: {r.text[:200]}")
+        return r.content
 
-    try:
-        async with httpx.AsyncClient(timeout=60) as client:
-            resp = await client.post(
-                "https://sh.dataspace.copernicus.eu/api/v1/process",
-                headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
-                json=payload
+    # ── Evalscripts ───────────────────────────────────────────────────────────
+    S2_EVAL = """//VERSION=3
+function setup(){return{input:[{bands:["B04","B03","B02"]}],output:{bands:3,sampleType:"AUTO"}};}
+function evaluatePixel(s){return[2.5*s.B04,2.5*s.B03,2.5*s.B02];}"""
+
+    # S1 false-colour: R=VV (surface roughness), G=VH (vegetation), B=VV-VH
+    S1_EVAL = """//VERSION=3
+function setup(){return{input:[{bands:["VV","VH"],units:"LINEAR_POWER"}],output:{bands:3,sampleType:"AUTO"}};}
+function evaluatePixel(s){
+  var vv=Math.sqrt(s.VV), vh=Math.sqrt(s.VH);
+  return[2.5*vv, 3.5*vh, 1.5*(vv-vh)];
+}"""
+
+    # ── Step 1: Try Sentinel-2 ────────────────────────────────────────────────
+    s2_dt, s2_cloud = await _stac_best("sentinel-2-l2a")
+    use_s1 = False
+
+    if s2_dt and s2_cloud <= S2_CLOUD_THRESHOLD:
+        # Good S2 scene found
+        img_from = (s2_dt - timedelta(hours=12)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        img_to   = (s2_dt + timedelta(hours=12)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        label_dt = s2_dt.strftime("%Y-%m-%d")
+        source_label = f"Sentinel-2 L2A · {label_dt} · {s2_cloud:.0f}% cloud"
+        cloud_pct    = s2_cloud
+        try:
+            img_bytes = await _render("sentinel-2-l2a", img_from, img_to, S2_EVAL, None)
+        except Exception:
+            use_s1 = True
+    else:
+        use_s1 = True
+        if s2_dt:
+            print(f"[SAT-IMG] S2 cloud={s2_cloud}% > threshold — switching to S1 SAR", flush=True)
+        else:
+            print("[SAT-IMG] No S2 scene found — switching to S1 SAR", flush=True)
+
+    # ── Step 2: Fall back to Sentinel-1 SAR ──────────────────────────────────
+    if use_s1:
+        s1_dt, _ = await _stac_best("sentinel-1-grd")
+        if s1_dt:
+            img_from = (s1_dt - timedelta(hours=12)).strftime("%Y-%m-%dT%H:%M:%SZ")
+            img_to   = (s1_dt + timedelta(hours=12)).strftime("%Y-%m-%dT%H:%M:%SZ")
+            label_dt = s1_dt.strftime("%Y-%m-%d")
+        else:
+            # No specific scene — mosaic the full window
+            img_from  = from_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+            img_to    = to_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+            label_dt  = to_dt.strftime("%Y-%m-%d")
+            print("[SAT-IMG] No S1 scene in STAC — mosaicking full window", flush=True)
+
+        source_label = f"Sentinel-1 SAR (radar) · {label_dt} · cloud-proof"
+        cloud_pct    = 0.0
+        try:
+            img_bytes = await _render(
+                "sentinel-1-grd", img_from, img_to, S1_EVAL,
+                "mostRecent" if not s1_dt else None
             )
-    except Exception as e:
-        raise HTTPException(status_code=503, detail=f"Satellite image fetch failed: {e}")
+        except Exception as e:
+            # Last resort: S2 leastCC even if cloudy
+            if s2_dt:
+                img_from = from_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+                img_to   = to_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+                label_dt = s2_dt.strftime("%Y-%m-%d")
+                source_label = f"Sentinel-2 L2A (cloudy) · {label_dt} · {s2_cloud:.0f}% cloud"
+                cloud_pct    = s2_cloud
+                img_bytes = await _render("sentinel-2-l2a", img_from, img_to, S2_EVAL, "leastCC")
+            else:
+                raise HTTPException(status_code=503, detail=f"No imagery available: {e}")
 
-    if resp.status_code != 200:
-        raise HTTPException(status_code=503, detail=f"CDSE Process API returned {resp.status_code}: {resp.text[:200]}")
-
-    img_b64 = base64.b64encode(resp.content).decode()
+    img_b64 = base64.b64encode(img_bytes).decode()
     return {
         "image_base64": img_b64,
-        "format": "image/png",
-        "bbox": bbox,
-        "from_date": label_from,
-        "to_date": label_to,
-        "source": "Sentinel-2 L2A via Copernicus Data Space"
+        "format":       "image/png",
+        "bbox":         bbox,
+        "scene_date":   label_dt,
+        "from_date":    from_dt.strftime("%Y-%m-%d"),
+        "to_date":      to_dt.strftime("%Y-%m-%d"),
+        "source":       source_label,
+        "cloud_pct":    cloud_pct,
+        "sensor":       "S1-SAR" if use_s1 else "S2",
     }
 
 
