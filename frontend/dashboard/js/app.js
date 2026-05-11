@@ -10232,7 +10232,11 @@ class PlotraDashboard {
                                 <span class="badge bg-warning text-dark fw-normal small ms-1"
                                       title="4-Index fusion: NDVI+EVI+SAVI+NDMI">4-Index</span>
                             </div>
-                            <div class="d-flex align-items-center gap-2">
+                            <div class="d-flex align-items-center gap-2 flex-wrap">
+                                <select class="form-select form-select-sm" id="analysisParcelSelector"
+                                        style="max-width:220px;display:none;background:rgba(255,255,255,0.15);color:#fff;border-color:rgba(255,255,255,0.3);"
+                                        onchange="app.switchAnalysisParcel(this.value)">
+                                </select>
                                 <button class="btn btn-sm btn-light" id="refreshHistoryBtn"
                                         onclick="app.refreshDeforestationHistory()" style="display:none;">
                                     <i class="bi bi-arrow-clockwise me-1"></i>Refresh
@@ -10379,8 +10383,8 @@ class PlotraDashboard {
                 });
             });
             }
-            // Populate analysis farm selector with mapped farms only
-            const mappedFarms = farms?.filter(f => f.parcels?.length > 0 && f.parcels[0].boundary_geojson) || [];
+            // Populate analysis farm selector with mapped farms (any parcel has a polygon)
+            const mappedFarms = farms?.filter(f => f.parcels?.some(p => p.boundary_geojson)) || [];
             const selector = document.getElementById('analysisFarmSelector');
             if (selector) {
                 const previouslySelected = selector.value;
@@ -10417,10 +10421,20 @@ class PlotraDashboard {
             const el = document.getElementById(id);
             if (el) el.innerHTML = `<div class="text-center py-3"><div class="spinner-border spinner-border-sm" role="status"></div><span class="ms-2">${msg}</span></div>`;
         };
+        // Reset parcel selector when farm changes
+        const parcelSel = document.getElementById('analysisParcelSelector');
+        if (parcelSel) { parcelSel.style.display = 'none'; parcelSel.innerHTML = ''; }
         setLoading('historicalAnalysis', 'Loading historical data...');
         setLoading('satelliteImagePanel', 'Loading satellite image...');
-        this.loadHistoricalAnalysis(farmId);
+        this.loadHistoricalAnalysis(farmId, null);
         this.loadSatelliteImage(farmId, date);
+    }
+
+    switchAnalysisParcel(parcelId) {
+        if (!parcelId || !this._currentHistoryFarmId) return;
+        const container = document.getElementById('historicalAnalysis');
+        if (container) container.innerHTML = `<div class="text-center py-5"><span class="spinner-border spinner-border-sm me-2"></span>Loading parcel history…</div>`;
+        this.loadHistoricalAnalysis(this._currentHistoryFarmId, parcelId);
     }
 
     async runAnalysisForSelectedFarm() {
@@ -11369,10 +11383,34 @@ class PlotraDashboard {
         }
     }
 
-    async loadHistoricalAnalysis(farmId) {
+    async loadHistoricalAnalysis(farmId, parcelId = null) {
         this._currentHistoryFarmId = farmId;
+        this._currentHistoryParcelId = parcelId;
         const container = document.getElementById('historicalAnalysis');
         if (!container) return;
+
+        // Populate parcel selector for this farm
+        const parcelSel = document.getElementById('analysisParcelSelector');
+        if (parcelSel) {
+            try {
+                const farm = await api.getFarmById(farmId);
+                const mappedParcels = (farm?.parcels || []).filter(p => p.boundary_geojson);
+                if (mappedParcels.length > 1) {
+                    parcelSel.innerHTML = mappedParcels.map((p, i) =>
+                        `<option value="${p.id}" ${p.id === parcelId ? 'selected' : ''}>
+                            ${p.parcel_name || `Parcel ${i + 1}`}
+                        </option>`
+                    ).join('');
+                    parcelSel.style.display = '';
+                    // Default to first if none specified
+                    if (!parcelId) parcelId = mappedParcels[0].id;
+                } else {
+                    parcelSel.style.display = 'none';
+                    parcelSel.innerHTML = '';
+                    if (!parcelId && mappedParcels[0]) parcelId = mappedParcels[0].id;
+                }
+            } catch (_) { parcelSel.style.display = 'none'; }
+        }
 
         container.innerHTML = `
             <div class="text-center py-5">
@@ -11388,7 +11426,8 @@ class PlotraDashboard {
         if (refreshBtn) refreshBtn.style.display = 'none';
 
         try {
-            const data = await api.request(`/farmer/farm/${farmId}/deforestation-history`);
+            const qs = parcelId ? `?parcel_id=${parcelId}` : '';
+            const data = await api.request(`/farmer/farm/${farmId}/deforestation-history${qs}`);
             this._renderInlineDeforestationHistory(container, data, farmId);
             if (refreshBtn) refreshBtn.style.display = '';
         } catch (err) {

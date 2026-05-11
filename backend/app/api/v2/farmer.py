@@ -2154,6 +2154,7 @@ async def get_historical_farm_analysis(
 @router.get("/farm/{farm_id}/deforestation-history")
 async def get_farm_deforestation_history(
     farm_id: str,
+    parcel_id: Optional[str] = None,
     current_user: User = Depends(require_farmer),
     db: AsyncSession = Depends(get_db)
 ):
@@ -2162,6 +2163,7 @@ async def get_farm_deforestation_history(
     Uses 4-index fusion (NDVI/EVI/SAVI/NDMI), weather fusion via Open-Meteo,
     drought discrimination, and canopy-intact detection.
     Returns EUDR compliance verdict + classified events with full reasoning.
+    Optional parcel_id to select a specific parcel; defaults to oldest mapped parcel.
     """
     from app.services.satellite_analysis import satellite_engine
 
@@ -2173,14 +2175,17 @@ async def get_farm_deforestation_history(
     if not farm:
         raise HTTPException(status_code=404, detail="Farm not found or access denied.")
 
-    # Get primary parcel with a boundary polygon (oldest = parcel 1)
-    parcel_result = await db.execute(
-        select(LandParcel)
-        .where(LandParcel.farm_id == farm_id)
-        .where(LandParcel.boundary_geojson.isnot(None))
-        .order_by(LandParcel.created_at.asc())
-        .limit(1)
+    # Get the requested parcel, or fall back to oldest mapped parcel
+    query = select(LandParcel).where(
+        LandParcel.farm_id == farm_id,
+        LandParcel.boundary_geojson.isnot(None),
     )
+    if parcel_id:
+        query = query.where(LandParcel.id == parcel_id)
+    else:
+        query = query.order_by(LandParcel.created_at.asc()).limit(1)
+
+    parcel_result = await db.execute(query)
     parcel = parcel_result.scalar_one_or_none()
     if not parcel:
         raise HTTPException(
