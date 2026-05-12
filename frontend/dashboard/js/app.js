@@ -11390,6 +11390,10 @@ class PlotraDashboard {
     }
 
     async loadHistoricalAnalysis(farmId, parcelId = null) {
+        // Guard: if a newer call comes in while this one is awaiting, discard this result
+        this._historyLoadSeq = (this._historyLoadSeq || 0) + 1;
+        const mySeq = this._historyLoadSeq;
+
         this._currentHistoryFarmId = farmId;
         this._currentHistoryParcelId = parcelId;
         const container = document.getElementById('historicalAnalysis');
@@ -11443,16 +11447,24 @@ class PlotraDashboard {
 
         try {
             const qs = parcelId ? `?parcel_id=${parcelId}` : '';
-            const data = await api.request(`/farmer/farm/${farmId}/deforestation-history${qs}`);
+            const data = await api.request(
+                `/farmer/farm/${farmId}/deforestation-history${qs}`,
+                { timeout: 60000 }
+            );
+            // Discard if a newer loadHistoricalAnalysis call has since started
+            if (mySeq !== this._historyLoadSeq) return;
             this._renderInlineDeforestationHistory(container, data, farmId);
             if (refreshBtn) refreshBtn.style.display = '';
         } catch (err) {
+            if (mySeq !== this._historyLoadSeq) return;
             // Fallback: if deforestation history fails (e.g. no polygon), show old records
             console.warn('Deforestation history failed:', err.message);
             try {
                 const old = await api.request(`/farmer/farm/${farmId}/historical-analysis`, { optional: true }) || {};
+                if (mySeq !== this._historyLoadSeq) return;
                 this._renderLegacyHistoricalCards(container, old);
             } catch (e2) {
+                if (mySeq !== this._historyLoadSeq) return;
                 container.innerHTML = `
                     <div class="alert alert-warning m-3">
                         <i class="bi bi-exclamation-triangle me-2"></i>

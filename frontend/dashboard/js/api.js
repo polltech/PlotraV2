@@ -60,13 +60,13 @@ class PlotraAPI {
             delete config.headers['Content-Type'];
         }
 
-        // Add timeout if AbortSignal.timeout is supported
+        // Add timeout — caller can override via options.timeout (ms)
+        const timeoutMs = options.timeout || 30000;
         if (typeof AbortSignal !== 'undefined' && AbortSignal.timeout) {
-            config.signal = AbortSignal.timeout(10000); // 10 second timeout
+            config.signal = AbortSignal.timeout(timeoutMs);
         } else {
-            // Fallback for older browsers
             const controller = new AbortController();
-            setTimeout(() => controller.abort(), 10000);
+            setTimeout(() => controller.abort(), timeoutMs);
             config.signal = controller.signal;
         }
         
