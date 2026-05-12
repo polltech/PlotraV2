@@ -257,24 +257,31 @@ async def authenticate_user(
 
     if not user:
         return None
-    
+
+    # Auto-unlock if lockout window has expired (uses updated_at as locked-at proxy)
+    if user.is_locked:
+        lockout_seconds = settings.auth.lockout_duration_minutes * 60
+        last_change = user.updated_at or user.created_at
+        elapsed = (datetime.utcnow() - last_change).total_seconds() if last_change else 0
+        if elapsed >= lockout_seconds:
+            user.is_locked = False
+            user.failed_login_attempts = 0
+        else:
+            return None  # still within lockout window
+
     if not verify_password(password, user.password_hash):
-        # Increment failed login attempts
-        user.failed_login_attempts += 1
+        user.failed_login_attempts = (user.failed_login_attempts or 0) + 1
         if user.failed_login_attempts >= settings.auth.max_login_attempts:
             user.is_locked = True
         await db.commit()
         return None
-    
-    # Check if account is locked
-    if user.is_locked:
-        return None
-    
-    # Reset failed attempts on successful login
+
+    # Successful login — reset counters
     user.failed_login_attempts = 0
+    user.is_locked = False
     user.last_login = datetime.utcnow()
     await db.commit()
-    
+
     return user
 
 
