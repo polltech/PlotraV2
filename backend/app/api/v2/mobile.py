@@ -8,6 +8,7 @@ Security:
   - API key is read from PLOTRA_MOBILE__API_KEY env var, not hardcoded
   - Simple per-IP rate limiting (PLOTRA_MOBILE__RATE_LIMIT_PER_MINUTE, default 60/min)
 """
+import math
 import random
 import string
 import time
@@ -44,6 +45,32 @@ DEFAULT_FARMER_PASSWORD = "PolyFarmer2024!"
 DEFAULT_FARMER_PHONE    = "+254700000002"
 DEFAULT_FARMER_FIRST    = "Polygon"
 DEFAULT_FARMER_LAST     = "Farmer"
+
+# ── Geometry helpers ──────────────────────────────────────────────────────────
+
+def _polygon_area_ha(coords: list) -> float:
+    """Shoelace formula area for a [lon, lat] polygon, in hectares."""
+    if len(coords) < 3:
+        return 0.0
+    mean_lat = sum(c[1] for c in coords) / len(coords)
+    lat_m = 111320.0
+    lon_m = 111320.0 * math.cos(math.radians(mean_lat))
+    area = 0.0
+    n = len(coords)
+    for i in range(n):
+        j = (i + 1) % n
+        area += coords[i][0] * lon_m * coords[j][1] * lat_m
+        area -= coords[j][0] * lon_m * coords[i][1] * lat_m
+    return abs(area) / 2.0 / 10_000.0
+
+
+async def _refresh_farm_area(db, farm):
+    """Sum parcel areas and write total back to farm.total_area_hectares."""
+    from sqlalchemy import select as _select
+    res = await db.execute(_select(LandParcel).where(LandParcel.farm_id == farm.id))
+    total = sum(p.area_hectares or 0.0 for p in res.scalars().all())
+    farm.total_area_hectares = round(total, 4)
+
 
 # ── Auth & rate-limit helpers ──────────────────────────────────────────────────
 
@@ -436,9 +463,17 @@ async def submit_polygon_capture(
         )
         db.add(parcel)
 
+    # Use calculated area as fallback if app sent 0
+    saved_area = payload.area_ha or _polygon_area_ha(coords)
+    if existing_parcel:
+        existing_parcel.area_hectares = saved_area
+    else:
+        parcel.area_hectares = saved_area
+
     farm.centroid_lat = centroid_lat
     farm.centroid_lon = centroid_lon
     farm.verification_status = "pending"
+    await _refresh_farm_area(db, farm)
 
     await db.commit()
     await db.refresh(parcel)
@@ -447,7 +482,7 @@ async def submit_polygon_capture(
         "record_id": parcel.id,
         "farm_id": farm.id,
         "parcel_number": getattr(parcel, "parcel_number", ""),
-        "area_ha": payload.area_ha,
+        "area_ha": saved_area,
         "status": "updated" if existing_parcel else "created",
     }
 
@@ -496,6 +531,8 @@ async def batch_sync(
             farm.centroid_lat = sum(lats) / len(lats)
             farm.verification_status = "pending"
 
+            saved_area = capture.area_ha or _polygon_area_ha(coords)
+
             from sqlalchemy.orm.attributes import flag_modified
 
             ex_result = await db.execute(
@@ -508,7 +545,7 @@ async def batch_sync(
                 existing.boundary_geojson = boundary_geojson
                 flag_modified(existing, "boundary_geojson")
                 existing.boundary_geometry = boundary_geometry
-                existing.area_hectares = capture.area_ha
+                existing.area_hectares = saved_area
                 existing.perimeter_meters = capture.perimeter_meters
                 existing.gps_accuracy_meters = capture.accuracy_m
                 existing.mapping_method = "gps"
@@ -525,7 +562,7 @@ async def batch_sync(
                     parcel_name=capture.parcel_name or parcel_number,
                     boundary_geojson=boundary_geojson,
                     boundary_geometry=boundary_geometry,
-                    area_hectares=capture.area_ha,
+                    area_hectares=saved_area,
                     perimeter_meters=capture.perimeter_meters,
                     gps_accuracy_meters=capture.accuracy_m,
                     mapping_method="gps",
@@ -534,6 +571,7 @@ async def batch_sync(
                     consent_satellite_monitoring=1,
                 )
                 db.add(parcel)
+            await _refresh_farm_area(db, farm)
             synced += 1
         except Exception as e:
             failed.append({"farm_id": capture.farm_id, "error": str(e)})
