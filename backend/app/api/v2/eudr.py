@@ -712,15 +712,11 @@ async def run_parcel_farming_analysis(
     if not coords:
         raise HTTPException(status_code=422, detail="Parcel has no boundary polygon — cannot run analysis.")
 
-    # Centroid for Hansen lookup
-    centroid_lon = parcel.centroid_lon or farm.centroid_lon
-    centroid_lat = parcel.centroid_lat or farm.centroid_lat
-    if centroid_lon is None or centroid_lat is None:
-        # Compute centroid from polygon
-        lons = [c[0] for c in coords]
-        lats = [c[1] for c in coords]
-        centroid_lon = sum(lons) / len(lons)
-        centroid_lat = sum(lats) / len(lats)
+    # Centroid computed from polygon coordinates
+    lons = [c[0] for c in coords]
+    lats = [c[1] for c in coords]
+    centroid_lon = sum(lons) / len(lons)
+    centroid_lat = sum(lats) / len(lats)
 
     async def _run_analysis():
         try:
