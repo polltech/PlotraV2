@@ -3,7 +3,7 @@ from app.models.base import Base, UUIDMixin, TimestampMixin, AuditMixin, SoftDel
 from app.models.user import User, UserRole, UserStatus, Cooperative, CooperativeMember
 from app.models.farm import Farm, LandParcel, GeoPolygon, LandDocument, DocumentType
 from app.models.traceability import Delivery, Batch, PracticeLog, Warehouse
-from app.models.satellite import SatelliteObservation, BiomassTrend, SatelliteProvider, WeatherObservation
+from app.models.satellite import SatelliteObservation, BiomassTrend, SatelliteProvider, WeatherObservation, EudrFarmingAnalysis
 from app.models.verification import VerificationRecord, VerificationStatus
 from app.models.compliance import (
     DueDiligenceStatement, Certificate, DigitalProductPassport, ComplianceStatus, EUDRCompliance
@@ -41,6 +41,7 @@ __all__ = [
     "BiomassTrend",
     "SatelliteProvider",
     "WeatherObservation",
+    "EudrFarmingAnalysis",
     "VerificationRecord",
     "VerificationStatus",
     "DueDiligenceStatement",

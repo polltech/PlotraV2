@@ -2193,7 +2193,11 @@ async def get_farm_deforestation_history(
             detail="No mapped parcel found for this farm. Add a boundary polygon first."
         )
 
-    return await satellite_engine.analyze_parcel_history(parcel)
+    result = await satellite_engine.analyze_parcel_history(parcel)
+    # Inject parcel_id so the frontend can trigger farming analysis for this parcel
+    if isinstance(result, dict):
+        result["parcel_id"] = str(parcel.id)
+    return result
 
 
 @router.post("/farm/{farm_id}/store-historical-analysis")

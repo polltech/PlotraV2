@@ -7,9 +7,12 @@ KPIs:
 - Conflict Resolution SLA: <48h
 - False Positive Rate: <5%
 """
+import logging
 from datetime import datetime, timedelta
 from typing import List, Optional, Dict, Any
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
+
+logger = logging.getLogger(__name__)
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -657,4 +660,165 @@ async def get_farm_compliance(
         "satellite_data_available": sat_data is not None,
         "satellite_summary": sat_data,
         "assessed_at": datetime.utcnow().isoformat(),
+    }
+
+
+# ---------------------------------------------------------------------------
+# EUDR Farming History Analysis — farming start date + deforestation detection
+# ---------------------------------------------------------------------------
+
+@router.post("/parcel/{parcel_id}/farming-analysis")
+async def run_parcel_farming_analysis(
+    parcel_id: str,
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(require_farmer),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Run EUDR farming history analysis for a parcel.
+    Detects farming start date, land clearing events, and checks Hansen forest loss.
+    Analysis runs in background; poll GET /parcel/{parcel_id}/farming-analysis for result.
+    Returns immediately with status=queued.
+    """
+    from app.models.satellite import EudrFarmingAnalysis
+    from app.services.satellite_analysis import (
+        _load_satellite_credentials, _get_sentinel_hub_token, run_eudr_farming_analysis
+    )
+    from app.core.database import async_session_factory
+
+    result = await db.execute(select(LandParcel).where(LandParcel.id == parcel_id))
+    parcel = result.scalar_one_or_none()
+    if not parcel:
+        raise HTTPException(status_code=404, detail="Parcel not found")
+
+    farm_result = await db.execute(select(Farm).where(Farm.id == parcel.farm_id))
+    farm = farm_result.scalar_one_or_none()
+    if not farm:
+        raise HTTPException(status_code=404, detail="Farm not found")
+
+    # Verify access
+    if current_user.role.value not in ("plotra_admin", "cooperative_officer", "eudr_reviewer"):
+        if farm.owner_id != str(current_user.id):
+            raise HTTPException(status_code=403, detail="Access denied")
+
+    # Get parcel coordinates
+    coords = None
+    if parcel.boundary_geojson:
+        try:
+            geo = parcel.boundary_geojson if isinstance(parcel.boundary_geojson, dict) else __import__('json').loads(parcel.boundary_geojson)
+            coords = geo.get("coordinates", [None])[0]
+        except Exception:
+            pass
+    if not coords:
+        raise HTTPException(status_code=422, detail="Parcel has no boundary polygon — cannot run analysis.")
+
+    # Centroid for Hansen lookup
+    centroid_lon = parcel.centroid_lon or farm.centroid_lon
+    centroid_lat = parcel.centroid_lat or farm.centroid_lat
+    if centroid_lon is None or centroid_lat is None:
+        # Compute centroid from polygon
+        lons = [c[0] for c in coords]
+        lats = [c[1] for c in coords]
+        centroid_lon = sum(lons) / len(lons)
+        centroid_lat = sum(lats) / len(lats)
+
+    async def _run_analysis():
+        try:
+            creds = await _load_satellite_credentials()
+            token = await _get_sentinel_hub_token(
+                creds.get("client_id", ""), creds.get("client_secret", "")
+            )
+            analysis = await run_eudr_farming_analysis(token, coords, centroid_lon, centroid_lat)
+
+            async with async_session_factory() as session:
+                # Upsert — one row per parcel
+                existing = await session.execute(
+                    select(EudrFarmingAnalysis).where(EudrFarmingAnalysis.parcel_id == parcel_id)
+                )
+                row = existing.scalar_one_or_none()
+                if row is None:
+                    row = EudrFarmingAnalysis(parcel_id=parcel_id, farm_id=str(farm.id))
+                    session.add(row)
+
+                row.farming_start_month              = analysis.get("farming_start_month")
+                row.farming_start_confidence         = analysis.get("farming_start_confidence")
+                row.land_clearing_month              = analysis.get("land_clearing_month")
+                row.clearing_confidence              = analysis.get("clearing_confidence")
+                row.pre_2020_farming_confirmed       = int(analysis.get("pre_2020_farming_confirmed", False))
+                row.forest_present_before_clearing   = int(analysis.get("forest_present_before_clearing", False))
+                row.hansen_treecover2000             = analysis["hansen"].get("treecover2000")
+                row.hansen_loss_year                 = analysis["hansen"].get("loss_year")
+                row.hansen_was_forested              = int(analysis["hansen"].get("was_forested") or False)
+                row.hansen_tile                      = analysis["hansen"].get("tile")
+                row.eudr_status                      = analysis.get("eudr_status")
+                row.eudr_summary                     = analysis.get("eudr_summary")
+                row.eudr_risk_flags                  = analysis.get("eudr_risk_flags", [])
+                row.timeseries_months                = analysis.get("timeseries_months")
+                row.cloud_gap_months                 = analysis.get("cloud_gap_months")
+                row.chart_data                       = analysis.get("chart_data", [])
+                row.analysed_at                      = datetime.utcnow()
+                row.status                           = "active"
+
+                await session.commit()
+                logger.info(f"[EUDR farming] Parcel {parcel_id} analysis saved: {analysis.get('eudr_status')}")
+        except Exception as e:
+            logger.error(f"[EUDR farming] Analysis failed for parcel {parcel_id}: {e}")
+
+    background_tasks.add_task(_run_analysis)
+
+    return {
+        "status": "queued",
+        "parcel_id": parcel_id,
+        "message": "Farming analysis started. This may take 60-120 seconds. Poll GET /parcel/{parcel_id}/farming-analysis for results.",
+    }
+
+
+@router.get("/parcel/{parcel_id}/farming-analysis")
+async def get_parcel_farming_analysis(
+    parcel_id: str,
+    current_user: User = Depends(require_farmer),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Get the latest EUDR farming history analysis result for a parcel.
+    Run POST /parcel/{parcel_id}/farming-analysis first to trigger the analysis.
+    """
+    from app.models.satellite import EudrFarmingAnalysis
+
+    result = await db.execute(
+        select(EudrFarmingAnalysis).where(EudrFarmingAnalysis.parcel_id == parcel_id)
+    )
+    row = result.scalar_one_or_none()
+
+    if row is None:
+        return {
+            "parcel_id": parcel_id,
+            "status": "not_analysed",
+            "message": "No farming analysis found. Run POST /parcel/{parcel_id}/farming-analysis first.",
+        }
+
+    return {
+        "parcel_id":                     parcel_id,
+        "status":                        "completed",
+        "farming_start_month":           row.farming_start_month,
+        "farming_start_confidence":      row.farming_start_confidence,
+        "land_clearing_month":           row.land_clearing_month,
+        "clearing_confidence":           row.clearing_confidence,
+        "pre_2020_farming_confirmed":    bool(row.pre_2020_farming_confirmed),
+        "forest_present_before_clearing": bool(row.forest_present_before_clearing),
+        "eudr_status":                   row.eudr_status,
+        "eudr_summary":                  row.eudr_summary,
+        "eudr_risk_flags":               row.eudr_risk_flags or [],
+        "hansen": {
+            "treecover2000": row.hansen_treecover2000,
+            "loss_year":     row.hansen_loss_year,
+            "was_forested":  bool(row.hansen_was_forested) if row.hansen_was_forested is not None else None,
+            "tile":          row.hansen_tile,
+        },
+        "data_quality": {
+            "timeseries_months": row.timeseries_months,
+            "cloud_gap_months":  row.cloud_gap_months,
+        },
+        "chart_data":   row.chart_data or [],
+        "analysed_at":  row.analysed_at.isoformat() if row.analysed_at else None,
     }

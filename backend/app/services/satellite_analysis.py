@@ -3,7 +3,9 @@ Plotra Platform - Satellite Analysis Engine
 Real Sentinel Hub Statistics API. Auth via Planet API key (no OAuth needed).
 The Sentinel Hub dashboard is deprecated — authenticate directly with your Planet API key.
 """
+import asyncio
 import math
+import os
 import uuid
 import logging
 from datetime import datetime, timedelta
@@ -159,18 +161,22 @@ def _cusum_detect(values: List[Optional[float]], threshold: float = 3.0) -> tupl
 # Statistics API evalscripts
 # ---------------------------------------------------------------------------
 
-# Sentinel-2 L2A — optical vegetation indices
+# Sentinel-2 L2A — optical vegetation + soil + disturbance indices
+# B12 (SWIR2) added for NBR (Normalized Burn Ratio — forest disturbance sensitive)
+# BSI (Bare Soil Index) — spikes immediately when land is cleared
 _EVALSCRIPT = """
 //VERSION=3
 function setup() {
   return {
-    input: [{bands: ["B02", "B03", "B04", "B08", "B8A", "B11", "SCL"]}],
+    input: [{bands: ["B02", "B03", "B04", "B08", "B8A", "B11", "B12", "SCL"]}],
     output: [
       {id: "ndvi", bands: 1, sampleType: "FLOAT32"},
       {id: "evi",  bands: 1, sampleType: "FLOAT32"},
       {id: "savi", bands: 1, sampleType: "FLOAT32"},
       {id: "ndmi", bands: 1, sampleType: "FLOAT32"},
       {id: "ndwi", bands: 1, sampleType: "FLOAT32"},
+      {id: "bsi",  bands: 1, sampleType: "FLOAT32"},
+      {id: "nbr",  bands: 1, sampleType: "FLOAT32"},
       {id: "dataMask", bands: 1}
     ]
   };
@@ -181,9 +187,12 @@ function evaluatePixel(s) {
   let savi = 1.5 * (s.B08 - s.B04) / (s.B08 + s.B04 + 0.5 + 1e-6);
   let ndmi = (s.B8A - s.B11) / (s.B8A + s.B11 + 1e-6);
   let ndwi = (s.B03 - s.B08) / (s.B03 + s.B08 + 1e-6);
+  let bsi  = ((s.B11 + s.B04) - (s.B08 + s.B02)) / ((s.B11 + s.B04) + (s.B08 + s.B02) + 1e-6);
+  let nbr  = (s.B08 - s.B12) / (s.B08 + s.B12 + 1e-6);
   return {
     ndvi: [ndvi], evi: [evi], savi: [savi],
-    ndmi: [ndmi], ndwi: [ndwi], dataMask: [1]
+    ndmi: [ndmi], ndwi: [ndwi], bsi: [bsi], nbr: [nbr],
+    dataMask: [1]
   };
 }
 """
@@ -290,6 +299,8 @@ async def _fetch_sentinel_hub_timeseries(token: str, coords: List) -> List[Dict]
             "evi":                   round(_s(outputs, "evi",  "mean", 0), 3) if valid > 0 else None,
             "savi":                  round(_s(outputs, "savi", "mean", 0), 3) if valid > 0 else None,
             "ndmi":                  round(_s(outputs, "ndmi", "mean", 0), 3) if valid > 0 else None,
+            "bsi":                   round(_s(outputs, "bsi",  "mean", 0), 3) if valid > 0 else None,
+            "nbr":                   round(_s(outputs, "nbr",  "mean", 0), 3) if valid > 0 else None,
             # Pixel-level stats
             "ndvi_std":              ndvi_std,
             "ndvi_pct_below_035":    ndvi_pct_below,
@@ -355,6 +366,420 @@ async def _fetch_s1_rvi_timeseries(token: str, coords: List, from_date: str, to_
 
     logger.info(f"[S1-RVI] {len(rvi_by_period)} quarters with valid SAR RVI")
     return rvi_by_period
+
+
+# ---------------------------------------------------------------------------
+# EUDR Farming History — Monthly timeseries (2017 → today)
+# Uses same evalscript but monthly aggregation for farming start detection.
+# ---------------------------------------------------------------------------
+
+async def _fetch_eudr_monthly_timeseries(token: str, coords: List) -> List[Dict]:
+    """
+    Fetch monthly multi-index timeseries from Jan 2017 to today.
+    Returns list of monthly dicts with NDVI, EVI, SAVI, NDMI, BSI, NBR.
+    Months with full cloud cover are included with None values (gap markers).
+    """
+    if not coords:
+        raise HTTPException(status_code=400, detail="Parcel has no boundary coordinates.")
+
+    from_date = "2017-01-01T00:00:00Z"
+    to_date   = datetime.utcnow().strftime("%Y-%m-%dT23:59:59Z")
+
+    payload = {
+        "input": {
+            "bounds": {"geometry": {"type": "Polygon", "coordinates": [coords]}},
+            "data": [{
+                "type": "sentinel-2-l2a",
+                "dataFilter": {"timeRange": {"from": from_date, "to": to_date}, "maxCloudCoverage": 90}
+            }]
+        },
+        "aggregation": {
+            "timeRange": {"from": from_date, "to": to_date},
+            "aggregationInterval": {"of": "P1M"},
+            "evalscript": _EVALSCRIPT,
+            "resx": 20,
+            "resy": 20,
+        },
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=180) as client:
+            resp = await client.post(
+                _CDSE_STATS_URL,
+                headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+                json=payload,
+            )
+    except httpx.TimeoutException:
+        raise HTTPException(status_code=504, detail="Copernicus Statistics API timed out (monthly EUDR fetch).")
+    except httpx.ConnectError:
+        raise HTTPException(status_code=503, detail="Cannot reach Copernicus Data Space Statistics API.")
+
+    if resp.status_code == 401:
+        raise HTTPException(status_code=503, detail="Copernicus 401 — check OAuth credentials in Admin → System → Satellite.")
+    if resp.status_code not in (200, 206):
+        raise HTTPException(status_code=503, detail=f"Sentinel Hub returned {resp.status_code}: {resp.text[:300]}")
+
+    intervals = resp.json().get("data", [])
+    if not intervals:
+        raise HTTPException(status_code=404, detail="No Sentinel-2 imagery found from 2017 for this parcel.")
+
+    def _sv(outputs, name, key, default=None):
+        try:
+            v = float(outputs.get(name, {}).get("bands", {}).get("B0", {}).get("stats", {}).get(key, default))
+            return None if (math.isnan(v) or math.isinf(v)) else v
+        except (TypeError, ValueError):
+            return default
+
+    results = []
+    for iv in intervals:
+        outputs      = iv.get("outputs", {})
+        sample_count = _sv(outputs, "ndvi", "sampleCount", 0) or 0
+        nodata_count = _sv(outputs, "ndvi", "noDataCount", 0) or 0
+        valid        = int(sample_count - nodata_count)
+        ndvi_mean    = _sv(outputs, "ndvi", "mean") if valid > 0 else None
+
+        results.append({
+            "month":        iv.get("interval", {}).get("from", "")[:7],   # "2019-03"
+            "period_from":  iv.get("interval", {}).get("from", "")[:10],
+            "period_to":    iv.get("interval", {}).get("to",   "")[:10],
+            "ndvi":  round(ndvi_mean, 3) if ndvi_mean is not None else None,
+            "evi":   round(_sv(outputs, "evi",  "mean", 0), 3) if valid > 0 else None,
+            "savi":  round(_sv(outputs, "savi", "mean", 0), 3) if valid > 0 else None,
+            "ndmi":  round(_sv(outputs, "ndmi", "mean", 0), 3) if valid > 0 else None,
+            "bsi":   round(_sv(outputs, "bsi",  "mean", 0), 3) if valid > 0 else None,
+            "nbr":   round(_sv(outputs, "nbr",  "mean", 0), 3) if valid > 0 else None,
+            "cloud_cover_pct": round(nodata_count / max(1, sample_count) * 100, 1),
+            "valid_pixels":    valid,
+        })
+
+    logger.info(f"[EUDR monthly] {len(results)} months fetched, {sum(1 for r in results if r['ndvi'] is not None)} with valid data")
+    return results
+
+
+def _score_month_land_use(m: Dict) -> Dict:
+    """
+    Score a single month's multi-index values into land-use signals.
+
+    Returns dict with:
+      forest_score  — 0-1, high = stable dense canopy (NDVI high+stable, NDMI high, BSI low)
+      crop_score    — 0-1, high = active cropping (NDVI moderate + seasonal, SAVI moderate)
+      bare_score    — 0-1, high = exposed soil/cleared land (BSI high, NDMI low, NDVI low)
+      disturbance   — 0-1, high = recent disturbance (NBR drop + BSI spike together)
+    """
+    ndvi = m.get("ndvi")
+    evi  = m.get("evi")
+    savi = m.get("savi")
+    ndmi = m.get("ndmi")
+    bsi  = m.get("bsi")
+    nbr  = m.get("nbr")
+
+    if ndvi is None:
+        return {"forest_score": None, "crop_score": None, "bare_score": None, "disturbance": None}
+
+    # Forest: high NDVI (>0.65), high NDMI (>0.2), low BSI (<0.0), high NBR (>0.5)
+    forest_score = 0.0
+    if ndvi is not None:  forest_score += min(max((ndvi - 0.4) / 0.4, 0), 1) * 0.35
+    if evi  is not None:  forest_score += min(max((evi  - 0.3) / 0.4, 0), 1) * 0.20
+    if ndmi is not None:  forest_score += min(max((ndmi - 0.0) / 0.4, 0), 1) * 0.25
+    if nbr  is not None:  forest_score += min(max((nbr  - 0.3) / 0.4, 0), 1) * 0.20
+
+    # Crop: NDVI moderate (0.3-0.7), SAVI moderate, NDMI moderate (not as high as forest)
+    crop_score = 0.0
+    if ndvi is not None:
+        crop_score += (1.0 - abs(ndvi - 0.5) / 0.3) * 0.35 if 0.2 <= ndvi <= 0.8 else 0
+    if savi is not None:
+        crop_score += min(max((savi - 0.1) / 0.4, 0), 1) * 0.35
+    if ndmi is not None:
+        crop_score += (1.0 - abs(ndmi - 0.1) / 0.2) * 0.30 if -0.1 <= ndmi <= 0.3 else 0
+
+    # Bare soil: high BSI (>0.0), low NDVI (<0.25), low NDMI (<0.0)
+    bare_score = 0.0
+    if bsi  is not None:  bare_score += min(max((bsi  + 0.1) / 0.3, 0), 1) * 0.40
+    if ndvi is not None:  bare_score += min(max((0.25 - ndvi) / 0.25, 0), 1) * 0.35
+    if ndmi is not None:  bare_score += min(max((-ndmi) / 0.2, 0), 1) * 0.25
+
+    # Disturbance: NBR drops + BSI spikes simultaneously
+    disturbance = 0.0
+    if nbr is not None:   disturbance += min(max((0.5 - nbr) / 0.5, 0), 1) * 0.5
+    if bsi is not None:   disturbance += min(max((bsi + 0.1) / 0.4, 0), 1) * 0.5
+
+    return {
+        "forest_score":  round(min(max(forest_score, 0), 1), 3),
+        "crop_score":    round(min(max(crop_score, 0), 1), 3),
+        "bare_score":    round(min(max(bare_score, 0), 1), 3),
+        "disturbance":   round(min(max(disturbance, 0), 1), 3),
+    }
+
+
+def _detect_farming_start(monthly: List[Dict]) -> Dict:
+    """
+    Analyse monthly multi-index timeseries to detect:
+      - land_clearing_month: first month where bare/disturbance score spikes
+      - farming_start_month: first month of consistent crop signal after clearing
+      - pre_2020_confirmed: True if farming_start_month < "2020-01"
+      - confidence: HIGH / MEDIUM / LOW based on cloud gap months around event
+
+    Algorithm:
+      1. Score each month using _score_month_land_use()
+      2. Find the first persistent bare/disturbance event (≥1 consecutive bare month)
+      3. Find first crop month after that bare event (crop_score > 0.35)
+      4. Compute confidence from valid_pixels around the event
+    """
+    EUDR_CUTOFF = "2020-01"
+    CROP_THRESHOLD    = 0.35
+    BARE_THRESHOLD    = 0.40
+    DISTURB_THRESHOLD = 0.45
+
+    scored = []
+    for m in monthly:
+        scores = _score_month_land_use(m)
+        scored.append({**m, **scores})
+
+    # --- Find clearing / disturbance event ---
+    clearing_month   = None
+    clearing_idx     = None
+    for i, m in enumerate(scored):
+        if m.get("bare_score") is None:
+            continue
+        bare  = m["bare_score"]
+        dist  = m.get("disturbance", 0) or 0
+        if bare >= BARE_THRESHOLD or dist >= DISTURB_THRESHOLD:
+            # Require that previous 2 valid months had higher vegetation (confirms it's a drop, not always bare)
+            prev_valid = [s for s in scored[max(0, i-3):i] if s.get("ndvi") is not None]
+            if prev_valid and any(p["ndvi"] > 0.35 for p in prev_valid):
+                clearing_month = m["month"]
+                clearing_idx   = i
+                break
+
+    # --- Find farming start (first crop month after clearing, or ever) ---
+    search_from = clearing_idx if clearing_idx is not None else 0
+    farming_start_month  = None
+    farming_start_idx    = None
+    consecutive_crop     = 0
+    for i in range(search_from, len(scored)):
+        m = scored[i]
+        if m.get("crop_score") is None:
+            consecutive_crop = 0
+            continue
+        if m["crop_score"] >= CROP_THRESHOLD:
+            consecutive_crop += 1
+            if consecutive_crop >= 2:  # require 2 consecutive months to avoid false positives
+                # Backtrack to first of the pair
+                farming_start_idx   = i - 1
+                farming_start_month = scored[farming_start_idx]["month"]
+                break
+        else:
+            consecutive_crop = 0
+
+    # --- Confidence: count cloud gaps in 3-month window around event ---
+    def _confidence_around(idx: Optional[int], window: int = 3) -> str:
+        if idx is None:
+            return "LOW"
+        lo  = max(0, idx - window)
+        hi  = min(len(scored), idx + window + 1)
+        gap = sum(1 for m in scored[lo:hi] if m.get("valid_pixels", 0) == 0)
+        if gap == 0:
+            return "HIGH"
+        if gap <= 1:
+            return "MEDIUM"
+        return "LOW"
+
+    farming_confidence  = _confidence_around(farming_start_idx)
+    clearing_confidence = _confidence_around(clearing_idx)
+
+    pre_2020 = False
+    if farming_start_month:
+        pre_2020 = farming_start_month < EUDR_CUTOFF
+
+    # Forest signal before clearing (was it forested?)
+    pre_clearing_months = scored[:clearing_idx] if clearing_idx else scored[:12]
+    valid_pre = [m for m in pre_clearing_months if m.get("forest_score") is not None]
+    forest_before = (
+        len(valid_pre) >= 3 and
+        sum(m["forest_score"] for m in valid_pre) / len(valid_pre) >= 0.35
+    )
+
+    # Build scored timeseries for frontend chart (all months, with scores)
+    chart_months = []
+    for m in scored:
+        chart_months.append({
+            "month":         m["month"],
+            "ndvi":          m.get("ndvi"),
+            "savi":          m.get("savi"),
+            "evi":           m.get("evi"),
+            "ndmi":          m.get("ndmi"),
+            "bsi":           m.get("bsi"),
+            "nbr":           m.get("nbr"),
+            "forest_score":  m.get("forest_score"),
+            "crop_score":    m.get("crop_score"),
+            "bare_score":    m.get("bare_score"),
+            "disturbance":   m.get("disturbance"),
+            "cloud_cover_pct": m.get("cloud_cover_pct"),
+        })
+
+    return {
+        "clearing_month":        clearing_month,
+        "clearing_confidence":   clearing_confidence,
+        "farming_start_month":   farming_start_month,
+        "farming_start_confidence": farming_confidence,
+        "pre_2020_confirmed":    pre_2020,
+        "forest_present_before_clearing": forest_before,
+        "total_months_analysed": len(monthly),
+        "cloud_gap_months":      sum(1 for m in monthly if m.get("valid_pixels", 0) == 0),
+        "chart_data":            chart_months,
+    }
+
+
+async def _hansen_forest_loss(lon: float, lat: float) -> Dict:
+    """
+    Query Hansen Global Forest Change v1.11 (2023) for a given lon/lat.
+    Uses free public GeoTIFF COG tiles — no authentication required.
+
+    Returns:
+      treecover2000: % forest cover in year 2000 (0-100)
+      loss_year: year of forest loss (None = no loss, 2001-2023)
+      was_forested: True if treecover2000 >= 30%
+    """
+    try:
+        import rasterio
+        from rasterio.windows import Window
+        from rasterio.env import Env
+    except ImportError:
+        logger.warning("[Hansen] rasterio not available — skipping Hansen check")
+        return {"treecover2000": None, "loss_year": None, "was_forested": None, "error": "rasterio not installed"}
+
+    def _tile_name(lat_deg: float, lon_deg: float) -> str:
+        """Compute Hansen tile filename suffix for a lat/lon point."""
+        lat_tile = math.ceil(lat_deg / 10.0) * 10
+        lon_tile = math.floor(lon_deg / 10.0) * 10
+        lat_str  = f"{abs(lat_tile):02d}{'N' if lat_tile >= 0 else 'S'}"
+        lon_str  = f"{abs(lon_tile):03d}{'E' if lon_tile >= 0 else 'W'}"
+        return f"{lat_str}_{lon_str}"
+
+    base_url  = "https://storage.googleapis.com/earthenginepartners-hansen/GFC-2023-v1.11"
+    tile      = _tile_name(lat, lon)
+    tc_url    = f"{base_url}/Hansen_GFC-2023-v1.11_treecover2000_{tile}.tif"
+    ly_url    = f"{base_url}/Hansen_GFC-2023-v1.11_lossyear_{tile}.tif"
+
+    def _read_pixel(url: str, lon_pt: float, lat_pt: float) -> Optional[int]:
+        gdal_url = f"/vsicurl/{url}"
+        try:
+            with Env(GDAL_DISABLE_READDIR_ON_OPEN="YES", CPL_VSIL_CURL_ALLOWED_EXTENSIONS="tif"):
+                with rasterio.open(gdal_url) as src:
+                    row, col = src.index(lon_pt, lat_pt)
+                    data = src.read(1, window=Window(col, row, 1, 1))
+                    return int(data[0, 0])
+        except Exception as e:
+            logger.warning(f"[Hansen] Failed to read {url}: {e}")
+            return None
+
+    try:
+        treecover = await asyncio.get_event_loop().run_in_executor(None, _read_pixel, tc_url, lon, lat)
+        lossyear  = await asyncio.get_event_loop().run_in_executor(None, _read_pixel, ly_url, lon, lat)
+    except Exception as e:
+        logger.warning(f"[Hansen] Executor error: {e}")
+        return {"treecover2000": None, "loss_year": None, "was_forested": None, "error": str(e)}
+
+    loss_year_actual = (2000 + lossyear) if (lossyear is not None and lossyear > 0) else None
+    was_forested     = (treecover is not None and treecover >= 30)
+
+    logger.info(f"[Hansen] tile={tile} treecover2000={treecover}% lossyear={lossyear} → loss_year={loss_year_actual}")
+    return {
+        "treecover2000": treecover,
+        "loss_year":     loss_year_actual,
+        "was_forested":  was_forested,
+        "tile":          tile,
+    }
+
+
+async def run_eudr_farming_analysis(
+    token: str,
+    coords: List,
+    centroid_lon: float,
+    centroid_lat: float,
+) -> Dict:
+    """
+    Full EUDR farming history analysis for a parcel.
+    Combines monthly multi-index satellite timeseries + Hansen forest loss tile.
+
+    Returns complete analysis including:
+      farming_start_month, clearing_month, eudr_status, hansen_data, chart_data
+    """
+    import asyncio as _asyncio
+
+    # Run satellite timeseries and Hansen lookup concurrently
+    monthly_task = _fetch_eudr_monthly_timeseries(token, coords)
+    hansen_task  = _hansen_forest_loss(centroid_lon, centroid_lat)
+    monthly_data, hansen_data = await _asyncio.gather(monthly_task, hansen_task)
+
+    # Detect farming start from multi-index monthly signals
+    detection = _detect_farming_start(monthly_data)
+
+    # Synthesise EUDR verdict
+    farming_start  = detection.get("farming_start_month")
+    clearing_month = detection.get("clearing_month")
+    pre_2020       = detection.get("pre_2020_confirmed", False)
+    forest_cleared = (
+        hansen_data.get("was_forested") and
+        hansen_data.get("loss_year") is not None and
+        hansen_data.get("loss_year") >= 2021
+    )
+
+    if pre_2020 and not forest_cleared:
+        eudr_status = "COMPLIANT"
+        eudr_summary = (
+            f"Farming confirmed from {farming_start} (pre-2020). "
+            "No post-2020 deforestation detected."
+        )
+    elif forest_cleared and farming_start and farming_start >= "2021-01":
+        eudr_status = "RISK"
+        eudr_summary = (
+            f"Forest cleared in {hansen_data['loss_year']} and farming started {farming_start}. "
+            "Likely post-2020 deforestation. EUDR NON-COMPLIANT."
+        )
+    elif forest_cleared and pre_2020:
+        eudr_status = "INVESTIGATE"
+        eudr_summary = (
+            f"Farming pre-2020 confirmed ({farming_start}) but Hansen shows forest loss "
+            f"in {hansen_data['loss_year']} at this location. Manual review required."
+        )
+    elif farming_start is None:
+        eudr_status  = "INSUFFICIENT_DATA"
+        eudr_summary = "Could not determine farming start date. Insufficient cloud-free imagery."
+    else:
+        eudr_status  = "PENDING_REVIEW"
+        eudr_summary = f"Farming start detected {farming_start}. Additional evidence recommended."
+
+    risk_flags = []
+    if forest_cleared:
+        risk_flags.append(f"Hansen: forest loss detected in {hansen_data['loss_year']}")
+    if detection.get("forest_present_before_clearing"):
+        risk_flags.append("Satellite: forest signature present before clearing event")
+    if detection.get("cloud_gap_months", 0) > 6:
+        risk_flags.append(f"Data quality: {detection['cloud_gap_months']} months with cloud cover gaps")
+
+    return {
+        "farming_start_month":           farming_start,
+        "farming_start_confidence":      detection.get("farming_start_confidence"),
+        "land_clearing_month":           clearing_month,
+        "clearing_confidence":           detection.get("clearing_confidence"),
+        "pre_2020_farming_confirmed":    pre_2020,
+        "forest_present_before_clearing": detection.get("forest_present_before_clearing"),
+        "eudr_status":                   eudr_status,
+        "eudr_summary":                  eudr_summary,
+        "eudr_risk_flags":               risk_flags,
+        "hansen": {
+            "treecover2000":  hansen_data.get("treecover2000"),
+            "loss_year":      hansen_data.get("loss_year"),
+            "was_forested":   hansen_data.get("was_forested"),
+            "tile":           hansen_data.get("tile"),
+            "error":          hansen_data.get("error"),
+        },
+        "timeseries_months":    detection.get("total_months_analysed"),
+        "cloud_gap_months":     detection.get("cloud_gap_months"),
+        "chart_data":           detection.get("chart_data", []),
+        "analysed_at":          datetime.utcnow().isoformat(),
+    }
 
 
 def _classify_timeseries_events(quarters: List[Dict]) -> Dict:
@@ -614,90 +1039,122 @@ def _build_event_reasoning(
     ndmi_drought: bool, recovers: bool, w: Dict,
 ) -> str:
     """
-    Human-readable explanation for each classified event.
-    Explains which indices changed, why the classification was made,
-    and what it means for EUDR compliance.
+    Plain-language explanation for each classified event.
+    Covers what each index measured, what changed, and what it means
+    for EUDR compliance. Includes BSI and NBR where available.
     """
     def _fmt(v):
         return f"{v:.3f}" if v is not None else "n/a"
 
     def _d(d):
-        if d is None:
-            return ""
-        sign = "+" if d > 0 else ""
-        return f" ({sign}{d:.3f})"
+        if d is None: return ""
+        return f" ({'+' if d > 0 else ''}{d:.3f})"
 
-    ndvi_str  = f"NDVI {_fmt(prev.get('ndvi'))}→{_fmt(curr.get('ndvi'))}{_d(ndvi_d)}"
-    evi_str   = f"EVI {_fmt(prev.get('evi'))}→{_fmt(curr.get('evi'))}{_d(evi_d)}" if evi_d is not None else None
-    savi_str  = f"SAVI {_fmt(prev.get('savi'))}→{_fmt(curr.get('savi'))}{_d(savi_d)}" if savi_d is not None else None
-    ndmi_str  = f"NDMI {_fmt(prev.get('ndmi'))}→{_fmt(curr.get('ndmi'))}{_d(ndmi_d)}" if ndmi_d is not None else None
-    fuse_str  = f"Fusion {_fmt(prev.get('fusion_score'))}→{_fmt(curr.get('fusion_score'))}{_d(fusion_d)}" if fusion_d is not None else None
+    def _plain_index(name: str, meaning: str, before, after, delta) -> Optional[str]:
+        if delta is None: return None
+        direction = "rose" if delta > 0 else "fell"
+        return f"{name} ({meaning}) {direction} from {_fmt(before)} to {_fmt(after)}{_d(delta)}"
 
-    indices = " | ".join(s for s in [ndvi_str, evi_str, savi_str, ndmi_str, fuse_str] if s)
+    ndvi_line = _plain_index("NDVI", "overall plant cover",   prev.get("ndvi"),  curr.get("ndvi"),  ndvi_d)
+    evi_line  = _plain_index("EVI",  "canopy density",         prev.get("evi"),   curr.get("evi"),   evi_d)
+    savi_line = _plain_index("SAVI", "crops/sparse vegetation",prev.get("savi"),  curr.get("savi"),  savi_d)
+    ndmi_line = _plain_index("NDMI", "moisture in vegetation", prev.get("ndmi"),  curr.get("ndmi"),  ndmi_d)
+    bsi_line  = _plain_index("BSI",  "bare/exposed soil",      prev.get("bsi"),   curr.get("bsi"),   curr.get("bsi") - prev.get("bsi") if curr.get("bsi") is not None and prev.get("bsi") is not None else None)
+    nbr_line  = _plain_index("NBR",  "forest disturbance",     prev.get("nbr"),   curr.get("nbr"),   curr.get("nbr") - prev.get("nbr") if curr.get("nbr") is not None and prev.get("nbr") is not None else None)
+    fuse_line = (f"Combined index score fell from {_fmt(prev.get('fusion_score'))} to "
+                 f"{_fmt(curr.get('fusion_score'))}{_d(fusion_d)}.") if fusion_d is not None else None
+
+    index_lines = " · ".join(s for s in [ndvi_line, evi_line, savi_line, ndmi_line, bsi_line, nbr_line] if s)
+
+    bsi_curr = curr.get("bsi")
+    nbr_curr = curr.get("nbr")
+    bsi_spike = bsi_curr is not None and bsi_curr > 0.10
+    nbr_drop  = nbr_curr is not None and nbr_curr < 0.30
 
     if event_type == "DEFORESTATION":
-        evi_note = (f" EVI also collapsed ({evi_d:+.3f}), confirming canopy removal."
+        bsi_note = (f" BSI (bare soil) rose to {bsi_curr:.3f} — the land surface became exposed, "
+                    "which is a direct sign of vegetation removal."
+                    if bsi_spike else "")
+        nbr_note = (f" NBR (forest disturbance) fell to {nbr_curr:.3f}, "
+                    "well below the undisturbed forest level (>0.5), confirming severe canopy damage."
+                    if nbr_drop else "")
+        evi_note = (f" EVI (canopy density) also collapsed ({evi_d:+.3f}), "
+                    "confirming the tree canopy — not just the ground cover — was removed."
                     if evi_d is not None and evi_d <= -0.15 else "")
         return (
-            f"All 4 vegetation indices declined sharply: {indices}.{evi_note} "
-            f"Fusion score fell below the deforestation threshold (0.35). "
-            f"No vegetation recovery detected in the following 2 quarters. "
-            f"This pattern is consistent with tree clearing or severe land conversion. "
-            f"Post-EUDR cutoff (Dec 2020) — classified as a EUDR VIOLATION."
-        )
+            f"All vegetation indices declined sharply this quarter. {index_lines}.{evi_note}{bsi_note}{nbr_note} "
+            f"{fuse_line or ''} "
+            f"No recovery was detected in the next two quarters. "
+            f"This combination — falling plant cover, rising bare soil, and forest disturbance signal — "
+            f"is consistent with land clearing or tree removal. "
+            f"Because this happened after the EUDR cut-off date (31 Dec 2020), "
+            f"it is classified as an EUDR VIOLATION."
+        ).strip()
 
     if event_type == "DROUGHT_STRESS":
         wx_note = ""
         if w.get("drought_flag"):
-            wx_note = (f" Weather data confirms: rainfall was {w.get('rainfall_mm', '?')} mm "
-                       f"with water deficit of {w.get('water_deficit_mm', '?')} mm for this quarter.")
-        ndmi_note = (" NDMI moisture signal dropped proportionally more than NDVI "
-                     f"(ratio {abs(ndmi_d)/max(abs(ndvi_d),0.001):.1f}×), indicating the primary "
-                     "stressor is water deficit rather than vegetation removal."
+            wx_note = (f" Rainfall records confirm this: only {w.get('rainfall_mm', '?')} mm "
+                       f"fell this quarter with a water deficit of {w.get('water_deficit_mm', '?')} mm.")
+        ndmi_note = (" NDMI (moisture) dropped faster than NDVI, "
+                     f"at {abs(ndmi_d)/max(abs(ndvi_d),0.001):.1f}× the rate — "
+                     "this pattern means the vegetation was water-stressed, not removed."
                      if ndmi_drought and ndmi_d is not None else "")
         return (
-            f"Vegetation stress detected ({indices}) but attributed to drought, not deforestation.{wx_note}{ndmi_note} "
-            f"Drought-induced NDVI declines are temporary and do not represent land clearing. "
-            f"NOT an EUDR violation."
+            f"Vegetation declined this quarter ({index_lines}) but the cause is drought, "
+            f"not land clearing.{wx_note}{ndmi_note} "
+            f"BSI (bare soil) did not rise significantly, meaning the soil surface stayed covered. "
+            f"Drought-related declines are temporary and expected in dry seasons. "
+            f"This is NOT an EUDR violation."
         )
 
     if event_type == "CANOPY_DISTURBANCE":
-        evi_note = (f" EVI changed only {evi_d:+.3f} while NDVI changed {ndvi_d:+.3f} "
-                    f"— EVI is more sensitive to canopy structure and its relative stability "
-                    "indicates overstory trees remain in place."
+        evi_note = (f" EVI (which measures the tall canopy specifically) changed only "
+                    f"{evi_d:+.3f} compared to NDVI's {ndvi_d:+.3f} — "
+                    "the tree layer is still intact, only the ground-level vegetation was affected."
                     if evi_d is not None else "")
+        nbr_note = (f" NBR (forest disturbance) stayed at {nbr_curr:.3f}, "
+                    "indicating the canopy structure was not damaged."
+                    if nbr_curr is not None and nbr_curr >= 0.40 else "")
         return (
-            f"NDVI declined notably but EVI (canopy proxy) remained relatively stable: {indices}.{evi_note} "
-            f"Interpretation: the forest canopy is intact — only the understory, ground cover, or crop layer "
-            f"has been affected (e.g. seasonal crop harvest, understory clearing, grazing). "
-            f"This is NOT classified as deforestation. NOT an EUDR violation."
+            f"NDVI declined this quarter but the tree canopy remained intact: {index_lines}.{evi_note}{nbr_note} "
+            f"This is consistent with a seasonal crop harvest, understory clearing, or grazing — "
+            f"activities that reduce ground-level vegetation without removing trees. "
+            f"This is NOT classified as deforestation and is NOT an EUDR violation."
         )
 
     if event_type == "VEGETATION_LOSS":
-        no_wx = " No drought signal detected from weather data or NDMI pattern." if not drought_induced else ""
+        bsi_note = (f" BSI (bare soil) rose to {bsi_curr:.3f}, suggesting some land exposure."
+                    if bsi_spike else " BSI (bare soil) did not spike significantly.")
+        nbr_note = (f" NBR (forest disturbance) dropped to {nbr_curr:.3f}, "
+                    "suggesting partial forest damage."
+                    if nbr_drop else "")
+        no_wx = " No drought or water stress was detected from weather or moisture data." if not drought_induced else ""
         return (
-            f"Sustained multi-index vegetation decline without recovery: {indices}.{no_wx} "
-            f"This does not meet the EVI-confirmed canopy-loss threshold for DEFORESTATION, "
-            f"but the persistence and magnitude are concerning. "
-            f"Possible causes: partial clearing, agroforestry change, or slow degradation. "
-            f"Manual field verification recommended."
+            f"A sustained vegetation decline was detected that did not recover: {index_lines}.{bsi_note}{nbr_note}{no_wx} "
+            f"This falls short of the full deforestation threshold (EVI did not collapse completely), "
+            f"but the persistence and scale are concerning. "
+            f"Possible causes include partial clearing, agroforestry change, or gradual degradation. "
+            f"Field verification is recommended before making an EUDR compliance decision."
         )
 
     if event_type == "SEASONAL_DIP":
         return (
-            f"Vegetation declined but recovered within 1–2 quarters: {indices}. "
-            f"This matches a normal seasonal dry-season pattern (e.g. leaf-off, crop harvest). "
-            f"No EUDR concern — seasonal variation is expected and not a compliance issue."
+            f"Vegetation declined this quarter but recovered within 1–2 quarters: {index_lines}. "
+            f"BSI (bare soil) and NBR (forest disturbance) did not show abnormal changes. "
+            f"This is a normal dry-season pattern — for example, a crop harvest or leaf-off period. "
+            f"No EUDR concern. Seasonal variation is expected and is not a compliance issue."
         )
 
     if event_type == "REGROWTH":
         return (
-            f"Positive vegetation recovery detected: {indices}. "
-            f"All indices trending upward after a prior low period. "
-            f"Consistent with post-drought recovery, reforestation, or new crop establishment."
+            f"Vegetation is recovering this quarter — indices are rising after a previous low: {index_lines}. "
+            f"BSI (bare soil) is declining as plant cover returns. "
+            f"This is consistent with post-drought recovery, crop re-establishment, or reforestation. "
+            f"A positive signal for this parcel."
         )
 
-    return indices
+    return index_lines
 
 
 def _classify_with_weather(quarters: List[Dict], weather_by_period: Dict, xgb_classify_fn=None) -> Dict:
@@ -1126,6 +1583,30 @@ class SatelliteAnalysisEngine:
     def __init__(self):
         self.ndvi_threshold = 0.3
         self.baseline_year  = 2020
+        # Invalidate cached model if it was trained without BSI/NBR (32 features).
+        # The new feature set has 32 features; old models have 24. Force retrain.
+        self._ensure_model_features()
+
+    @staticmethod
+    def _ensure_model_features():
+        """Delete cached model if it was built with fewer features than current schema."""
+        try:
+            from app.services.ml_classifier import (
+                MODEL_PATH, FEATURE_NAMES, delete_cached_model,
+            )
+            import xgboost as xgb
+            if os.path.exists(MODEL_PATH):
+                clf = xgb.XGBClassifier()
+                clf.load_model(MODEL_PATH)
+                n_cached = clf.n_features_in_
+                if n_cached != len(FEATURE_NAMES):
+                    logger.info(
+                        f"[XGB] Cached model has {n_cached} features, "
+                        f"current schema has {len(FEATURE_NAMES)} — deleting stale model."
+                    )
+                    delete_cached_model()
+        except Exception as e:
+            logger.debug(f"[XGB] Feature check skipped: {e}")
 
     async def analyze_parcel(self, parcel: Any, acquisition_date: Optional[datetime] = None) -> Dict[str, Any]:
         if acquisition_date is None:

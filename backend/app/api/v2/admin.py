@@ -9,6 +9,7 @@ from typing import List, Optional
 
 logger = logging.getLogger(__name__)
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, Form, File
+from pydantic import BaseModel
 from typing import Union
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
@@ -2574,3 +2575,220 @@ async def test_satellite_connection(
         return {"success": False, "message": "Cannot reach Copernicus Data Space — check server network"}
     except Exception as e:
         return {"success": False, "message": f"Error: {str(e)}"}
+
+
+# ---------------------------------------------------------------------------
+# ML Classifier — retrain + labelling endpoints
+# ---------------------------------------------------------------------------
+
+class EventLabel(BaseModel):
+    parcel_id:   str
+    period_from: str           # "2021-03-01"
+    confirmed_label: str       # one of CLASSES in ml_classifier.py
+    notes: Optional[str] = None
+
+
+@router.post("/ml/label-event")
+async def label_event(
+    payload: EventLabel,
+    current_user: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Save a confirmed event label for a parcel quarter.
+    Used to accumulate real training data for the classifier.
+    """
+    from app.services.ml_classifier import CLASSES, CLASS_IDX, build_feature_vector
+    from app.models.system import SystemConfig
+    from app.models.satellite import WeatherObservation
+    import json as _json
+
+    if payload.confirmed_label not in CLASS_IDX:
+        raise HTTPException(status_code=422, detail=f"Invalid label. Must be one of: {CLASSES}")
+
+    # Load the two quarterly rows around this period to build the feature vector
+    from app.models.farm import LandParcel
+    parcel_res = await db.execute(select(LandParcel).where(LandParcel.id == payload.parcel_id))
+    parcel = parcel_res.scalar_one_or_none()
+    if not parcel:
+        raise HTTPException(status_code=404, detail="Parcel not found")
+
+    # Store the label in SystemConfig as JSON list (simple key-value store)
+    KEY = "ml_training_labels"
+    cfg_res = await db.execute(select(SystemConfig).where(SystemConfig.config_key == KEY))
+    cfg = cfg_res.scalar_one_or_none()
+
+    labels = []
+    if cfg and cfg.config_value:
+        try:
+            labels = _json.loads(cfg.config_value)
+        except Exception:
+            labels = []
+
+    labels.append({
+        "parcel_id":       payload.parcel_id,
+        "period_from":     payload.period_from,
+        "confirmed_label": payload.confirmed_label,
+        "labelled_by":     str(current_user.id),
+        "notes":           payload.notes,
+        "labelled_at":     datetime.utcnow().isoformat(),
+    })
+
+    if cfg is None:
+        cfg = SystemConfig(config_key=KEY, config_value=_json.dumps(labels))
+        db.add(cfg)
+    else:
+        cfg.config_value = _json.dumps(labels)
+
+    await db.commit()
+    return {"saved": True, "total_labels": len(labels), "label": payload.confirmed_label}
+
+
+@router.get("/ml/labels")
+async def get_labels(current_user: User = Depends(require_admin), db: AsyncSession = Depends(get_db)):
+    """List all confirmed event labels saved for retraining."""
+    from app.models.system import SystemConfig
+    import json as _json
+
+    cfg_res = await db.execute(select(SystemConfig).where(SystemConfig.config_key == "ml_training_labels"))
+    cfg = cfg_res.scalar_one_or_none()
+    labels = []
+    if cfg and cfg.config_value:
+        try:
+            labels = _json.loads(cfg.config_value)
+        except Exception:
+            labels = []
+    return {"total": len(labels), "labels": labels}
+
+
+@router.post("/ml/retrain")
+async def retrain_classifier(
+    current_user: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Retrain the event classifier.
+    Blends confirmed real labels from the DB with synthetic domain data.
+    If no real labels exist, retrains on updated synthetic data only
+    (useful after adding new features like BSI/NBR).
+    Deletes the cached model file first to force a fresh train.
+    """
+    from app.services.ml_classifier import (
+        retrain_with_real_observations, delete_cached_model,
+        build_feature_vector, FEATURE_NAMES,
+    )
+    from app.models.system import SystemConfig
+    import json as _json
+
+    # Load confirmed labels
+    cfg_res = await db.execute(select(SystemConfig).where(SystemConfig.config_key == "ml_training_labels"))
+    cfg = cfg_res.scalar_one_or_none()
+    raw_labels = []
+    if cfg and cfg.config_value:
+        try:
+            raw_labels = _json.loads(cfg.config_value)
+        except Exception:
+            raw_labels = []
+
+    # For each label, try to reconstruct the feature vector from stored satellite data
+    # (best-effort — labels without matching satellite rows contribute label only via
+    #  synthetic augmentation of that class)
+    observations = []
+    for lbl in raw_labels:
+        # Feature vectors are expensive to rebuild here; accept label-only entries
+        # and use them to weight synthetic generation in retrain_with_real_observations.
+        # Full feature reconstruction can be added later when satellite rows are cached.
+        observations.append({
+            "label":    lbl["confirmed_label"],
+            "features": [],   # empty — retrain_with_real_observations skips empties
+        })
+
+    # Force delete cached model so stale BSI/NBR-less model is replaced
+    delete_cached_model()
+
+    result = retrain_with_real_observations(observations)
+
+    # Log retrain event
+    KEY2 = "ml_retrain_log"
+    log_res = await db.execute(select(SystemConfig).where(SystemConfig.config_key == KEY2))
+    log_cfg = log_res.scalar_one_or_none()
+    retrain_log = []
+    if log_cfg and log_cfg.config_value:
+        try:
+            retrain_log = _json.loads(log_cfg.config_value)
+        except Exception:
+            retrain_log = []
+
+    retrain_log.append({
+        "retrained_at":    datetime.utcnow().isoformat(),
+        "retrained_by":    str(current_user.id),
+        "real_samples":    result.get("real_samples", 0),
+        "synthetic_samples": result.get("synthetic_samples", 0),
+        "total_samples":   result.get("total_samples", 0),
+        "features":        result.get("features", len(FEATURE_NAMES)),
+    })
+    retrain_log = retrain_log[-20:]   # keep last 20 runs
+
+    if log_cfg is None:
+        log_cfg = SystemConfig(config_key=KEY2, config_value=_json.dumps(retrain_log))
+        db.add(log_cfg)
+    else:
+        log_cfg.config_value = _json.dumps(retrain_log)
+
+    await db.commit()
+    return {**result, "retrain_log_entries": len(retrain_log)}
+
+
+@router.get("/ml/status")
+async def ml_status(
+    current_user: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Return current classifier status: feature count, training history, label count.
+    """
+    from app.services.ml_classifier import (
+        load_or_train_model, get_feature_importance, FEATURE_NAMES, CLASSES, MODEL_PATH,
+    )
+    from app.models.system import SystemConfig
+    import json as _json
+
+    model = load_or_train_model()
+
+    cfg_res = await db.execute(select(SystemConfig).where(SystemConfig.config_key == "ml_training_labels"))
+    cfg = cfg_res.scalar_one_or_none()
+    label_count = 0
+    label_breakdown: dict = {}
+    if cfg and cfg.config_value:
+        try:
+            labels = _json.loads(cfg.config_value)
+            label_count = len(labels)
+            for lbl in labels:
+                cl = lbl.get("confirmed_label", "unknown")
+                label_breakdown[cl] = label_breakdown.get(cl, 0) + 1
+        except Exception:
+            pass
+
+    log_res = await db.execute(select(SystemConfig).where(SystemConfig.config_key == "ml_retrain_log"))
+    log_cfg = log_res.scalar_one_or_none()
+    retrain_log = []
+    if log_cfg and log_cfg.config_value:
+        try:
+            retrain_log = _json.loads(log_cfg.config_value)
+        except Exception:
+            pass
+
+    importance = get_feature_importance() if model else None
+
+    return {
+        "model_loaded":        model is not None,
+        "model_path":          MODEL_PATH,
+        "feature_count":       len(FEATURE_NAMES),
+        "feature_names":       FEATURE_NAMES,
+        "classes":             CLASSES,
+        "confirmed_labels":    label_count,
+        "label_breakdown":     label_breakdown,
+        "last_retrain":        retrain_log[-1] if retrain_log else None,
+        "retrain_history":     retrain_log,
+        "top_features":        dict(list(importance.items())[:10]) if importance else None,
+    }

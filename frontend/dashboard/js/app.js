@@ -7082,6 +7082,7 @@ class PlotraDashboard {
                             <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabApp">App Settings</button></li>
                             <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabEudr">EUDR API</button></li>
                             <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabCreds">API Credentials</button></li>
+                            <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabML" onclick="app.loadMLStatus()">Classifier</button></li>
                         </ul>
                         <div class="tab-content mt-4">
                             <!-- Required Documents -->
@@ -7240,6 +7241,67 @@ class PlotraDashboard {
                                 </div>
                                 <div id="credentialsList"></div>
                             </div>
+
+                            <!-- ── ML Classifier tab ── -->
+                            <div class="tab-pane fade" id="tabML">
+                                <div class="d-flex align-items-center justify-content-between mb-3">
+                                    <h5 class="mb-0">Event Classifier</h5>
+                                    <button class="btn btn-sm btn-outline-primary" onclick="app.loadMLStatus()">
+                                        <i class="bi bi-arrow-clockwise me-1"></i>Refresh Status
+                                    </button>
+                                </div>
+                                <div id="mlStatusPanel">
+                                    <div class="text-muted text-center py-3 small">
+                                        <span class="spinner-border spinner-border-sm me-2"></span>Loading classifier status…
+                                    </div>
+                                </div>
+                                <hr>
+                                <h6 class="mb-2">Label a Confirmed Event</h6>
+                                <p class="text-muted small mb-2">
+                                    Confirm the correct classification for a specific parcel quarter.
+                                    Saved labels are used when retraining.
+                                </p>
+                                <div class="row g-2 mb-3">
+                                    <div class="col-md-3">
+                                        <input type="text" class="form-control form-control-sm" id="mlParcelId" placeholder="Parcel ID (UUID)">
+                                    </div>
+                                    <div class="col-md-2">
+                                        <input type="text" class="form-control form-control-sm" id="mlPeriod" placeholder="Period (2021-03-01)">
+                                    </div>
+                                    <div class="col-md-3">
+                                        <select class="form-select form-select-sm" id="mlLabel">
+                                            <option value="">— Select label —</option>
+                                            <option value="DEFORESTATION">DEFORESTATION</option>
+                                            <option value="VEGETATION_LOSS">VEGETATION_LOSS</option>
+                                            <option value="DROUGHT_STRESS">DROUGHT_STRESS</option>
+                                            <option value="CANOPY_DISTURBANCE">CANOPY_DISTURBANCE</option>
+                                            <option value="SEASONAL_DIP">SEASONAL_DIP</option>
+                                            <option value="REGROWTH">REGROWTH</option>
+                                            <option value="NO_CHANGE">NO_CHANGE</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-2">
+                                        <input type="text" class="form-control form-control-sm" id="mlNotes" placeholder="Notes (optional)">
+                                    </div>
+                                    <div class="col-md-2">
+                                        <button class="btn btn-sm btn-outline-success w-100" onclick="app.saveEventLabel()">
+                                            <i class="bi bi-check-lg me-1"></i>Save Label
+                                        </button>
+                                    </div>
+                                </div>
+                                <hr>
+                                <div class="d-flex align-items-center gap-3">
+                                    <button class="btn btn-sm btn-warning" onclick="app.retrainClassifier(this)">
+                                        <i class="bi bi-cpu me-1"></i>Retrain Classifier
+                                    </button>
+                                    <span class="text-muted small">
+                                        Retrains using confirmed labels + updated synthetic data
+                                        (adds BSI, NBR, and interaction features).
+                                        Takes ~10 seconds.
+                                    </span>
+                                </div>
+                                <div id="mlRetrainResult" class="mt-3"></div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -7276,6 +7338,129 @@ class PlotraDashboard {
             this.showToast(`${section} settings saved`, 'success');
         } catch (e) {
             this.showToast(e.message, 'error');
+        }
+    }
+
+    async loadMLStatus() {
+        const panel = document.getElementById('mlStatusPanel');
+        if (!panel) return;
+        panel.innerHTML = '<div class="text-muted small text-center py-2"><span class="spinner-border spinner-border-sm me-2"></span>Loading…</div>';
+        try {
+            const d = await api.request('/admin/ml/status');
+            const lastRun = d.last_retrain;
+            const topF    = d.top_features ? Object.entries(d.top_features).slice(0, 8) : [];
+            const lblBreak = Object.entries(d.label_breakdown || {});
+
+            panel.innerHTML = `
+                <div class="row g-3 mb-3">
+                    <div class="col-md-3">
+                        <div class="card border-0 bg-${d.model_loaded ? 'success' : 'danger'}-subtle h-100">
+                            <div class="card-body py-2 text-center">
+                                <div class="fw-bold fs-5">${d.model_loaded ? 'Loaded ✓' : 'Not loaded'}</div>
+                                <div class="small text-muted">Model status</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card border-0 bg-light h-100">
+                            <div class="card-body py-2 text-center">
+                                <div class="fw-bold fs-5">${d.feature_count}</div>
+                                <div class="small text-muted">Features (incl. BSI, NBR)</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card border-0 bg-light h-100">
+                            <div class="card-body py-2 text-center">
+                                <div class="fw-bold fs-5">${d.confirmed_labels}</div>
+                                <div class="small text-muted">Confirmed labels</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card border-0 bg-light h-100">
+                            <div class="card-body py-2 text-center">
+                                <div class="fw-bold fs-5">${lastRun ? new Date(lastRun.retrained_at).toLocaleDateString('en-GB') : 'Never'}</div>
+                                <div class="small text-muted">Last retrain</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                ${lastRun ? `
+                <div class="alert alert-info py-2 small mb-3">
+                    Last retrain: <strong>${lastRun.real_samples} real</strong> +
+                    <strong>${lastRun.synthetic_samples} synthetic</strong> =
+                    <strong>${lastRun.total_samples} total</strong> samples ·
+                    ${lastRun.features} features · by ${lastRun.retrained_by?.slice(0,8)}…
+                </div>` : ''}
+                ${lblBreak.length ? `
+                <div class="mb-3">
+                    <div class="fw-semibold small mb-1">Label breakdown</div>
+                    <div class="d-flex flex-wrap gap-2">
+                        ${lblBreak.map(([cl, n]) => `<span class="badge bg-secondary fw-normal">${cl}: ${n}</span>`).join('')}
+                    </div>
+                </div>` : ''}
+                ${topF.length ? `
+                <div>
+                    <div class="fw-semibold small mb-1">Top features by importance</div>
+                    ${topF.map(([f, s]) => `
+                        <div class="d-flex align-items-center gap-2 mb-1">
+                            <span class="small text-muted" style="width:160px;flex-shrink:0">${f}</span>
+                            <div class="progress flex-grow-1" style="height:8px">
+                                <div class="progress-bar bg-primary" style="width:${(s*100/topF[0][1]).toFixed(0)}%"></div>
+                            </div>
+                            <span class="small text-muted">${s.toFixed(4)}</span>
+                        </div>`).join('')}
+                </div>` : ''}`;
+        } catch (e) {
+            if (panel) panel.innerHTML = `<div class="text-danger small">${e.message}</div>`;
+        }
+    }
+
+    async saveEventLabel() {
+        const parcelId = document.getElementById('mlParcelId')?.value?.trim();
+        const period   = document.getElementById('mlPeriod')?.value?.trim();
+        const label    = document.getElementById('mlLabel')?.value;
+        const notes    = document.getElementById('mlNotes')?.value?.trim();
+        if (!parcelId || !period || !label) {
+            this.showToast('Fill in Parcel ID, Period, and Label.', 'warning'); return;
+        }
+        try {
+            const res = await api.request('/admin/ml/label-event', {
+                method: 'POST',
+                body: JSON.stringify({ parcel_id: parcelId, period_from: period, confirmed_label: label, notes }),
+            });
+            this.showToast(`Label saved — ${res.total_labels} total labels stored.`, 'success');
+            document.getElementById('mlParcelId').value = '';
+            document.getElementById('mlPeriod').value   = '';
+            document.getElementById('mlLabel').value    = '';
+            document.getElementById('mlNotes').value    = '';
+            this.loadMLStatus();
+        } catch (e) {
+            this.showToast('Save failed: ' + e.message, 'error');
+        }
+    }
+
+    async retrainClassifier(btnEl) {
+        if (!confirm('Retrain the event classifier now?\nThis replaces the current model with one that includes BSI + NBR features.\nTakes ~10 seconds.')) return;
+        const result = document.getElementById('mlRetrainResult');
+        if (btnEl) { btnEl.disabled = true; btnEl.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Retraining…'; }
+        if (result) result.innerHTML = '';
+        try {
+            const res = await api.request('/admin/ml/retrain', { method: 'POST', timeout: 120000 });
+            if (result) result.innerHTML = `
+                <div class="alert alert-success py-2 small">
+                    <i class="bi bi-check-circle me-1"></i>
+                    Retrain complete: <strong>${res.real_samples} real</strong> +
+                    <strong>${res.synthetic_samples} synthetic</strong> =
+                    <strong>${res.total_samples} total</strong> samples ·
+                    <strong>${res.features} features</strong> (NDVI, EVI, SAVI, NDMI, RVI, BSI, NBR + interactions).
+                </div>`;
+            this.loadMLStatus();
+        } catch (e) {
+            if (result) result.innerHTML = `<div class="alert alert-danger py-2 small">${e.message}</div>`;
+        } finally {
+            if (btnEl) { btnEl.disabled = false; btnEl.innerHTML = '<i class="bi bi-cpu me-1"></i>Retrain Classifier'; }
         }
     }
 
@@ -11438,7 +11623,7 @@ class PlotraDashboard {
                 <p class="text-muted small mb-0">
                     Fetching quarterly satellite data Dec 2020 → today…<br>
                     Fetching weather history from Open-Meteo…<br>
-                    Running 5-index fusion + XGBoost classification…
+                    Running 5-index fusion + statistical classification…
                 </p>
             </div>`;
 
@@ -11453,8 +11638,10 @@ class PlotraDashboard {
             );
             // Discard if a newer loadHistoricalAnalysis call has since started
             if (mySeq !== this._historyLoadSeq) return;
-            this._renderInlineDeforestationHistory(container, data, farmId);
+            this._renderInlineDeforestationHistory(container, data, farmId, parcelId || data.parcel_id || null);
             if (refreshBtn) refreshBtn.style.display = '';
+            // Auto-load any existing farming analysis for this parcel
+            if (data.parcel_id) this.loadFarmingAnalysis(data.parcel_id);
         } catch (err) {
             if (mySeq !== this._historyLoadSeq) return;
             // Fallback: if deforestation history fails (e.g. no polygon), show old records
@@ -11479,7 +11666,9 @@ class PlotraDashboard {
         if (this._currentHistoryFarmId) this.loadHistoricalAnalysis(this._currentHistoryFarmId);
     }
 
-    _renderInlineDeforestationHistory(container, data, farmId) {
+    _renderInlineDeforestationHistory(container, data, farmId, parcelId = null) {
+        // Merge parcel_id from argument or from API response
+        if (!data.parcel_id && parcelId) data = { ...data, parcel_id: parcelId };
         const quarters    = data.quarters || [];
         const events      = data.events   || [];
         const weather     = data.weather  || [];
@@ -11558,8 +11747,8 @@ class PlotraDashboard {
                 </tr>
                 <tr id="fr-reason-${idx}" class="d-none">
                     <td colspan="7" class="bg-light border-start border-4 border-${m.color} ps-3 py-2 small text-muted">
-                        <i class="bi bi-cpu me-1"></i><strong>AI Analysis:</strong>
-                        ${e.confidence != null ? `<span class="badge bg-secondary ms-1">${(e.confidence * 100).toFixed(0)}% confident</span>` : ''}
+                        <i class="bi bi-bar-chart-line me-1"></i><strong>Index Analysis:</strong>
+                        ${e.confidence != null ? `<span class="badge bg-secondary ms-1">${(e.confidence * 100).toFixed(0)}% confidence</span>` : ''}
                         ${e.is_breakpoint ? '<span class="badge bg-danger ms-1">CUSUM Structural Break</span>' : ''}
                         <br>${e.reasoning || '—'}
                         ${e.ndvi_std != null ? `<br><span class="text-info">Spatial heterogeneity: σ=${(+e.ndvi_std).toFixed(4)} · ${(((+e.ndvi_pct_below_035) || 0) * 100).toFixed(1)}% pixels below NDVI 0.35</span>` : ''}
@@ -11657,11 +11846,33 @@ class PlotraDashboard {
                         </thead>
                         <tbody>${eventRows}</tbody>
                     </table>
+                    <div class="d-flex flex-wrap gap-3 small text-muted mt-2">
+                        <span><span class="badge bg-danger me-1">VIOLATION</span>Post-2020 deforestation</span>
+                        <span><span class="badge bg-warning text-dark me-1">DROUGHT</span>Drought-induced, not a violation</span>
+                        <span><span class="badge bg-info text-dark me-1">CANOPY OK</span>Understory only, trees intact</span>
+                    </div>
                 </div>
-                <div class="d-flex flex-wrap gap-3 small text-muted mt-2">
-                    <span><span class="badge bg-danger me-1">VIOLATION</span>Post-2020 deforestation</span>
-                    <span><span class="badge bg-warning text-dark me-1">DROUGHT</span>Drought-induced, not a violation</span>
-                    <span><span class="badge bg-info text-dark me-1">CANOPY OK</span>Understory only, trees intact</span>
+            </div>
+
+            <!-- ── EUDR Farming History Analysis ─────────────────────────────── -->
+            <hr class="my-3">
+            <div class="d-flex align-items-center justify-content-between mb-2">
+                <div>
+                    <span class="fw-semibold small"><i class="bi bi-calendar-range me-1 text-success"></i>Farming Start Date Detection</span>
+                    <span class="text-muted small ms-2">— 2017→today monthly multi-index + Hansen forest tiles</span>
+                </div>
+                ${data.parcel_id ? `
+                <button class="btn btn-sm btn-outline-success"
+                        onclick="app.runFarmingAnalysis('${data.parcel_id}', this)">
+                    <i class="bi bi-cpu me-1"></i>Analyse Farming History
+                </button>` : ''}
+            </div>
+            <div id="farmingAnalysis-${data.parcel_id || uid}">
+                <!-- Will be populated by loadFarmingAnalysis or runFarmingAnalysis -->
+                <div class="p-3 text-center text-muted small border rounded bg-light">
+                    <i class="bi bi-calendar-x fs-3 d-block mb-2 text-muted"></i>
+                    Click <strong>"Analyse Farming History"</strong> to detect farming start date and forest clearing.
+                    <br><small>Uses Jan 2017–today monthly Sentinel-2 + free Hansen GFC forest tiles.</small>
                 </div>
             </div>`;
 
@@ -11906,6 +12117,209 @@ class PlotraDashboard {
         });
         html += '</tbody></table></div>';
         container.innerHTML = html;
+    }
+
+    // ── EUDR Farming History Analysis ────────────────────────────────────────
+
+    async runFarmingAnalysis(parcelId, btnEl) {
+        if (btnEl) { btnEl.disabled = true; btnEl.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Starting…'; }
+        try {
+            await api.request(`/eudr/parcel/${parcelId}/farming-analysis`, { method: 'POST' });
+            this.showToast('Farming analysis started — results in ~90 seconds.', 'info');
+            // Poll for result
+            const containerId = `farmingAnalysis-${parcelId}`;
+            const container   = document.getElementById(containerId);
+            if (container) {
+                container.innerHTML = `
+                    <div class="d-flex align-items-center gap-2 p-3 text-muted small">
+                        <span class="spinner-border spinner-border-sm"></span>
+                        Analysing 2017–today monthly satellite data + Hansen forest tiles…
+                        <span class="text-muted">(may take 60–120 s)</span>
+                    </div>`;
+            }
+            // Poll every 15s up to 3 minutes
+            let attempts = 0;
+            const poll = setInterval(async () => {
+                attempts++;
+                const result = await api.request(`/eudr/parcel/${parcelId}/farming-analysis`).catch(() => null);
+                if (result && result.status === 'completed') {
+                    clearInterval(poll);
+                    if (container) this._renderFarmingAnalysisPanel(container, result);
+                    if (btnEl) { btnEl.disabled = false; btnEl.innerHTML = '<i class="bi bi-arrow-clockwise me-1"></i>Re-analyse'; }
+                } else if (attempts >= 12) {
+                    clearInterval(poll);
+                    if (container) container.innerHTML = '<div class="alert alert-warning small">Analysis is taking longer than expected — try refreshing the page.</div>';
+                    if (btnEl) { btnEl.disabled = false; btnEl.innerHTML = '<i class="bi bi-arrow-clockwise me-1"></i>Re-analyse'; }
+                }
+            }, 15000);
+        } catch (err) {
+            this.showToast('Failed to start farming analysis: ' + (err.message || err), 'error');
+            if (btnEl) { btnEl.disabled = false; btnEl.innerHTML = '<i class="bi bi-cpu me-1"></i>Analyse Farming History'; }
+        }
+    }
+
+    async loadFarmingAnalysis(parcelId) {
+        const containerId = `farmingAnalysis-${parcelId}`;
+        const container   = document.getElementById(containerId);
+        if (!container) return;
+        container.innerHTML = `<div class="d-flex align-items-center gap-2 p-3 text-muted small"><span class="spinner-border spinner-border-sm"></span>Loading…</div>`;
+        try {
+            const data = await api.request(`/eudr/parcel/${parcelId}/farming-analysis`);
+            if (data.status === 'not_analysed') {
+                container.innerHTML = `
+                    <div class="p-3 text-center text-muted small">
+                        <i class="bi bi-calendar-x fs-3 d-block mb-2"></i>
+                        No farming history analysis yet.
+                        <br>Click <strong>"Analyse Farming History"</strong> above to run the analysis.
+                        <br><small>Uses 2017–today Sentinel-2 data + Hansen forest tiles — takes ~90 seconds.</small>
+                    </div>`;
+            } else {
+                this._renderFarmingAnalysisPanel(container, data);
+            }
+        } catch (err) {
+            container.innerHTML = `<div class="text-muted small p-3">Could not load farming analysis: ${err.message || err}</div>`;
+        }
+    }
+
+    _renderFarmingAnalysisPanel(container, data) {
+        const statusColors = {
+            COMPLIANT:        { bg: 'success', icon: 'check-circle-fill', label: 'EUDR Compliant' },
+            RISK:             { bg: 'danger',  icon: 'x-circle-fill',     label: 'EUDR Risk' },
+            INVESTIGATE:      { bg: 'warning', icon: 'exclamation-triangle-fill', label: 'Investigate' },
+            INSUFFICIENT_DATA:{ bg: 'secondary',icon:'question-circle-fill', label: 'Insufficient Data' },
+            PENDING_REVIEW:   { bg: 'info',    icon: 'info-circle-fill',  label: 'Pending Review' },
+        };
+        const sc      = statusColors[data.eudr_status] || statusColors['PENDING_REVIEW'];
+        const conf    = c => c === 'HIGH' ? 'text-success fw-semibold' : c === 'MEDIUM' ? 'text-warning fw-semibold' : 'text-muted';
+        const fmtMonth = m => m ? (() => { const [y,mo] = m.split('-'); return `${new Date(+y,+mo-1).toLocaleString('default',{month:'long'})} ${y}`; })() : '—';
+        const hansen   = data.hansen || {};
+        const dq       = data.data_quality || {};
+        const chartData = data.chart_data || [];
+        const uid       = `fa-${data.parcel_id?.slice(0,8) || Math.random().toString(36).slice(2)}`;
+
+        const riskBadges = (data.eudr_risk_flags || []).map(f =>
+            `<span class="badge bg-danger-subtle text-danger border border-danger-subtle me-1 mb-1 fw-normal small">${f}</span>`
+        ).join('');
+
+        container.innerHTML = `
+            <!-- Verdict banner -->
+            <div class="alert alert-${sc.bg} d-flex align-items-start gap-3 mb-3 py-2">
+                <i class="bi bi-${sc.icon} fs-3 mt-1 flex-shrink-0"></i>
+                <div class="flex-grow-1">
+                    <div class="fw-bold fs-6 mb-1">${sc.label}</div>
+                    <div class="mb-2 small">${data.eudr_summary || '—'}</div>
+                    ${riskBadges}
+                </div>
+            </div>
+
+            <!-- Key dates row -->
+            <div class="row g-2 mb-3">
+                <div class="col-6 col-md-3">
+                    <div class="card border-0 bg-light h-100">
+                        <div class="card-body py-2 px-3">
+                            <div class="text-muted small mb-1"><i class="bi bi-calendar-check me-1"></i>Farming Started</div>
+                            <div class="fw-bold">${fmtMonth(data.farming_start_month)}</div>
+                            <div class="small ${conf(data.farming_start_confidence)}">${data.farming_start_confidence || '—'} confidence</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="card border-0 bg-light h-100">
+                        <div class="card-body py-2 px-3">
+                            <div class="text-muted small mb-1"><i class="bi bi-tree me-1"></i>Land Clearing</div>
+                            <div class="fw-bold">${fmtMonth(data.land_clearing_month)}</div>
+                            <div class="small ${conf(data.clearing_confidence)}">${data.clearing_confidence || '—'} confidence</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="card border-0 bg-light h-100">
+                        <div class="card-body py-2 px-3">
+                            <div class="text-muted small mb-1"><i class="bi bi-map me-1"></i>Hansen Forest Loss</div>
+                            <div class="fw-bold">${hansen.loss_year ? `Year ${hansen.loss_year}` : 'None detected'}</div>
+                            <div class="small text-muted">Cover 2000: ${hansen.treecover2000 != null ? hansen.treecover2000 + '%' : '—'}</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="card border-0 bg-light h-100">
+                        <div class="card-body py-2 px-3">
+                            <div class="text-muted small mb-1"><i class="bi bi-shield-check me-1"></i>Pre-2020 Farming</div>
+                            <div class="fw-bold ${data.pre_2020_farming_confirmed ? 'text-success' : 'text-danger'}">
+                                ${data.pre_2020_farming_confirmed ? 'Confirmed ✓' : 'Not confirmed'}
+                            </div>
+                            <div class="small text-muted">${dq.cloud_gap_months || 0} cloud-gap months</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Multi-index chart title -->
+            <div class="fw-semibold small text-muted mb-1">
+                <i class="bi bi-graph-up me-1"></i>
+                Monthly Land Use Signals (Jan 2017 → Today) — NDVI, SAVI, EVI, BSI, NBR, Land Use Scores
+            </div>
+            <div id="${uid}-chart" class="mb-3"></div>
+
+            <!-- Data quality footer -->
+            <div class="d-flex flex-wrap gap-3 small text-muted mt-2">
+                <span><i class="bi bi-calendar3 me-1"></i>${dq.timeseries_months || 0} months analysed</span>
+                <span><i class="bi bi-cloud me-1"></i>${dq.cloud_gap_months || 0} cloud-gap months</span>
+                ${data.analysed_at ? `<span class="ms-auto"><i class="bi bi-clock me-1"></i>Analysed ${new Date(data.analysed_at).toLocaleDateString('en-GB', {day:'2-digit',month:'short',year:'numeric'})}</span>` : ''}
+            </div>`;
+
+        // ── Render multi-index + land use score chart ─────────────────────────
+        if (chartData.length > 0) {
+            const labels  = chartData.map(m => m.month);
+            const ndviV   = chartData.map(m => m.ndvi   ?? null);
+            const saviV   = chartData.map(m => m.savi   ?? null);
+            const eviV    = chartData.map(m => m.evi    ?? null);
+            const bsiV    = chartData.map(m => m.bsi    ?? null);
+            const nbrV    = chartData.map(m => m.nbr    ?? null);
+            const ndmiV   = chartData.map(m => m.ndmi   ?? null);
+            const cropV   = chartData.map(m => m.crop_score    ?? null);
+            const forestV = chartData.map(m => m.forest_score  ?? null);
+            const bareV   = chartData.map(m => m.bare_score    ?? null);
+
+            // Mark farming start and clearing annotations
+            const annots = [];
+            if (data.farming_start_month) {
+                annots.push({ x: data.farming_start_month, borderColor: '#198754', strokeDashArray: 0, borderWidth: 2,
+                    label: { text: 'Farm Start', borderColor: '#198754', style: { color:'#fff', background:'#198754', fontSize:'9px' } } });
+            }
+            if (data.land_clearing_month) {
+                annots.push({ x: data.land_clearing_month, borderColor: '#dc3545', strokeDashArray: 0, borderWidth: 2,
+                    label: { text: 'Clearing', borderColor: '#dc3545', style: { color:'#fff', background:'#dc3545', fontSize:'9px' } } });
+            }
+            // EUDR 2020 cutoff line
+            annots.push({ x: '2020-01', borderColor: '#6f42c1', strokeDashArray: 6, borderWidth: 2,
+                label: { text: 'EUDR Cutoff', borderColor: '#6f42c1', style: { color:'#6f42c1', background:'#fff', fontSize:'9px' } } });
+
+            new ApexCharts(document.getElementById(`${uid}-chart`), {
+                chart:  { type:'line', height:340, toolbar:{ show:true, tools:{ download:true, zoom:true, reset:true, pan:true } }, animations:{ enabled:false }, zoom:{ enabled:true } },
+                series: [
+                    { name:'NDVI',         data: ndviV,   type:'line' },
+                    { name:'SAVI',         data: saviV,   type:'line' },
+                    { name:'EVI',          data: eviV,    type:'line' },
+                    { name:'NDMI',         data: ndmiV,   type:'line' },
+                    { name:'BSI',          data: bsiV,    type:'line' },
+                    { name:'NBR',          data: nbrV,    type:'line' },
+                    { name:'Crop Score',   data: cropV,   type:'line' },
+                    { name:'Forest Score', data: forestV, type:'line' },
+                    { name:'Bare Score',   data: bareV,   type:'line' },
+                ],
+                stroke:  { curve:'smooth', width:[2.5,2,1.5,1.5,1.5,1.5,2.5,2.5,2.5], dashArray:[0,0,0,0,4,4,6,6,6] },
+                colors:  ['#198754','#fd7e14','#0d6efd','#0dcaf0','#dc3545','#6f42c1','#20c997','#ffc107','#adb5bd'],
+                markers: { size:0, hover:{ sizeOffset:3 } },
+                xaxis:   { categories: labels, labels:{ rotate:-45, style:{ fontSize:'9px' }, formatter: v => v?.slice(0,7) } },
+                yaxis:   { min:-0.5, max:1.0, title:{ text:'Value' }, labels:{ formatter: v => v!=null ? v.toFixed(2):'' }, tickAmount:6 },
+                annotations: { xaxis: annots },
+                legend:  { show:true, position:'top', fontSize:'10px', onItemClick:{ toggleDataSeries:true } },
+                tooltip: { shared:true, intersect:false, y:{ formatter: v => v!=null ? v.toFixed(3):'no data' } },
+                grid:    { borderColor:'#e9ecef' },
+                noData:  { text:'No valid imagery' },
+            }).render();
+        }
     }
 
     exportAnalysisReport() {

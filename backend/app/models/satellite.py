@@ -190,3 +190,51 @@ class SatelliteTask(BaseModel):
     
     # Celery task ID
     celery_task_id = Column(String(100), nullable=True)
+
+
+class EudrFarmingAnalysis(BaseModel):
+    """
+    EUDR Farming History Analysis result for a parcel.
+    Stores detected farming start date, land clearing event, Hansen forest
+    loss data, and multi-index monthly chart data.
+    One row per parcel — re-running the analysis overwrites the existing row.
+    """
+
+    __tablename__ = "eudr_farming_analyses"
+
+    parcel_id = Column(String(36), ForeignKey("land_parcels.id"), nullable=False, index=True, unique=True)
+    farm_id   = Column(String(36), ForeignKey("farms.id"),        nullable=False, index=True)
+
+    # Farming start detection
+    farming_start_month      = Column(String(7),  nullable=True)   # "2019-03"
+    farming_start_confidence = Column(String(10), nullable=True)   # HIGH / MEDIUM / LOW
+
+    # Land clearing event
+    land_clearing_month      = Column(String(7),  nullable=True)
+    clearing_confidence      = Column(String(10), nullable=True)
+
+    # Deforestation / forest evidence
+    forest_present_before_clearing = Column(Integer, default=0)    # 0/1 bool
+    pre_2020_farming_confirmed     = Column(Integer, default=0)
+
+    # Hansen GFC data
+    hansen_treecover2000 = Column(Float,   nullable=True)  # % tree cover in 2000
+    hansen_loss_year     = Column(Integer, nullable=True)  # year of forest loss (2001-2023)
+    hansen_was_forested  = Column(Integer, nullable=True)  # 0/1 bool
+    hansen_tile          = Column(String(20), nullable=True)
+
+    # EUDR verdict
+    eudr_status  = Column(String(30), nullable=True)  # COMPLIANT / RISK / INVESTIGATE / INSUFFICIENT_DATA
+    eudr_summary = Column(String(500), nullable=True)
+    eudr_risk_flags = Column(JSON, nullable=True)
+
+    # Data quality
+    timeseries_months = Column(Integer, nullable=True)
+    cloud_gap_months  = Column(Integer, nullable=True)
+
+    # Full monthly chart data (stored as JSON for frontend chart)
+    chart_data = Column(JSON, nullable=True)
+
+    analysed_at = Column(DateTime, nullable=True)
+
+    parcel = relationship("LandParcel")
