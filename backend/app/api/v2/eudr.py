@@ -722,7 +722,7 @@ async def run_parcel_farming_analysis(
         try:
             creds = await _load_satellite_credentials()
             token = await _get_sentinel_hub_token(
-                creds.get("client_id", ""), creds.get("client_secret", "")
+                creds.get("oauth_client_id", ""), creds.get("oauth_client_secret", "")
             )
             analysis = await run_eudr_farming_analysis(token, coords, centroid_lon, centroid_lat)
 
@@ -758,7 +758,8 @@ async def run_parcel_farming_analysis(
                 await session.commit()
                 logger.info(f"[EUDR farming] Parcel {parcel_id} analysis saved: {analysis.get('eudr_status')}")
         except Exception as e:
-            logger.error(f"[EUDR farming] Analysis failed for parcel {parcel_id}: {e}")
+            detail = getattr(e, 'detail', None) or str(e) or type(e).__name__
+            logger.error(f"[EUDR farming] Analysis failed for parcel {parcel_id}: {detail}")
 
     background_tasks.add_task(_run_analysis)
 
