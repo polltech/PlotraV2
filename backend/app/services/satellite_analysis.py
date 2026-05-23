@@ -1727,22 +1727,40 @@ class SatelliteAnalysisEngine:
         client_secret = creds.get("oauth_client_secret", "")
         token         = await _get_sentinel_hub_token(client_id, client_secret)
 
-        # 1. Sentinel-2 optical timeseries (with pixel-level stDev + pct_below_035)
-        quarters = await _fetch_sentinel_hub_timeseries(token, coords)
-
-        # 2. Sentinel-1 SAR RVI — cloud-proof parallel fetch
+        # 1+2+4. Fetch S2 timeseries, SAR RVI, and weather concurrently to cut wall-clock time
         from_date = "2020-12-01"
         to_date   = datetime.utcnow().strftime("%Y-%m-%d")
-        try:
-            rvi_by_period = await _fetch_s1_rvi_timeseries(token, coords, from_date, to_date)
-            for q in quarters:
-                q["rvi"] = rvi_by_period.get(q["period_from"])
-            logger.info(f"[S1-RVI] Merged SAR RVI for {sum(1 for q in quarters if q.get('rvi') is not None)} quarters")
-        except Exception as exc:
-            logger.warning(f"[S1-RVI] Fetch failed: {exc} — proceeding without SAR data")
+
+        import asyncio as _asyncio
+
+        async def _safe_sar():
+            try:
+                return await _fetch_s1_rvi_timeseries(token, coords, from_date, to_date)
+            except Exception as exc:
+                logger.warning(f"[S1-RVI] Fetch failed: {exc} — proceeding without SAR data")
+                return {}
+
+        async def _safe_weather():
+            try:
+                raw = await fetch_weather_history(lat, lon)
+                return raw
+            except Exception as exc:
+                detail = getattr(exc, 'detail', None) or str(exc) or type(exc).__name__
+                logger.warning(f"Weather fetch failed for parcel {parcel_id}: {detail}")
+                return None
+
+        quarters, rvi_by_period, weather_raw = await _asyncio.gather(
+            _fetch_sentinel_hub_timeseries(token, coords),
+            _safe_sar(),
+            _safe_weather(),
+        )
+
+        # Merge SAR RVI into quarters
+        for q in quarters:
+            q["rvi"] = rvi_by_period.get(q["period_from"])
+        logger.info(f"[S1-RVI] Merged SAR RVI for {sum(1 for q in quarters if q.get('rvi') is not None)} quarters")
 
         # 3. CUSUM segmentation on fusion score series
-        # Run after indices are populated so fusion_score can be computed first
         for q in quarters:
             q["fusion_score"] = _compute_fusion_score(q)
 
@@ -1752,16 +1770,15 @@ class SatelliteAnalysisEngine:
             q["cusum_score"]   = cusum_scores[i]
             q["is_breakpoint"] = breakpoints[i]
 
-        # 4. Weather history — non-blocking
+        # 4. Aggregate weather (already fetched above in parallel)
         weather_quarters: List[Dict] = []
-        try:
-            weather_raw      = await fetch_weather_history(lat, lon)
-            weather_quarters = _aggregate_weather_to_quarters(weather_raw, quarters)
-            logger.info(f"Weather merged: {len(weather_quarters)} quarters, "
-                        f"{sum(1 for w in weather_quarters if w['drought_flag'])} drought quarter(s)")
-        except Exception as exc:
-            detail = getattr(exc, 'detail', None) or str(exc) or type(exc).__name__
-            logger.warning(f"Weather fetch failed for parcel {parcel_id}: {detail}")
+        if weather_raw:
+            try:
+                weather_quarters = _aggregate_weather_to_quarters(weather_raw, quarters)
+                logger.info(f"Weather merged: {len(weather_quarters)} quarters, "
+                            f"{sum(1 for w in weather_quarters if w['drought_flag'])} drought quarter(s)")
+            except Exception as exc:
+                logger.warning(f"Weather aggregation failed for parcel {parcel_id}: {exc}")
 
         if weather_quarters and parcel_id:
             try:
