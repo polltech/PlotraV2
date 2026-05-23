@@ -11634,7 +11634,7 @@ class PlotraDashboard {
             const qs = parcelId ? `?parcel_id=${parcelId}` : '';
             const data = await api.request(
                 `/farmer/farm/${farmId}/deforestation-history${qs}`,
-                { timeout: 60000 }
+                { timeout: 180000 }
             );
             // Discard if a newer loadHistoricalAnalysis call has since started
             if (mySeq !== this._historyLoadSeq) return;
