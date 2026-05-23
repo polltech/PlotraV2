@@ -886,7 +886,7 @@ async def fetch_weather_history(lat: float, lon: float) -> Dict:
         "timezone": "UTC",
     }
     try:
-        async with httpx.AsyncClient(timeout=60) as client:
+        async with httpx.AsyncClient(timeout=25) as client:
             resp = await client.get(url, params=params)
     except httpx.TimeoutException:
         raise HTTPException(status_code=504, detail="Open-Meteo weather API timed out.")
