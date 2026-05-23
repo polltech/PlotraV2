@@ -249,7 +249,7 @@ async def _fetch_sentinel_hub_timeseries(token: str, coords: List) -> List[Dict]
     }
 
     try:
-        async with httpx.AsyncClient(timeout=120) as client:
+        async with httpx.AsyncClient(timeout=75) as client:
             resp = await client.post(
                 _CDSE_STATS_URL,
                 headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
@@ -341,7 +341,7 @@ async def _fetch_s1_rvi_timeseries(token: str, coords: List, from_date: str, to_
     }
 
     try:
-        async with httpx.AsyncClient(timeout=120) as client:
+        async with httpx.AsyncClient(timeout=60) as client:
             resp = await client.post(
                 _CDSE_STATS_URL,
                 headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
@@ -1760,7 +1760,8 @@ class SatelliteAnalysisEngine:
             logger.info(f"Weather merged: {len(weather_quarters)} quarters, "
                         f"{sum(1 for w in weather_quarters if w['drought_flag'])} drought quarter(s)")
         except Exception as exc:
-            logger.warning(f"Weather fetch failed for parcel {parcel_id}: {exc}")
+            detail = getattr(exc, 'detail', None) or str(exc) or type(exc).__name__
+            logger.warning(f"Weather fetch failed for parcel {parcel_id}: {detail}")
 
         if weather_quarters and parcel_id:
             try:
