@@ -12263,21 +12263,120 @@ class PlotraDashboard {
                 </div>
             </div>
 
-            <!-- Multi-index chart title -->
+            <!-- Evidence breakdown -->
+            <div class="mb-3">
+                <div class="fw-semibold small mb-2"><i class="bi bi-list-check me-1"></i>Evidence used to reach this verdict</div>
+                <div class="table-responsive">
+                <table class="table table-sm table-bordered mb-0 small">
+                    <thead class="table-light">
+                        <tr>
+                            <th style="width:30%">Source / Tool</th>
+                            <th style="width:45%">Signal Detected</th>
+                            <th style="width:15%">Confidence</th>
+                            <th style="width:10%">Verdict</th>
+                        </tr>
+                    </thead>
+                    <tbody id="${uid}-evidence"></tbody>
+                </table>
+                </div>
+            </div>
+
+            <!-- Multi-index chart -->
             <div class="fw-semibold small text-muted mb-1">
                 <i class="bi bi-graph-up me-1"></i>
-                Monthly Land Use Signals (Jan 2017 → Today) — NDVI, SAVI, EVI, BSI, NBR, Land Use Scores
+                Monthly Land Use Signals (1990 → Today) — All Indices &amp; Land Use Scores
             </div>
-            <div id="${uid}-chart" class="mb-3"></div>
+            <div id="${uid}-chart" class="mb-2"></div>
+            <div id="${uid}-score-chart" class="mb-3"></div>
 
             <!-- Data quality footer -->
             <div class="d-flex flex-wrap gap-3 small text-muted mt-2">
                 <span><i class="bi bi-calendar3 me-1"></i>${dq.timeseries_months || 0} months analysed</span>
                 <span><i class="bi bi-cloud me-1"></i>${dq.cloud_gap_months || 0} cloud-gap months</span>
+                <span><i class="bi bi-satellite me-1"></i>${(() => { const s = [...new Set(chartData.map(m=>m.source).filter(Boolean))]; return s.includes('landsat5') ? 'Landsat 5 + Landsat 8 + Sentinel-2' : s.includes('landsat8') ? 'Landsat 8 + Sentinel-2' : 'Sentinel-2'; })()}</span>
                 ${data.analysed_at ? `<span class="ms-auto"><i class="bi bi-clock me-1"></i>Analysed ${new Date(data.analysed_at).toLocaleDateString('en-GB', {day:'2-digit',month:'short',year:'numeric'})}</span>` : ''}
             </div>`;
 
-        // ── Render multi-index + land use score chart ─────────────────────────
+        // ── Build evidence table ───────────────────────────────────────────────
+        const evTbody = document.getElementById(`${uid}-evidence`);
+        if (evTbody) {
+            const verdictCell = (supports, isGood) => {
+                const ok = isGood ? 'success' : 'danger';
+                const ic = isGood ? 'check-circle-fill' : 'x-circle-fill';
+                return `<span class="text-${ok}"><i class="bi bi-${ic}"></i></span>`;
+            };
+            const confBadge = c => {
+                const map = { HIGH:'success', MEDIUM:'warning', LOW:'secondary' };
+                return c ? `<span class="badge bg-${map[c]||'secondary'}-subtle text-${map[c]||'secondary'} border border-${map[c]||'secondary'}-subtle">${c}</span>` : '—';
+            };
+
+            // Compute summary stats from chartData
+            const validMonths   = chartData.filter(m => m.ndvi != null);
+            const avgNDVI       = validMonths.length ? (validMonths.reduce((s,m)=>s+(m.ndvi||0),0)/validMonths.length).toFixed(2) : null;
+            const peakBSI       = validMonths.length ? Math.max(...validMonths.map(m=>m.bsi||0)).toFixed(2) : null;
+            const avgForestScore= validMonths.length ? (validMonths.reduce((s,m)=>s+(m.forest_score||0),0)/validMonths.length).toFixed(2) : null;
+            const avgCropScore  = validMonths.length ? (validMonths.reduce((s,m)=>s+(m.crop_score||0),0)/validMonths.length).toFixed(2) : null;
+            const maxDisturbance= validMonths.length ? Math.max(...validMonths.map(m=>m.disturbance||0)).toFixed(2) : null;
+
+            const rows = [];
+
+            // 1 — Farming start detection
+            if (data.farming_start_month) {
+                const src = { sentinel2:'Sentinel-2 L2A', landsat8:'Landsat 8 OLI', landsat5:'Landsat 5 TM', hansen_proxy:'Hansen GFC (proxy)' }[data.farming_start_source] || data.farming_start_source;
+                rows.push([src, `Crop signal first confirmed ${fmtMonth(data.farming_start_month)}`, confBadge(data.farming_start_confidence), verdictCell('farming', data.pre_2020_farming_confirmed)]);
+            } else if (data.predates_coverage) {
+                rows.push(['Satellite Archive', 'Farm already active at start of satellite record (pre-1990)', confBadge('HIGH'), verdictCell('farming', true)]);
+            } else {
+                rows.push(['Satellite Timeseries', 'Could not confirm farming start — insufficient cloud-free data', confBadge('LOW'), '—']);
+            }
+
+            // 2 — Land clearing / disturbance
+            if (data.land_clearing_month) {
+                rows.push(['BSI + NBR (Sentinel/Landsat)', `Land clearing event detected ${fmtMonth(data.land_clearing_month)} — bare soil spike + disturbance signal (peak BSI: ${peakBSI})`, confBadge(data.clearing_confidence), verdictCell('clearing', data.forest_was_cleared)]);
+            } else if (peakBSI !== null) {
+                rows.push(['BSI (Bare Soil Index)', `No clearing event detected — peak BSI: ${peakBSI} (below threshold)`, confBadge('MEDIUM'), verdictCell('no_clearing', !data.forest_was_cleared)]);
+            }
+
+            // 3 — NDVI / vegetation density
+            if (avgNDVI !== null) {
+                const ndviHigh = parseFloat(avgNDVI) > 0.5;
+                rows.push(['NDVI (Vegetation Density)', `Mean NDVI over full period: ${avgNDVI} — ${ndviHigh ? 'dense vegetation consistent with established farming/forest' : 'moderate to low vegetation'}`, confBadge(validMonths.length > 24 ? 'HIGH' : 'MEDIUM'), '—']);
+            }
+
+            // 4 — Forest / crop score balance
+            if (avgForestScore !== null && avgCropScore !== null) {
+                const forestDom = parseFloat(avgForestScore) > parseFloat(avgCropScore);
+                rows.push(['Forest + Crop Score', `Avg forest score: ${avgForestScore} · Avg crop score: ${avgCropScore} — ${forestDom ? 'forest-dominant baseline before conversion' : 'crop-dominant throughout'}`, confBadge('MEDIUM'), verdictCell('forest', data.forest_present_before_clearing)]);
+            }
+
+            // 5 — Disturbance signal
+            if (maxDisturbance !== null) {
+                const highDist = parseFloat(maxDisturbance) > 0.5;
+                rows.push(['NBR Disturbance Index', `Peak disturbance score: ${maxDisturbance} — ${highDist ? 'significant disturbance event detected (likely clearing)' : 'no major disturbance signal'}`, confBadge(highDist ? 'HIGH' : 'LOW'), highDist ? verdictCell('dist', data.forest_was_cleared) : '—']);
+            }
+
+            // 6 — Hansen GFC
+            rows.push([
+                'Hansen GFC v1.11 (2000–2023)',
+                hansen.treecover2000 != null
+                    ? `Tree cover in 2000: ${hansen.treecover2000}%${hansen.loss_year ? ` · Forest loss year: ${hansen.loss_year}` : ' · No forest loss on record'}`
+                    : 'Hansen data unavailable for this location',
+                confBadge(hansen.treecover2000 != null ? 'HIGH' : 'LOW'),
+                hansen.treecover2000 != null ? verdictCell('hansen', !data.forest_was_cleared) : '—'
+            ]);
+
+            // 7 — Data quality
+            const totalMonths = dq.timeseries_months || 0;
+            const gapMonths   = dq.cloud_gap_months  || 0;
+            const coverage    = totalMonths > 0 ? Math.round((1 - gapMonths/totalMonths)*100) : 0;
+            rows.push(['Data Quality', `${totalMonths} months analysed · ${gapMonths} cloud-gap months · ${coverage}% valid coverage`, confBadge(coverage >= 80 ? 'HIGH' : coverage >= 60 ? 'MEDIUM' : 'LOW'), '—']);
+
+            evTbody.innerHTML = rows.map(([src, signal, conf, verd]) =>
+                `<tr><td class="fw-semibold text-nowrap">${src}</td><td>${signal}</td><td class="text-center">${conf}</td><td class="text-center">${verd}</td></tr>`
+            ).join('');
+        }
+
+        // ── Render charts ─────────────────────────────────────────────────────
         if (chartData.length > 0) {
             const labels  = chartData.map(m => m.month);
             const ndviV   = chartData.map(m => m.ndvi   ?? null);
@@ -12289,58 +12388,71 @@ class PlotraDashboard {
             const cropV   = chartData.map(m => m.crop_score    ?? null);
             const forestV = chartData.map(m => m.forest_score  ?? null);
             const bareV   = chartData.map(m => m.bare_score    ?? null);
+            const distV   = chartData.map(m => m.disturbance   ?? null);
 
-            // Mark farming start and clearing annotations
+            // Shared annotations
             const annots = [];
-            if (data.farming_start_month) {
+            if (data.farming_start_month)
                 annots.push({ x: data.farming_start_month, borderColor: '#198754', strokeDashArray: 0, borderWidth: 2,
                     label: { text: 'Farm Start', borderColor: '#198754', style: { color:'#fff', background:'#198754', fontSize:'9px' } } });
-            }
-            if (data.land_clearing_month) {
+            if (data.land_clearing_month)
                 annots.push({ x: data.land_clearing_month, borderColor: '#dc3545', strokeDashArray: 0, borderWidth: 2,
                     label: { text: 'Clearing', borderColor: '#dc3545', style: { color:'#fff', background:'#dc3545', fontSize:'9px' } } });
-            }
-            // EUDR 2020 cutoff line
-            annots.push({ x: '2020-01', borderColor: '#6f42c1', strokeDashArray: 6, borderWidth: 2,
-                label: { text: 'EUDR Cutoff', borderColor: '#6f42c1', style: { color:'#6f42c1', background:'#fff', fontSize:'9px' } } });
-            // Data source transition lines
+            annots.push({ x: '2020-12', borderColor: '#6f42c1', strokeDashArray: 6, borderWidth: 2,
+                label: { text: 'EUDR Cutoff Dec 2020', borderColor: '#6f42c1', style: { color:'#6f42c1', background:'#fff', fontSize:'9px' } } });
             const sources = chartData.map(m => m.source).filter(Boolean);
-            if (sources.includes('landsat8') || sources.includes('landsat5')) {
-                annots.push({ x: '2013-01', borderColor: '#adb5bd', strokeDashArray: 4, borderWidth: 1,
-                    label: { text: 'Landsat 8 →', borderColor: '#adb5bd', style: { color:'#6c757d', background:'#f8f9fa', fontSize:'8px' } } });
-            }
-            if (sources.includes('landsat5')) {
-                annots.push({ x: '1990-01', borderColor: '#adb5bd', strokeDashArray: 4, borderWidth: 1,
-                    label: { text: 'Landsat 5 →', borderColor: '#adb5bd', style: { color:'#6c757d', background:'#f8f9fa', fontSize:'8px' } } });
-            }
-            if (sources.includes('sentinel2')) {
-                annots.push({ x: '2017-01', borderColor: '#adb5bd', strokeDashArray: 4, borderWidth: 1,
-                    label: { text: 'Sentinel-2 →', borderColor: '#adb5bd', style: { color:'#6c757d', background:'#f8f9fa', fontSize:'8px' } } });
-            }
+            if (sources.includes('landsat5'))
+                annots.push({ x: '1990-01', borderColor: '#adb5bd', strokeDashArray: 3, borderWidth: 1,
+                    label: { text: 'L5 →', borderColor: '#adb5bd', style: { color:'#6c757d', background:'#f8f9fa', fontSize:'8px' } } });
+            if (sources.includes('landsat8'))
+                annots.push({ x: '2013-01', borderColor: '#adb5bd', strokeDashArray: 3, borderWidth: 1,
+                    label: { text: 'L8 →', borderColor: '#adb5bd', style: { color:'#6c757d', background:'#f8f9fa', fontSize:'8px' } } });
+            if (sources.includes('sentinel2'))
+                annots.push({ x: '2017-01', borderColor: '#adb5bd', strokeDashArray: 3, borderWidth: 1,
+                    label: { text: 'S2 →', borderColor: '#adb5bd', style: { color:'#6c757d', background:'#f8f9fa', fontSize:'8px' } } });
 
-            new ApexCharts(document.getElementById(`${uid}-chart`), {
-                chart:  { type:'line', height:340, toolbar:{ show:true, tools:{ download:true, zoom:true, reset:true, pan:true } }, animations:{ enabled:false }, zoom:{ enabled:true } },
-                series: [
-                    { name:'NDVI',         data: ndviV,   type:'line' },
-                    { name:'SAVI',         data: saviV,   type:'line' },
-                    { name:'EVI',          data: eviV,    type:'line' },
-                    { name:'NDMI',         data: ndmiV,   type:'line' },
-                    { name:'BSI',          data: bsiV,    type:'line' },
-                    { name:'NBR',          data: nbrV,    type:'line' },
-                    { name:'Crop Score',   data: cropV,   type:'line' },
-                    { name:'Forest Score', data: forestV, type:'line' },
-                    { name:'Bare Score',   data: bareV,   type:'line' },
-                ],
-                stroke:  { curve:'smooth', width:[2.5,2,1.5,1.5,1.5,1.5,2.5,2.5,2.5], dashArray:[0,0,0,0,4,4,6,6,6] },
-                colors:  ['#198754','#fd7e14','#0d6efd','#0dcaf0','#dc3545','#6f42c1','#20c997','#ffc107','#adb5bd'],
-                markers: { size:0, hover:{ sizeOffset:3 } },
-                xaxis:   { categories: labels, labels:{ rotate:-45, style:{ fontSize:'9px' }, formatter: v => v?.slice(0,7) } },
-                yaxis:   { min:-0.5, max:1.0, title:{ text:'Value' }, labels:{ formatter: v => v!=null ? v.toFixed(2):'' }, tickAmount:6 },
+            const commonOpts = {
+                chart:  { toolbar:{ show:true, tools:{ download:true, zoom:true, reset:true, pan:true } }, animations:{ enabled:false }, zoom:{ enabled:true } },
+                xaxis:  { categories: labels, labels:{ rotate:-45, style:{ fontSize:'9px' }, formatter: v => v?.slice(0,7) } },
                 annotations: { xaxis: annots },
-                legend:  { show:true, position:'top', fontSize:'10px', onItemClick:{ toggleDataSeries:true } },
-                tooltip: { shared:true, intersect:false, y:{ formatter: v => v!=null ? v.toFixed(3):'no data' } },
-                grid:    { borderColor:'#e9ecef' },
-                noData:  { text:'No valid imagery' },
+                legend: { show:true, position:'top', fontSize:'10px', onItemClick:{ toggleDataSeries:true } },
+                tooltip:{ shared:true, intersect:false, y:{ formatter: v => v!=null ? v.toFixed(3):'no data' } },
+                grid:   { borderColor:'#e9ecef' },
+                noData: { text:'No valid imagery' },
+            };
+
+            // Chart 1 — Raw indices (NDVI, EVI, SAVI, NDMI, BSI, NBR)
+            new ApexCharts(document.getElementById(`${uid}-chart`), {
+                ...commonOpts,
+                chart: { ...commonOpts.chart, type:'line', height:280 },
+                title: { text:'Raw Spectral Indices', align:'left', style:{ fontSize:'11px', color:'#6c757d' } },
+                series: [
+                    { name:'NDVI',  data: ndviV },
+                    { name:'EVI',   data: eviV  },
+                    { name:'SAVI',  data: saviV },
+                    { name:'NDMI',  data: ndmiV },
+                    { name:'BSI',   data: bsiV  },
+                    { name:'NBR',   data: nbrV  },
+                ],
+                stroke:  { curve:'smooth', width:[2.5,2,2,1.5,1.5,1.5], dashArray:[0,0,0,0,4,4] },
+                colors:  ['#198754','#0d6efd','#fd7e14','#0dcaf0','#dc3545','#6f42c1'],
+                yaxis:   { min:-0.6, max:1.0, labels:{ formatter: v => v!=null ? v.toFixed(2):'' }, tickAmount:6 },
+            }).render();
+
+            // Chart 2 — Derived land use scores (crop, forest, bare, disturbance)
+            new ApexCharts(document.getElementById(`${uid}-score-chart`), {
+                ...commonOpts,
+                chart: { ...commonOpts.chart, type:'line', height:220 },
+                title: { text:'Land Use Scores (0–1) — basis for verdict', align:'left', style:{ fontSize:'11px', color:'#6c757d' } },
+                series: [
+                    { name:'Crop Score',    data: cropV   },
+                    { name:'Forest Score',  data: forestV },
+                    { name:'Bare Score',    data: bareV   },
+                    { name:'Disturbance',   data: distV   },
+                ],
+                stroke:  { curve:'smooth', width:[2.5,2.5,2,2], dashArray:[0,0,4,6] },
+                colors:  ['#20c997','#198754','#fd7e14','#dc3545'],
+                yaxis:   { min:0, max:1.0, labels:{ formatter: v => v!=null ? v.toFixed(2):'' }, tickAmount:5 },
             }).render();
         }
     }
