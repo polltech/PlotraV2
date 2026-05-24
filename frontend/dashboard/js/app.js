@@ -12218,8 +12218,12 @@ class PlotraDashboard {
                     <div class="card border-0 bg-light h-100">
                         <div class="card-body py-2 px-3">
                             <div class="text-muted small mb-1"><i class="bi bi-calendar-check me-1"></i>Farming Started</div>
-                            <div class="fw-bold">${fmtMonth(data.farming_start_month)}</div>
-                            <div class="small ${conf(data.farming_start_confidence)}">${data.farming_start_confidence || '—'} confidence</div>
+                            <div class="fw-bold">${data.predates_coverage && !data.farming_start_month ? 'Before 2017' : fmtMonth(data.farming_start_month)}</div>
+                            <div class="small ${conf(data.farming_start_confidence)}">${
+                                data.farming_start_source === 'hansen_proxy' ? '<span class="text-warning">via Hansen loss year</span>' :
+                                data.farming_start_source === 'pre_2017_unknown' ? '<span class="text-muted">predates satellite data</span>' :
+                                data.farming_start_confidence ? `${data.farming_start_confidence} confidence` : '—'
+                            }</div>
                         </div>
                     </div>
                 </div>
@@ -12235,9 +12239,9 @@ class PlotraDashboard {
                 <div class="col-6 col-md-3">
                     <div class="card border-0 bg-light h-100">
                         <div class="card-body py-2 px-3">
-                            <div class="text-muted small mb-1"><i class="bi bi-map me-1"></i>Hansen Forest Loss</div>
-                            <div class="fw-bold">${hansen.loss_year ? `Year ${hansen.loss_year}` : 'None detected'}</div>
-                            <div class="small text-muted">Cover 2000: ${hansen.treecover2000 != null ? hansen.treecover2000 + '%' : '—'}</div>
+                            <div class="text-muted small mb-1"><i class="bi bi-tree-fill me-1"></i>Previously Forested</div>
+                            <div class="fw-bold ${hansen.was_forested ? 'text-danger' : 'text-success'}">${hansen.was_forested == null ? '—' : hansen.was_forested ? 'Yes (forested)' : 'No forest detected'}</div>
+                            <div class="small text-muted">${hansen.loss_year ? `Loss year: ${hansen.loss_year}` : `Cover 2000: ${hansen.treecover2000 != null ? hansen.treecover2000 + '%' : '—'}`}</div>
                         </div>
                     </div>
                 </div>

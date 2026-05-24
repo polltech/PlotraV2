@@ -517,13 +517,15 @@ def _detect_farming_start(monthly: List[Dict]) -> Dict:
       - land_clearing_month: first month where bare/disturbance score spikes
       - farming_start_month: first month of consistent crop signal after clearing
       - pre_2020_confirmed: True if farming_start_month < "2020-01"
+      - predates_coverage: True if land was already being farmed at start of Sentinel-2 record (2017)
       - confidence: HIGH / MEDIUM / LOW based on cloud gap months around event
 
     Algorithm:
       1. Score each month using _score_month_land_use()
-      2. Find the first persistent bare/disturbance event (≥1 consecutive bare month)
-      3. Find first crop month after that bare event (crop_score > 0.35)
-      4. Compute confidence from valid_pixels around the event
+      2. Check if land was already farmed in first 6 months (predates 2017 coverage)
+      3. Find the first persistent bare/disturbance event (land clearing)
+      4. Find first crop month after that bare event (crop_score > 0.35)
+      5. Compute confidence from valid_pixels around the event
     """
     EUDR_CUTOFF = "2020-01"
     CROP_THRESHOLD    = 0.35
@@ -534,6 +536,15 @@ def _detect_farming_start(monthly: List[Dict]) -> Dict:
     for m in monthly:
         scores = _score_month_land_use(m)
         scored.append({**m, **scores})
+
+    # --- Check if land was ALREADY being farmed at the start of the satellite record ---
+    # If the first 6 valid months show consistent crop signal, the farm predates our data (pre-2017).
+    # We must NOT report Jan-2017 as the farming start in this case.
+    first_valid = [m for m in scored[:12] if m.get("crop_score") is not None]
+    predates_coverage = (
+        len(first_valid) >= 4 and
+        sum(1 for m in first_valid if m["crop_score"] >= CROP_THRESHOLD) >= 3
+    )
 
     # --- Find clearing / disturbance event ---
     clearing_month   = None
@@ -551,8 +562,10 @@ def _detect_farming_start(monthly: List[Dict]) -> Dict:
                 clearing_idx   = i
                 break
 
-    # --- Find farming start (first crop month after clearing, or ever) ---
-    search_from = clearing_idx if clearing_idx is not None else 0
+    # --- Find farming start (first crop month after clearing) ---
+    # Only search if we found a clearing event, OR if land was not already farmed at baseline.
+    # If land was already farmed at the start and no clearing was found, the start predates our data.
+    search_from = clearing_idx if clearing_idx is not None else (0 if not predates_coverage else len(scored))
     farming_start_month  = None
     farming_start_idx    = None
     consecutive_crop     = 0
@@ -622,6 +635,7 @@ def _detect_farming_start(monthly: List[Dict]) -> Dict:
         "clearing_confidence":   clearing_confidence,
         "farming_start_month":   farming_start_month,
         "farming_start_confidence": farming_confidence,
+        "predates_coverage":     predates_coverage,
         "pre_2020_confirmed":    pre_2020,
         "forest_present_before_clearing": forest_before,
         "total_months_analysed": len(monthly),
@@ -715,32 +729,81 @@ async def run_eudr_farming_analysis(
     # Detect farming start from multi-index monthly signals
     detection = _detect_farming_start(monthly_data)
 
-    # Synthesise EUDR verdict
-    farming_start  = detection.get("farming_start_month")
-    clearing_month = detection.get("clearing_month")
-    pre_2020       = detection.get("pre_2020_confirmed", False)
+    farming_start     = detection.get("farming_start_month")
+    clearing_month    = detection.get("clearing_month")
+    predates_coverage = detection.get("predates_coverage", False)
+
+    # If Sentinel-2 shows the land was already farmed from 2017 and no clearing event found,
+    # use Hansen forest loss year to estimate when farming/clearing started (extends back to 2001).
+    farming_start_source = "sentinel2"
+    if predates_coverage and farming_start is None and hansen_data.get("loss_year"):
+        loss_yr = hansen_data["loss_year"]
+        farming_start = f"{loss_yr}-01"           # approximate: year of forest loss
+        farming_start_source = "hansen_proxy"
+        logger.info(f"Farming predates Sentinel-2 coverage; using Hansen loss year {loss_yr} as proxy")
+    elif predates_coverage and farming_start is None:
+        farming_start_source = "pre_2017_unknown"
+
+    pre_2020 = (farming_start is not None and farming_start < "2020-01") or predates_coverage
     forest_cleared = (
         hansen_data.get("was_forested") and
         hansen_data.get("loss_year") is not None and
         hansen_data.get("loss_year") >= 2021
     )
 
-    if pre_2020 and not forest_cleared:
+    def _fmt_start(s):
+        if s is None:
+            return "unknown"
+        try:
+            y, m = s.split("-")
+            from datetime import date
+            return date(int(y), int(m), 1).strftime("%B %Y")
+        except Exception:
+            return s
+
+    if predates_coverage and farming_start_source == "pre_2017_unknown":
         eudr_status = "COMPLIANT"
         eudr_summary = (
-            f"Farming confirmed from {farming_start} (pre-2020). "
+            "Farm was already established before 2017 (predates satellite coverage). "
+            "No Hansen forest loss detected post-2020. EUDR Compliant."
+        )
+    elif predates_coverage and farming_start_source == "hansen_proxy":
+        loss_yr = hansen_data["loss_year"]
+        was_forested = hansen_data.get("was_forested", False)
+        if loss_yr >= 2021:
+            eudr_status = "RISK"
+            eudr_summary = (
+                f"Hansen shows forest cleared in {loss_yr} at this location. "
+                "Post-2020 deforestation detected. EUDR NON-COMPLIANT."
+            )
+        elif was_forested and loss_yr >= 2000:
+            eudr_status = "COMPLIANT"
+            eudr_summary = (
+                f"Forest loss detected in {loss_yr} (pre-2020). "
+                "Farming predates the EUDR Dec 2020 cutoff. EUDR Compliant."
+            )
+        else:
+            eudr_status = "COMPLIANT"
+            eudr_summary = (
+                f"Farm established ~{loss_yr} (predates 2020). "
+                "No post-2020 deforestation. EUDR Compliant."
+            )
+    elif pre_2020 and not forest_cleared:
+        eudr_status = "COMPLIANT"
+        eudr_summary = (
+            f"Farming confirmed from {_fmt_start(farming_start)} (pre-2020). "
             "No post-2020 deforestation detected."
         )
     elif forest_cleared and farming_start and farming_start >= "2021-01":
         eudr_status = "RISK"
         eudr_summary = (
-            f"Forest cleared in {hansen_data['loss_year']} and farming started {farming_start}. "
+            f"Forest cleared in {hansen_data['loss_year']} and farming started {_fmt_start(farming_start)}. "
             "Likely post-2020 deforestation. EUDR NON-COMPLIANT."
         )
     elif forest_cleared and pre_2020:
         eudr_status = "INVESTIGATE"
         eudr_summary = (
-            f"Farming pre-2020 confirmed ({farming_start}) but Hansen shows forest loss "
+            f"Farming pre-2020 confirmed ({_fmt_start(farming_start)}) but Hansen shows forest loss "
             f"in {hansen_data['loss_year']} at this location. Manual review required."
         )
     elif farming_start is None:
@@ -748,7 +811,7 @@ async def run_eudr_farming_analysis(
         eudr_summary = "Could not determine farming start date. Insufficient cloud-free imagery."
     else:
         eudr_status  = "PENDING_REVIEW"
-        eudr_summary = f"Farming start detected {farming_start}. Additional evidence recommended."
+        eudr_summary = f"Farming start detected {_fmt_start(farming_start)}. Additional evidence recommended."
 
     risk_flags = []
     if forest_cleared:
@@ -761,6 +824,8 @@ async def run_eudr_farming_analysis(
     return {
         "farming_start_month":           farming_start,
         "farming_start_confidence":      detection.get("farming_start_confidence"),
+        "farming_start_source":          farming_start_source,
+        "predates_coverage":             predates_coverage,
         "land_clearing_month":           clearing_month,
         "clearing_confidence":           detection.get("clearing_confidence"),
         "pre_2020_farming_confirmed":    pre_2020,
