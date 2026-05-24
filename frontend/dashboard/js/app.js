@@ -5823,20 +5823,27 @@ class PlotraDashboard {
                 </div>
             </div>
 
-            <!-- 4-Index Timeline Chart -->
+            <!-- Chart 1: Raw spectral indices -->
             <div class="px-3 mb-1">
                 <h6 class="text-muted mb-1 d-flex align-items-center gap-2">
-                    <i class="bi bi-graph-up"></i>4-Index Vegetation Analysis — Dec 2020 to Today (quarterly)
-                    <span class="badge bg-secondary fw-normal" title="Fusion = NDVI×0.35 + EVI×0.25 + SAVI×0.20 + NDMI×0.20">Fusion Score</span>
-                    <span class="ms-auto text-muted fw-normal small"><i class="bi bi-hand-index me-1"></i>Click events below to see reasoning</span>
+                    <i class="bi bi-graph-up"></i>Raw Spectral Indices — Dec 2020 to Today (quarterly)
+                    <span class="ms-auto text-muted fw-normal small"><i class="bi bi-hand-index me-1"></i>Click events below to expand reasoning</span>
                 </h6>
                 <div id="multiIndexChart"></div>
             </div>
 
-            <!-- Rainfall / Water Deficit Chart -->
+            <!-- Chart 2: Derived land use scores -->
+            <div class="px-3 mb-1">
+                <h6 class="text-muted mb-1">
+                    <i class="bi bi-layers me-1"></i>Land Use Scores — basis for event classification
+                </h6>
+                <div id="landUseScoreChart"></div>
+            </div>
+
+            <!-- Chart 3: Rainfall / Water Deficit -->
             <div class="px-3 mb-3">
                 <h6 class="text-muted mb-1"><i class="bi bi-bar-chart me-1"></i>Rainfall &amp; Water Deficit
-                    <span class="fw-normal small text-muted">(quarterly — orange bars = drought quarters)</span>
+                    <span class="fw-normal small text-muted">(quarterly — orange = drought quarters)</span>
                 </h6>
                 <div id="rainfallChart"></div>
             </div>
@@ -5866,98 +5873,119 @@ class PlotraDashboard {
             </div>`;
 
         // ── chart data ────────────────────────────────────────────────────────
-        const labels      = quarters.map(q => q.period_from);
-        const ndviVals    = quarters.map(q => q.ndvi    ?? null);
-        const eviVals     = quarters.map(q => q.evi     ?? null);
-        const saviVals    = quarters.map(q => q.savi    ?? null);
-        const ndmiVals    = quarters.map(q => q.ndmi    ?? null);
-        const fusionVals  = quarters.map(q => q.fusion_score ?? null);
+        const labels     = quarters.map(q => q.period_from);
+        const ndviVals   = quarters.map(q => q.ndvi  ?? null);
+        const eviVals    = quarters.map(q => q.evi   ?? null);
+        const saviVals   = quarters.map(q => q.savi  ?? null);
+        const ndmiVals   = quarters.map(q => q.ndmi  ?? null);
+        const bsiVals    = quarters.map(q => q.bsi   ?? null);
+        const nbrVals    = quarters.map(q => q.nbr   ?? null);
 
-        // Drought shaded bands on both charts
+        // Derive land use scores from quarterly indices (same formula as backend)
+        const scoreQ = quarters.map(q => {
+            const { ndvi, evi, savi, ndmi, bsi, nbr } = q;
+            if (ndvi == null) return { forest:null, crop:null, bare:null, dist:null };
+            const clamp = (v,lo,hi) => Math.min(Math.max(v,lo),hi);
+            let forest = 0;
+            if (ndvi!=null) forest += clamp((ndvi-0.4)/0.4,0,1)*0.35;
+            if (evi !=null) forest += clamp((evi -0.3)/0.4,0,1)*0.20;
+            if (ndmi!=null) forest += clamp((ndmi-0.0)/0.4,0,1)*0.25;
+            if (nbr !=null) forest += clamp((nbr -0.3)/0.4,0,1)*0.20;
+            let crop = 0;
+            if (ndvi!=null) crop += (ndvi>=0.2&&ndvi<=0.8) ? (1-Math.abs(ndvi-0.5)/0.3)*0.35 : 0;
+            if (savi!=null) crop += clamp((savi-0.1)/0.4,0,1)*0.35;
+            if (ndmi!=null) crop += (ndmi>=-0.1&&ndmi<=0.3) ? (1-Math.abs(ndmi-0.1)/0.2)*0.30 : 0;
+            let bare = 0;
+            if (bsi !=null) bare += clamp((bsi +0.1)/0.3,0,1)*0.40;
+            if (ndvi!=null) bare += clamp((0.25-ndvi)/0.25,0,1)*0.35;
+            if (ndmi!=null) bare += clamp((-ndmi)/0.2,0,1)*0.25;
+            let dist = 0;
+            if (nbr!=null) dist += clamp((0.5-nbr)/0.5,0,1)*0.5;
+            if (bsi!=null) dist += clamp((bsi+0.1)/0.4,0,1)*0.5;
+            return {
+                forest: +clamp(forest,0,1).toFixed(3),
+                crop:   +clamp(crop,0,1).toFixed(3),
+                bare:   +clamp(bare,0,1).toFixed(3),
+                dist:   +clamp(dist,0,1).toFixed(3),
+            };
+        });
+
+        // Shared annotations: drought bands + event markers
         const droughtBands = weather.filter(w => w.drought_flag).map(w => ({
             x: w.period_from, x2: w.period_to,
             fillColor: '#fd7e14', opacity: 0.10,
-            label: {
-                text: '☀ Drought',
-                borderColor: '#fd7e14',
+            label: { text: '☀ Drought', borderColor: '#fd7e14',
                 style: { color: '#fd7e14', background: 'rgba(255,255,255,0.85)', fontSize: '9px' },
-                position: 'top', offsetY: 0,
-            }
+                position: 'top', offsetY: 0 }
         }));
 
-        // Event vertical annotations (exclude seasonal dips to reduce noise)
         const eventAnnotations = events
             .filter(e => !['SEASONAL_DIP'].includes(e.event_type))
             .map(e => {
                 const col = e.eudr_violation ? '#dc3545'
-                    : e.drought_induced ? '#fd7e14'
+                    : e.drought_induced       ? '#fd7e14'
                     : e.event_type === 'CANOPY_DISTURBANCE' ? '#0dcaf0'
-                    : e.event_type === 'REGROWTH' ? '#198754'
-                    : '#6c757d';
-                return {
-                    x: e.period_from,
-                    borderColor: col,
-                    strokeDashArray: 3,
-                    label: {
-                        text: e.event_type.replace(/_/g, ' '),
-                        style: { color: '#fff', background: col, fontSize: '9px' },
-                        offsetY: -4,
-                    }
-                };
+                    : e.event_type === 'REGROWTH' ? '#198754' : '#6c757d';
+                return { x: e.period_from, borderColor: col, strokeDashArray: 3,
+                    label: { text: e.event_type.replace(/_/g,' '),
+                        style: { color:'#fff', background:col, fontSize:'9px' }, offsetY:-4 } };
             });
 
-        // Reference line at deforestation threshold
-        const thresholdLines = [
-            { y: 0.35, borderColor: '#dc3545', strokeDashArray: 5,
-              label: { text: 'Deforestation threshold', style: { fontSize: '9px', color: '#dc3545' } } },
-            { y: 0.45, borderColor: '#fd7e14', strokeDashArray: 5,
-              label: { text: 'Vegetation loss threshold', style: { fontSize: '9px', color: '#fd7e14' } } },
-        ];
+        const sharedAnnotations = { xaxis: [...droughtBands, ...eventAnnotations] };
+        const chartCommon = {
+            toolbar: { show:true, tools:{ download:true, zoom:true, reset:true, pan:true } },
+            animations: { enabled:false }, zoom: { enabled:true },
+        };
 
-        // ── 4-index multi-line chart ──────────────────────────────────────────
+        // ── Chart 1: Raw spectral indices ─────────────────────────────────────
         new ApexCharts(document.getElementById('multiIndexChart'), {
-            chart: {
-                type: 'line', height: 300,
-                toolbar: { show: true, tools: { download: true, zoom: true, reset: true, pan: true } },
-                animations: { enabled: false },
-                zoom: { enabled: true },
-            },
+            chart: { ...chartCommon, type:'line', height:280 },
+            title: { text:'Raw Spectral Indices', align:'left', style:{ fontSize:'11px', color:'#6c757d' } },
             series: [
-                { name: 'Fusion Score', type: 'line', data: fusionVals },
-                { name: 'NDVI',         type: 'line', data: ndviVals  },
-                { name: 'EVI',          type: 'line', data: eviVals   },
-                { name: 'SAVI',         type: 'line', data: saviVals  },
-                { name: 'NDMI',         type: 'line', data: ndmiVals  },
+                { name:'NDVI', data: ndviVals },
+                { name:'EVI',  data: eviVals  },
+                { name:'SAVI', data: saviVals },
+                { name:'NDMI', data: ndmiVals },
+                { name:'BSI',  data: bsiVals  },
+                { name:'NBR',  data: nbrVals  },
             ],
-            fill:   { type: ['solid','solid','solid','solid','solid'], opacity: [0,0,0,0,0] },
-            stroke: { curve: 'smooth', width: [3, 2.5, 1.5, 1.5, 1.5], dashArray: [6, 0, 0, 0, 0] },
-            colors: ['#6f42c1', '#198754', '#0d6efd', '#fd7e14', '#0dcaf0'],
-            markers: { size: [5, 4, 2, 2, 2], hover: { sizeOffset: 3 } },
-            xaxis: { categories: labels, labels: { rotate: -45, style: { fontSize: '10px' } } },
-            yaxis: {
-                min: -0.3, max: 1.0,
-                title: { text: 'Index Value' },
-                labels: { formatter: v => v != null ? v.toFixed(2) : '' },
-                tickAmount: 6,
+            stroke:  { curve:'smooth', width:[2.5,2,2,1.5,1.5,1.5], dashArray:[0,0,0,0,4,4] },
+            colors:  ['#198754','#0d6efd','#fd7e14','#0dcaf0','#dc3545','#6f42c1'],
+            markers: { size:3, hover:{ sizeOffset:3 } },
+            xaxis:   { categories:labels, labels:{ rotate:-45, style:{ fontSize:'10px' } } },
+            yaxis:   { min:-0.6, max:1.0, title:{ text:'Value' }, labels:{ formatter: v => v!=null?v.toFixed(2):'' }, tickAmount:6 },
+            annotations: { ...sharedAnnotations,
+                yaxis: [
+                    { y:0.35, borderColor:'#dc3545', strokeDashArray:5, label:{ text:'Deforestation threshold', style:{ fontSize:'9px', color:'#dc3545' } } },
+                    { y:0.45, borderColor:'#fd7e14', strokeDashArray:5, label:{ text:'Vegetation loss threshold', style:{ fontSize:'9px', color:'#fd7e14' } } },
+                ]
             },
-            annotations: {
-                xaxis: [...droughtBands, ...eventAnnotations],
-                yaxis: thresholdLines,
-            },
-            legend: {
-                show: true, position: 'top', fontSize: '11px',
-                markers: { width: 12, height: 3 },
-                tooltipHoverFormatter: (n, opts) => {
-                    const v = opts.w.globals.series[opts.seriesIndex][opts.dataPointIndex];
-                    return v != null ? n + ': <b>' + v.toFixed(3) + '</b>' : n + ': no data';
-                },
-            },
-            tooltip: {
-                shared: true, intersect: false,
-                y: { formatter: v => v != null ? v.toFixed(3) : 'cloud gap' },
-            },
-            noData: { text: 'No valid imagery' },
-            grid:   { borderColor: '#e9ecef' },
+            legend:  { show:true, position:'top', fontSize:'10px', onItemClick:{ toggleDataSeries:true } },
+            tooltip: { shared:true, intersect:false, y:{ formatter: v => v!=null?v.toFixed(3):'cloud gap' } },
+            grid:    { borderColor:'#e9ecef' },
+            noData:  { text:'No valid imagery' },
+        }).render();
+
+        // ── Chart 2: Derived land use scores ─────────────────────────────────
+        new ApexCharts(document.getElementById('landUseScoreChart'), {
+            chart: { ...chartCommon, type:'line', height:220 },
+            title: { text:'Land Use Scores (0–1) — basis for event classification', align:'left', style:{ fontSize:'11px', color:'#6c757d' } },
+            series: [
+                { name:'Crop Score',   data: scoreQ.map(s=>s.crop)   },
+                { name:'Forest Score', data: scoreQ.map(s=>s.forest) },
+                { name:'Bare Score',   data: scoreQ.map(s=>s.bare)   },
+                { name:'Disturbance',  data: scoreQ.map(s=>s.dist)   },
+            ],
+            stroke:  { curve:'smooth', width:[2.5,2.5,2,2], dashArray:[0,0,4,6] },
+            colors:  ['#20c997','#198754','#fd7e14','#dc3545'],
+            markers: { size:3, hover:{ sizeOffset:3 } },
+            xaxis:   { categories:labels, labels:{ rotate:-45, style:{ fontSize:'10px' } } },
+            yaxis:   { min:0, max:1.0, labels:{ formatter: v => v!=null?v.toFixed(2):'' }, tickAmount:5 },
+            annotations: sharedAnnotations,
+            legend:  { show:true, position:'top', fontSize:'10px', onItemClick:{ toggleDataSeries:true } },
+            tooltip: { shared:true, intersect:false, y:{ formatter: v => v!=null?v.toFixed(3):'no data' } },
+            grid:    { borderColor:'#e9ecef' },
+            noData:  { text:'No valid imagery' },
         }).render();
 
         // ── rainfall + water deficit chart ────────────────────────────────────
