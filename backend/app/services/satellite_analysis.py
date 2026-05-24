@@ -197,6 +197,64 @@ function evaluatePixel(s) {
 }
 """
 
+# Landsat 8/9 OLI-TIRS — same indices as S2 but different band mapping
+# B02=Blue, B03=Green, B04=Red, B05=NIR, B06=SWIR1, B07=SWIR2 (30m resolution)
+_LANDSAT8_EVALSCRIPT = """
+//VERSION=3
+function setup() {
+  return {
+    input: [{bands: ["B02","B03","B04","B05","B06","B07"]}],
+    output: [
+      {id: "ndvi", bands: 1, sampleType: "FLOAT32"},
+      {id: "evi",  bands: 1, sampleType: "FLOAT32"},
+      {id: "savi", bands: 1, sampleType: "FLOAT32"},
+      {id: "ndmi", bands: 1, sampleType: "FLOAT32"},
+      {id: "bsi",  bands: 1, sampleType: "FLOAT32"},
+      {id: "nbr",  bands: 1, sampleType: "FLOAT32"},
+      {id: "dataMask", bands: 1}
+    ]
+  };
+}
+function evaluatePixel(s) {
+  let ndvi = (s.B05 - s.B04) / (s.B05 + s.B04 + 1e-6);
+  let evi  = 2.5 * (s.B05 - s.B04) / (s.B05 + 6*s.B04 - 7.5*s.B02 + 1 + 1e-6);
+  let savi = 1.5 * (s.B05 - s.B04) / (s.B05 + s.B04 + 0.5 + 1e-6);
+  let ndmi = (s.B05 - s.B06) / (s.B05 + s.B06 + 1e-6);
+  let bsi  = ((s.B06 + s.B04) - (s.B05 + s.B02)) / ((s.B06 + s.B04) + (s.B05 + s.B02) + 1e-6);
+  let nbr  = (s.B05 - s.B07) / (s.B05 + s.B07 + 1e-6);
+  return { ndvi:[ndvi], evi:[evi], savi:[savi], ndmi:[ndmi], bsi:[bsi], nbr:[nbr], dataMask:[1] };
+}
+"""
+
+# Landsat 4-5 TM — covers 1982-2013 (best source for pre-2013 history)
+# B01=Blue, B02=Green, B03=Red, B04=NIR, B05=SWIR1, B07=SWIR2 (B06 is thermal, skip)
+_LANDSAT5_EVALSCRIPT = """
+//VERSION=3
+function setup() {
+  return {
+    input: [{bands: ["B01","B02","B03","B04","B05","B07"]}],
+    output: [
+      {id: "ndvi", bands: 1, sampleType: "FLOAT32"},
+      {id: "evi",  bands: 1, sampleType: "FLOAT32"},
+      {id: "savi", bands: 1, sampleType: "FLOAT32"},
+      {id: "ndmi", bands: 1, sampleType: "FLOAT32"},
+      {id: "bsi",  bands: 1, sampleType: "FLOAT32"},
+      {id: "nbr",  bands: 1, sampleType: "FLOAT32"},
+      {id: "dataMask", bands: 1}
+    ]
+  };
+}
+function evaluatePixel(s) {
+  let ndvi = (s.B04 - s.B03) / (s.B04 + s.B03 + 1e-6);
+  let evi  = 2.5 * (s.B04 - s.B03) / (s.B04 + 6*s.B03 - 7.5*s.B01 + 1 + 1e-6);
+  let savi = 1.5 * (s.B04 - s.B03) / (s.B04 + s.B03 + 0.5 + 1e-6);
+  let ndmi = (s.B04 - s.B05) / (s.B04 + s.B05 + 1e-6);
+  let bsi  = ((s.B05 + s.B03) - (s.B04 + s.B01)) / ((s.B05 + s.B03) + (s.B04 + s.B01) + 1e-6);
+  let nbr  = (s.B04 - s.B07) / (s.B04 + s.B07 + 1e-6);
+  return { ndvi:[ndvi], evi:[evi], savi:[savi], ndmi:[ndmi], bsi:[bsi], nbr:[nbr], dataMask:[1] };
+}
+"""
+
 # Sentinel-1 GRD — SAR Radar Vegetation Index (RVI)
 # RVI = 4*VH / (VV+VH): ranges 0–1, higher = denser vegetation canopy.
 # Cloud-proof: radar penetrates clouds/smoke. Sensitive to canopy structure.
@@ -369,7 +427,98 @@ async def _fetch_s1_rvi_timeseries(token: str, coords: List, from_date: str, to_
 
 
 # ---------------------------------------------------------------------------
-# EUDR Farming History — Monthly timeseries (2017 → today)
+# EUDR Farming History — Landsat monthly timeseries (1990 → 2016)
+# Extends farming start detection back to 1990 using Landsat 5 and 8.
+# Same indices as Sentinel-2 but adapted band mapping. 30m resolution.
+# ---------------------------------------------------------------------------
+
+async def _fetch_landsat_monthly_timeseries(
+    token: str,
+    coords: List,
+    dataset_type: str,
+    from_year: int,
+    to_year: int,
+    evalscript: str,
+    source_label: str,
+) -> List[Dict]:
+    """
+    Fetch monthly Landsat timeseries for a given period via Sentinel Hub Stats API.
+    dataset_type: "landsat-ot-l2" (L8/9, 2013+) or "landsat-tm-l2" (L4-5, 1982-2013)
+    Returns [] on any error so the caller can proceed with remaining sources.
+    """
+    from_date = f"{from_year}-01-01T00:00:00Z"
+    to_date   = f"{to_year}-12-31T23:59:59Z"
+
+    payload = {
+        "input": {
+            "bounds": {"geometry": {"type": "Polygon", "coordinates": [coords]}},
+            "data": [{
+                "type": dataset_type,
+                "dataFilter": {"timeRange": {"from": from_date, "to": to_date}, "maxCloudCoverage": 90}
+            }]
+        },
+        "aggregation": {
+            "timeRange": {"from": from_date, "to": to_date},
+            "aggregationInterval": {"of": "P1M"},
+            "evalscript": evalscript,
+            "resx": 30,
+            "resy": 30,
+        },
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=180) as client:
+            resp = await client.post(
+                _CDSE_STATS_URL,
+                headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+                json=payload,
+            )
+    except (httpx.TimeoutException, httpx.ConnectError) as exc:
+        logger.warning(f"[{source_label}] Fetch failed: {exc} — skipping")
+        return []
+
+    if resp.status_code not in (200, 206):
+        logger.warning(f"[{source_label}] HTTP {resp.status_code}: {resp.text[:200]} — skipping")
+        return []
+
+    intervals = resp.json().get("data", [])
+
+    def _sv(outputs, name, key, default=None):
+        try:
+            v = float(outputs.get(name, {}).get("bands", {}).get("B0", {}).get("stats", {}).get(key, default))
+            return None if (math.isnan(v) or math.isinf(v)) else v
+        except (TypeError, ValueError):
+            return default
+
+    results = []
+    for iv in intervals:
+        outputs      = iv.get("outputs", {})
+        sample_count = _sv(outputs, "ndvi", "sampleCount", 0) or 0
+        nodata_count = _sv(outputs, "ndvi", "noDataCount", 0) or 0
+        valid        = int(sample_count - nodata_count)
+        ndvi_mean    = _sv(outputs, "ndvi", "mean") if valid > 0 else None
+        results.append({
+            "month":           iv.get("interval", {}).get("from", "")[:7],
+            "period_from":     iv.get("interval", {}).get("from", "")[:10],
+            "period_to":       iv.get("interval", {}).get("to",   "")[:10],
+            "source":          source_label,
+            "ndvi":  round(ndvi_mean, 3) if ndvi_mean is not None else None,
+            "evi":   round(_sv(outputs, "evi",  "mean", 0), 3) if valid > 0 else None,
+            "savi":  round(_sv(outputs, "savi", "mean", 0), 3) if valid > 0 else None,
+            "ndmi":  round(_sv(outputs, "ndmi", "mean", 0), 3) if valid > 0 else None,
+            "bsi":   round(_sv(outputs, "bsi",  "mean", 0), 3) if valid > 0 else None,
+            "nbr":   round(_sv(outputs, "nbr",  "mean", 0), 3) if valid > 0 else None,
+            "cloud_cover_pct": round(nodata_count / max(1, sample_count) * 100, 1),
+            "valid_pixels":    valid,
+        })
+
+    valid_count = sum(1 for r in results if r["ndvi"] is not None)
+    logger.info(f"[{source_label}] {len(results)} months fetched ({from_year}-{to_year}), {valid_count} with valid data")
+    return results
+
+
+# ---------------------------------------------------------------------------
+# EUDR Farming History — Sentinel-2 monthly timeseries (2017 → today)
 # Uses same evalscript but monthly aggregation for farming start detection.
 # ---------------------------------------------------------------------------
 
@@ -442,6 +591,7 @@ async def _fetch_eudr_monthly_timeseries(token: str, coords: List) -> List[Dict]
             "month":        iv.get("interval", {}).get("from", "")[:7],   # "2019-03"
             "period_from":  iv.get("interval", {}).get("from", "")[:10],
             "period_to":    iv.get("interval", {}).get("to",   "")[:10],
+            "source":       "sentinel2",
             "ndvi":  round(ndvi_mean, 3) if ndvi_mean is not None else None,
             "evi":   round(_sv(outputs, "evi",  "mean", 0), 3) if valid > 0 else None,
             "savi":  round(_sv(outputs, "savi", "mean", 0), 3) if valid > 0 else None,
@@ -628,6 +778,7 @@ def _detect_farming_start(monthly: List[Dict]) -> Dict:
             "bare_score":    m.get("bare_score"),
             "disturbance":   m.get("disturbance"),
             "cloud_cover_pct": m.get("cloud_cover_pct"),
+            "source":        m.get("source", "sentinel2"),
         })
 
     return {
@@ -721,28 +872,70 @@ async def run_eudr_farming_analysis(
     """
     import asyncio as _asyncio
 
-    # Run satellite timeseries and Hansen lookup concurrently
-    monthly_task = _fetch_eudr_monthly_timeseries(token, coords)
-    hansen_task  = _hansen_forest_loss(centroid_lon, centroid_lat)
-    monthly_data, hansen_data = await _asyncio.gather(monthly_task, hansen_task)
+    # Run all four sources concurrently:
+    #   Landsat 5  (landsat-tm-l2)  1990–2012: 30m, extends detection back to 1990
+    #   Landsat 8  (landsat-ot-l2)  2013–2016: 30m, bridges to Sentinel-2
+    #   Sentinel-2 (sentinel-2-l2a) 2017–today: 10m, best resolution
+    #   Hansen GFC  —  forest loss tile (no token needed)
+    s2_task  = _fetch_eudr_monthly_timeseries(token, coords)
+    l8_task  = _fetch_landsat_monthly_timeseries(
+        token, coords, "landsat-ot-l2", 2013, 2016, _LANDSAT8_EVALSCRIPT, "landsat8"
+    )
+    l5_task  = _fetch_landsat_monthly_timeseries(
+        token, coords, "landsat-tm-l2", 1990, 2012, _LANDSAT5_EVALSCRIPT, "landsat5"
+    )
+    hansen_task = _hansen_forest_loss(centroid_lon, centroid_lat)
 
-    # Detect farming start from multi-index monthly signals
+    s2_data, l8_data, l5_data, hansen_data = await _asyncio.gather(
+        s2_task, l8_task, l5_task, hansen_task
+    )
+
+    # Merge chronologically; prefer higher-resolution source when months overlap
+    # Priority: sentinel2 > landsat8 > landsat5
+    source_priority = {"sentinel2": 3, "landsat8": 2, "landsat5": 1}
+    merged: Dict[str, Dict] = {}
+    for m in l5_data + l8_data + s2_data:
+        month = m["month"]
+        if month not in merged:
+            merged[month] = m
+        else:
+            existing_prio = source_priority.get(merged[month].get("source", ""), 0)
+            new_prio      = source_priority.get(m.get("source", ""), 0)
+            if new_prio > existing_prio:
+                merged[month] = m
+    monthly_data = sorted(merged.values(), key=lambda m: m["month"])
+
+    logger.info(
+        f"[EUDR farming] Merged timeseries: {len(l5_data)} L5 + {len(l8_data)} L8 + {len(s2_data)} S2 "
+        f"= {len(monthly_data)} months total ({monthly_data[0]['month'] if monthly_data else '?'} → "
+        f"{monthly_data[-1]['month'] if monthly_data else '?'})"
+    )
+
+    # Detect farming start from merged multi-source monthly signals
     detection = _detect_farming_start(monthly_data)
 
     farming_start     = detection.get("farming_start_month")
     clearing_month    = detection.get("clearing_month")
     predates_coverage = detection.get("predates_coverage", False)
 
-    # If Sentinel-2 shows the land was already farmed from 2017 and no clearing event found,
-    # use Hansen forest loss year to estimate when farming/clearing started (extends back to 2001).
-    farming_start_source = "sentinel2"
+    # If land was already being farmed at the very start of our merged dataset (1990)
+    # and no clearing was found, fall back to Hansen loss year as proxy.
+    # (predates_coverage now means "pre-1990" since L5 starts at 1990)
+    farming_start_source = monthly_data[0].get("source", "sentinel2") if farming_start and monthly_data else "sentinel2"
+    if farming_start:
+        # identify which source detected the farming start
+        for m in monthly_data:
+            if m["month"] == farming_start:
+                farming_start_source = m.get("source", "sentinel2")
+                break
+
     if predates_coverage and farming_start is None and hansen_data.get("loss_year"):
         loss_yr = hansen_data["loss_year"]
-        farming_start = f"{loss_yr}-01"           # approximate: year of forest loss
+        farming_start = f"{loss_yr}-01"
         farming_start_source = "hansen_proxy"
-        logger.info(f"Farming predates Sentinel-2 coverage; using Hansen loss year {loss_yr} as proxy")
+        logger.info(f"Farming predates Landsat coverage; using Hansen loss year {loss_yr} as proxy")
     elif predates_coverage and farming_start is None:
-        farming_start_source = "pre_2017_unknown"
+        farming_start_source = "pre_1990_unknown"
 
     pre_2020 = (farming_start is not None and farming_start < "2020-01") or predates_coverage
     forest_cleared = (
@@ -761,10 +954,10 @@ async def run_eudr_farming_analysis(
         except Exception:
             return s
 
-    if predates_coverage and farming_start_source == "pre_2017_unknown":
+    if predates_coverage and farming_start_source == "pre_1990_unknown":
         eudr_status = "COMPLIANT"
         eudr_summary = (
-            "Farm was already established before 2017 (predates satellite coverage). "
+            "Farm was already established before 1990 (predates all satellite coverage). "
             "No Hansen forest loss detected post-2020. EUDR Compliant."
         )
     elif predates_coverage and farming_start_source == "hansen_proxy":

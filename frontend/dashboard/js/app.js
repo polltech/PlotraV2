@@ -12220,8 +12220,10 @@ class PlotraDashboard {
                             <div class="text-muted small mb-1"><i class="bi bi-calendar-check me-1"></i>Farming Started</div>
                             <div class="fw-bold">${data.predates_coverage && !data.farming_start_month ? 'Before 2017' : fmtMonth(data.farming_start_month)}</div>
                             <div class="small ${conf(data.farming_start_confidence)}">${
-                                data.farming_start_source === 'hansen_proxy' ? '<span class="text-warning">via Hansen loss year</span>' :
-                                data.farming_start_source === 'pre_2017_unknown' ? '<span class="text-muted">predates satellite data</span>' :
+                                data.farming_start_source === 'hansen_proxy'     ? '<span class="text-warning">via Hansen loss year</span>' :
+                                data.farming_start_source === 'pre_1990_unknown' ? '<span class="text-muted">predates all satellite data</span>' :
+                                data.farming_start_source === 'landsat5'         ? `<span class="text-muted">Landsat 5</span> · ${data.farming_start_confidence || '—'} confidence` :
+                                data.farming_start_source === 'landsat8'         ? `<span class="text-muted">Landsat 8</span> · ${data.farming_start_confidence || '—'} confidence` :
                                 data.farming_start_confidence ? `${data.farming_start_confidence} confidence` : '—'
                             }</div>
                         </div>
@@ -12298,6 +12300,20 @@ class PlotraDashboard {
             // EUDR 2020 cutoff line
             annots.push({ x: '2020-01', borderColor: '#6f42c1', strokeDashArray: 6, borderWidth: 2,
                 label: { text: 'EUDR Cutoff', borderColor: '#6f42c1', style: { color:'#6f42c1', background:'#fff', fontSize:'9px' } } });
+            // Data source transition lines
+            const sources = chartData.map(m => m.source).filter(Boolean);
+            if (sources.includes('landsat8') || sources.includes('landsat5')) {
+                annots.push({ x: '2013-01', borderColor: '#adb5bd', strokeDashArray: 4, borderWidth: 1,
+                    label: { text: 'Landsat 8 →', borderColor: '#adb5bd', style: { color:'#6c757d', background:'#f8f9fa', fontSize:'8px' } } });
+            }
+            if (sources.includes('landsat5')) {
+                annots.push({ x: '1990-01', borderColor: '#adb5bd', strokeDashArray: 4, borderWidth: 1,
+                    label: { text: 'Landsat 5 →', borderColor: '#adb5bd', style: { color:'#6c757d', background:'#f8f9fa', fontSize:'8px' } } });
+            }
+            if (sources.includes('sentinel2')) {
+                annots.push({ x: '2017-01', borderColor: '#adb5bd', strokeDashArray: 4, borderWidth: 1,
+                    label: { text: 'Sentinel-2 →', borderColor: '#adb5bd', style: { color:'#6c757d', background:'#f8f9fa', fontSize:'8px' } } });
+            }
 
             new ApexCharts(document.getElementById(`${uid}-chart`), {
                 chart:  { type:'line', height:340, toolbar:{ show:true, tools:{ download:true, zoom:true, reset:true, pan:true } }, animations:{ enabled:false }, zoom:{ enabled:true } },
