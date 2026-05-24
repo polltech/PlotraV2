@@ -10440,16 +10440,16 @@ class PlotraDashboard {
                     </div>
                 </div>
 
-                <!-- Deforestation History & EUDR Analysis -->
+                <!-- EUDR Farming Analysis -->
                 <div class="col-12">
                     <div class="card border-0 shadow-sm">
                         <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2"
                              style="background:linear-gradient(135deg,#2c1a0e,#6f4e37);color:#fff;">
                             <div class="d-flex align-items-center gap-2">
-                                <i class="bi bi-graph-up-arrow fs-5"></i>
-                                <span class="fw-semibold">Deforestation History &amp; EUDR Analysis</span>
+                                <i class="bi bi-shield-check fs-5"></i>
+                                <span class="fw-semibold">EUDR Farming Analysis</span>
                                 <span class="badge bg-warning text-dark fw-normal small ms-1"
-                                      title="4-Index fusion: NDVI+EVI+SAVI+NDMI">4-Index</span>
+                                      title="Landsat 5 + Landsat 8 + Sentinel-2 + Hansen GFC">1990 → Today</span>
                             </div>
                             <div class="d-flex align-items-center gap-2 flex-wrap">
                                 <select class="form-select form-select-sm" id="analysisParcelSelector"
@@ -10467,17 +10467,10 @@ class PlotraDashboard {
                             </div>
                         </div>
                         <div class="card-body p-0">
-                            <!-- Satellite true-colour image -->
-                            <div id="satelliteImagePanel" style="background:#0d1b2a;min-height:180px;overflow:hidden;position:relative;">
-                                <div class="text-center py-5 text-secondary small">
-                                    <i class="bi bi-satellite me-2"></i>Select a farm to load satellite imagery
-                                </div>
-                            </div>
-                            <!-- Deforestation history charts + events -->
                             <div id="historicalAnalysis" class="p-3">
-                                <div class="text-muted text-center py-4">
-                                    <i class="bi bi-clock-history fs-3 d-block mb-2"></i>
-                                    Select a farm above to view quarterly deforestation history
+                                <div class="text-muted text-center py-5">
+                                    <i class="bi bi-shield-check fs-3 d-block mb-2"></i>
+                                    Select a farm and click <strong>Analyse</strong> to run EUDR farming analysis
                                 </div>
                             </div>
                         </div>
@@ -10583,9 +10576,9 @@ class PlotraDashboard {
                                     <i class="bi bi-${hasPolygon ? 'arrow-repeat' : 'geo-alt-fill'} me-1"></i>${hasPolygon ? 'Recapture' : 'Capture'}
                                 </button>
                                 <button class="btn btn-outline-info btn-sm flex-fill" style="min-width:70px"
-                                    onclick="app.requestSatelliteAnalysis('${farm.id}')"
+                                    onclick="app.runFarmingAnalysisForFarm('${farm.id}')"
                                     ${!hasPolygon ? 'disabled title="Capture farm polygon first"' : ''}>
-                                    <i class="bi bi-satellite-fill me-1"></i>Analyse
+                                    <i class="bi bi-shield-check me-1"></i>Analyse
                                 </button>
                             </div>
                         </div>
@@ -10634,33 +10627,109 @@ class PlotraDashboard {
         }
     }
 
-    switchAnalysisFarm(farmId, date = null) {
+    switchAnalysisFarm(farmId) {
         if (!farmId) return;
-        const setLoading = (id, msg) => {
-            const el = document.getElementById(id);
-            if (el) el.innerHTML = `<div class="text-center py-3"><div class="spinner-border spinner-border-sm" role="status"></div><span class="ms-2">${msg}</span></div>`;
-        };
-        // Reset parcel selector when farm changes
-        const parcelSel = document.getElementById('analysisParcelSelector');
-        if (parcelSel) { parcelSel.style.display = 'none'; parcelSel.innerHTML = ''; }
-        setLoading('historicalAnalysis', 'Loading historical data...');
-        setLoading('satelliteImagePanel', 'Loading satellite image...');
+        this._currentHistoryFarmId = farmId;
+        // Load parcels and show existing analysis if available
         this.loadHistoricalAnalysis(farmId, null);
-        this.loadSatelliteImage(farmId, date);
     }
 
     switchAnalysisParcel(parcelId) {
-        if (!parcelId || !this._currentHistoryFarmId) return;
+        if (!parcelId) return;
+        this._currentHistoryParcelId = parcelId;
         const container = document.getElementById('historicalAnalysis');
-        if (container) container.innerHTML = `<div class="text-center py-5"><span class="spinner-border spinner-border-sm me-2"></span>Loading parcel history…</div>`;
-        this.loadHistoricalAnalysis(this._currentHistoryFarmId, parcelId);
+        if (container) container.innerHTML = `<div class="text-center py-5"><span class="spinner-border spinner-border-sm me-2"></span>Loading analysis…</div>`;
+        this.loadFarmingAnalysis(parcelId, container);
     }
 
     async runAnalysisForSelectedFarm() {
         const selector = document.getElementById('analysisFarmSelector');
         const farmId = selector?.value;
         if (!farmId) { this.showToast('Select a farm from the dropdown first.', 'warning'); return; }
-        await this.requestSatelliteAnalysis(farmId);
+        // Get the first mapped parcel for this farm and trigger farming analysis
+        try {
+            const farm = await api.getFarmById(farmId);
+            const parcelId = this._currentHistoryParcelId ||
+                (farm?.parcels || []).filter(p => p.boundary_geojson)[0]?.id;
+            if (!parcelId) { this.showToast('No mapped parcel found. Capture a polygon first.', 'warning'); return; }
+            const container = document.getElementById('historicalAnalysis');
+            await this.triggerFarmingAnalysis(parcelId, container);
+        } catch (e) {
+            this.showToast(e.message || 'Analysis failed', 'error');
+        }
+    }
+
+    async runFarmingAnalysisForFarm(farmId) {
+        try {
+            const farm = await api.getFarmById(farmId);
+            const parcels = (farm?.parcels || []).filter(p => p.boundary_geojson);
+            if (!parcels.length) { this.showToast('No mapped parcel. Capture a polygon first.', 'warning'); return; }
+            // Switch to this farm in the analysis section and scroll to it
+            const selector = document.getElementById('analysisFarmSelector');
+            if (selector) { selector.value = farmId; }
+            this._currentHistoryFarmId = farmId;
+            // Show parcel selector if multiple parcels
+            const parcelSel = document.getElementById('analysisParcelSelector');
+            if (parcelSel) {
+                if (parcels.length > 1) {
+                    parcelSel.innerHTML = parcels.map((p,i) =>
+                        `<option value="${p.id}">${p.parcel_name || `Parcel ${i+1}`}</option>`).join('');
+                    parcelSel.style.display = '';
+                } else {
+                    parcelSel.style.display = 'none';
+                }
+            }
+            const parcelId = parcels[0].id;
+            this._currentHistoryParcelId = parcelId;
+            const container = document.getElementById('historicalAnalysis');
+            document.getElementById('historicalAnalysis')?.scrollIntoView({ behavior:'smooth', block:'start' });
+            await this.triggerFarmingAnalysis(parcelId, container);
+        } catch (e) {
+            this.showToast(e.message || 'Could not start analysis', 'error');
+        }
+    }
+
+    async triggerFarmingAnalysis(parcelId, container) {
+        if (!container) container = document.getElementById('historicalAnalysis');
+        if (!container) return;
+
+        container.innerHTML = `
+            <div class="text-center py-5">
+                <span class="spinner-border" style="color:#6f4e37;"></span>
+                <p class="mt-3 fw-semibold" style="color:#6f4e37;">Running EUDR Farming Analysis…</p>
+                <p class="text-muted small mb-0">
+                    Fetching Landsat 5 (1990–2012) + Landsat 8 (2013–2016) + Sentinel-2 (2017–today)<br>
+                    Checking Hansen Global Forest Change tiles<br>
+                    Detecting farming start date &amp; forest clearance…<br>
+                    <span class="text-muted">This takes 60–120 seconds.</span>
+                </p>
+            </div>`;
+
+        // POST to trigger background analysis
+        await api.request(`/eudr/parcel/${parcelId}/farming-analysis`, { method:'POST' });
+
+        // Poll every 6 seconds for up to 24 attempts (144s)
+        let attempts = 0;
+        const poll = setInterval(async () => {
+            attempts++;
+            try {
+                const result = await api.request(`/eudr/parcel/${parcelId}/farming-analysis`);
+                if (result && result.status === 'completed') {
+                    clearInterval(poll);
+                    this._renderFarmingAnalysisPanel(container, result);
+                    const refreshBtn = document.getElementById('refreshHistoryBtn');
+                    if (refreshBtn) refreshBtn.style.display = '';
+                } else if (attempts >= 24) {
+                    clearInterval(poll);
+                    container.innerHTML = `<div class="alert alert-warning m-3"><i class="bi bi-clock me-2"></i>Analysis is taking longer than expected. Try refreshing in a moment.</div>`;
+                }
+            } catch (e) {
+                if (attempts >= 24) {
+                    clearInterval(poll);
+                    container.innerHTML = `<div class="alert alert-danger m-3"><i class="bi bi-exclamation-triangle me-2"></i>Analysis failed: ${e.message}</div>`;
+                }
+            }
+        }, 6000);
     }
 
     async loadSatelliteImage(farmId, date = null) {
@@ -11603,95 +11672,43 @@ class PlotraDashboard {
     }
 
     async loadHistoricalAnalysis(farmId, parcelId = null) {
-        // Guard: if a newer call comes in while this one is awaiting, discard this result
-        this._historyLoadSeq = (this._historyLoadSeq || 0) + 1;
-        const mySeq = this._historyLoadSeq;
-
         this._currentHistoryFarmId = farmId;
-        this._currentHistoryParcelId = parcelId;
         const container = document.getElementById('historicalAnalysis');
         if (!container) return;
 
-        // Fetch farm info to get names for the loading banner and parcel selector
-        let farmName   = 'Farm';
-        let parcelName = null;
         const parcelSel = document.getElementById('analysisParcelSelector');
         try {
             const farm = await api.getFarmById(farmId);
-            farmName = farm?.farm_name || 'Farm';
             const mappedParcels = (farm?.parcels || []).filter(p => p.boundary_geojson);
 
             if (parcelSel) {
                 if (mappedParcels.length > 1) {
                     parcelSel.innerHTML = mappedParcels.map((p, i) =>
-                        `<option value="${p.id}" ${p.id === parcelId ? 'selected' : ''}>
-                            ${p.parcel_name || `Parcel ${i + 1}`}
-                        </option>`
+                        `<option value="${p.id}" ${p.id === parcelId ? 'selected' : ''}>${p.parcel_name || `Parcel ${i + 1}`}</option>`
                     ).join('');
                     parcelSel.style.display = '';
-                    if (!parcelId) parcelId = mappedParcels[0]?.id || null;
                 } else {
                     parcelSel.style.display = 'none';
                     parcelSel.innerHTML = '';
-                    if (!parcelId) parcelId = mappedParcels[0]?.id || null;
                 }
+                if (!parcelId) parcelId = mappedParcels[0]?.id || null;
             }
-
-            const active = mappedParcels.find(p => p.id === parcelId) || mappedParcels[0];
-            parcelName = active?.parcel_name || (mappedParcels.indexOf(active) >= 0
-                ? `Parcel ${mappedParcels.indexOf(active) + 1}` : null);
         } catch (_) {
             if (parcelSel) parcelSel.style.display = 'none';
         }
 
-        container.innerHTML = `
-            <div class="text-center py-5">
-                <span class="spinner-border" style="color:#6f4e37;"></span>
-                <p class="mt-3 fw-semibold" style="color:#6f4e37;">${farmName}${parcelName ? ` — ${parcelName}` : ''}</p>
-                <p class="text-muted small mb-0">
-                    Fetching quarterly satellite data Dec 2020 → today…<br>
-                    Fetching weather history from Open-Meteo…<br>
-                    Running 5-index fusion + statistical classification…
-                </p>
-            </div>`;
-
-        const refreshBtn = document.getElementById('refreshHistoryBtn');
-        if (refreshBtn) refreshBtn.style.display = 'none';
-
-        try {
-            const qs = parcelId ? `?parcel_id=${parcelId}` : '';
-            const data = await api.request(
-                `/farmer/farm/${farmId}/deforestation-history${qs}`,
-                { timeout: 180000 }
-            );
-            // Discard if a newer loadHistoricalAnalysis call has since started
-            if (mySeq !== this._historyLoadSeq) return;
-            this._renderInlineDeforestationHistory(container, data, farmId, parcelId || data.parcel_id || null);
-            if (refreshBtn) refreshBtn.style.display = '';
-            // Auto-load any existing farming analysis for this parcel
-            if (data.parcel_id) this.loadFarmingAnalysis(data.parcel_id);
-        } catch (err) {
-            if (mySeq !== this._historyLoadSeq) return;
-            // Fallback: if deforestation history fails (e.g. no polygon), show old records
-            console.warn('Deforestation history failed:', err.message);
-            try {
-                const old = await api.request(`/farmer/farm/${farmId}/historical-analysis`, { optional: true }) || {};
-                if (mySeq !== this._historyLoadSeq) return;
-                this._renderLegacyHistoricalCards(container, old);
-            } catch (e2) {
-                if (mySeq !== this._historyLoadSeq) return;
-                container.innerHTML = `
-                    <div class="alert alert-warning m-3">
-                        <i class="bi bi-exclamation-triangle me-2"></i>
-                        <strong>Analysis unavailable:</strong> ${err.message}
-                        <div class="small mt-1 text-muted">Add a boundary polygon to this farm's parcel to enable deforestation history.</div>
-                    </div>`;
-            }
+        if (!parcelId) {
+            container.innerHTML = `<div class="text-muted text-center py-5"><i class="bi bi-geo-alt fs-3 d-block mb-2"></i>No mapped parcel found. Capture the farm polygon first.</div>`;
+            return;
         }
+
+        this._currentHistoryParcelId = parcelId;
+        // Load any existing farming analysis result for this parcel
+        await this.loadFarmingAnalysis(parcelId, container);
     }
 
     refreshDeforestationHistory() {
-        if (this._currentHistoryFarmId) this.loadHistoricalAnalysis(this._currentHistoryFarmId);
+        if (this._currentHistoryFarmId) this.loadHistoricalAnalysis(this._currentHistoryFarmId, this._currentHistoryParcelId);
     }
 
     _renderInlineDeforestationHistory(container, data, farmId, parcelId = null) {
@@ -12186,20 +12203,25 @@ class PlotraDashboard {
         }
     }
 
-    async loadFarmingAnalysis(parcelId) {
-        const containerId = `farmingAnalysis-${parcelId}`;
-        const container   = document.getElementById(containerId);
+    async loadFarmingAnalysis(parcelId, container = null) {
+        // If no container passed, try the per-parcel container (farm details view)
+        if (!container) {
+            const containerId = `farmingAnalysis-${parcelId}`;
+            container = document.getElementById(containerId);
+        }
         if (!container) return;
         container.innerHTML = `<div class="d-flex align-items-center gap-2 p-3 text-muted small"><span class="spinner-border spinner-border-sm"></span>Loading…</div>`;
         try {
             const data = await api.request(`/eudr/parcel/${parcelId}/farming-analysis`);
             if (data.status === 'not_analysed') {
                 container.innerHTML = `
-                    <div class="p-3 text-center text-muted small">
-                        <i class="bi bi-calendar-x fs-3 d-block mb-2"></i>
-                        No farming history analysis yet.
-                        <br>Click <strong>"Analyse Farming History"</strong> above to run the analysis.
-                        <br><small>Uses 2017–today Sentinel-2 data + Hansen forest tiles — takes ~90 seconds.</small>
+                    <div class="text-center py-5 text-muted">
+                        <i class="bi bi-shield-check fs-3 d-block mb-2"></i>
+                        No analysis yet for this parcel.
+                        <br><button class="btn btn-info btn-sm mt-3" onclick="app.triggerFarmingAnalysis('${parcelId}')">
+                            <i class="bi bi-satellite-fill me-1"></i>Run EUDR Farming Analysis
+                        </button>
+                        <br><small class="text-muted mt-2 d-block">Uses Landsat (1990–2016) + Sentinel-2 (2017–today) + Hansen GFC — takes ~90 seconds.</small>
                     </div>`;
             } else {
                 this._renderFarmingAnalysisPanel(container, data);
