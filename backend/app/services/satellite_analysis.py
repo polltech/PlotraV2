@@ -938,10 +938,13 @@ async def run_eudr_farming_analysis(
         farming_start_source = "pre_1990_unknown"
 
     pre_2020 = (farming_start is not None and farming_start < "2020-01") or predates_coverage
-    forest_cleared = (
-        hansen_data.get("was_forested") and
-        hansen_data.get("loss_year") is not None and
-        hansen_data.get("loss_year") >= 2021
+
+    # Forest was cleared to create this farm if either:
+    #  - Hansen GFC shows forested land at this location (treecover2000 >= 10%)
+    #  - Satellite timeseries detected a forest-to-bare transition before crop signal
+    forest_was_cleared = (
+        bool(hansen_data.get("was_forested")) or
+        bool(detection.get("forest_present_before_clearing"))
     )
 
     def _fmt_start(s):
@@ -954,65 +957,52 @@ async def run_eudr_farming_analysis(
         except Exception:
             return s
 
-    if predates_coverage and farming_start_source == "pre_1990_unknown":
-        eudr_status = "COMPLIANT"
-        eudr_summary = (
-            "Farm was already established before 1990 (predates all satellite coverage). "
-            "No Hansen forest loss detected post-2020. EUDR Compliant."
-        )
-    elif predates_coverage and farming_start_source == "hansen_proxy":
-        loss_yr = hansen_data["loss_year"]
-        was_forested = hansen_data.get("was_forested", False)
-        if loss_yr >= 2021:
-            eudr_status = "RISK"
-            eudr_summary = (
-                f"Hansen shows forest cleared in {loss_yr} at this location. "
-                "Post-2020 deforestation detected. EUDR NON-COMPLIANT."
-            )
-        elif was_forested and loss_yr >= 2000:
-            eudr_status = "COMPLIANT"
-            eudr_summary = (
-                f"Forest loss detected in {loss_yr} (pre-2020). "
-                "Farming predates the EUDR Dec 2020 cutoff. EUDR Compliant."
-            )
-        else:
-            eudr_status = "COMPLIANT"
-            eudr_summary = (
-                f"Farm established ~{loss_yr} (predates 2020). "
-                "No post-2020 deforestation. EUDR Compliant."
-            )
-    elif pre_2020 and not forest_cleared:
-        eudr_status = "COMPLIANT"
-        eudr_summary = (
-            f"Farming confirmed from {_fmt_start(farming_start)} (pre-2020). "
-            "No post-2020 deforestation detected."
-        )
-    elif forest_cleared and farming_start and farming_start >= "2021-01":
-        eudr_status = "RISK"
-        eudr_summary = (
-            f"Forest cleared in {hansen_data['loss_year']} and farming started {_fmt_start(farming_start)}. "
-            "Likely post-2020 deforestation. EUDR NON-COMPLIANT."
-        )
-    elif forest_cleared and pre_2020:
-        eudr_status = "INVESTIGATE"
-        eudr_summary = (
-            f"Farming pre-2020 confirmed ({_fmt_start(farming_start)}) but Hansen shows forest loss "
-            f"in {hansen_data['loss_year']} at this location. Manual review required."
-        )
-    elif farming_start is None:
+    # ── Two-step EUDR flag ────────────────────────────────────────────────────
+    # Step 1: Was farming practiced before Dec 31st 2020?
+    #   YES → COMPLIANT (regardless of forest history — pre-cutoff is allowed)
+    #   NO  → Step 2
+    # Step 2: Was a forest cleared to create this farm?
+    #   YES → NON_COMPLIANT (post-2020 deforestation)
+    #   NO  → COMPLIANT (farming started post-2020 but on non-forest land)
+    # Special: insufficient data → flag for manual review
+    # ─────────────────────────────────────────────────────────────────────────
+    if farming_start is None and not predates_coverage:
         eudr_status  = "INSUFFICIENT_DATA"
-        eudr_summary = "Could not determine farming start date. Insufficient cloud-free imagery."
+        eudr_summary = (
+            "Could not determine farming start date from satellite data. "
+            "Insufficient cloud-free imagery available. Manual review required."
+        )
+    elif pre_2020:
+        eudr_status  = "COMPLIANT"
+        start_label  = "before 1990" if predates_coverage and farming_start is None else _fmt_start(farming_start)
+        eudr_summary = (
+            f"Farming confirmed before December 2020 ({start_label}). "
+            "EUDR Compliant — pre-cutoff farming is permitted."
+        )
+    elif forest_was_cleared:
+        eudr_status  = "NON_COMPLIANT"
+        loss_yr      = hansen_data.get("loss_year")
+        eudr_summary = (
+            f"No farming detected before December 2020. "
+            f"Forest was cleared to create this farm{f' (Hansen loss year: {loss_yr})' if loss_yr else ''}. "
+            "EUDR NON-COMPLIANT — post-2020 deforestation."
+        )
     else:
-        eudr_status  = "PENDING_REVIEW"
-        eudr_summary = f"Farming start detected {_fmt_start(farming_start)}. Additional evidence recommended."
+        eudr_status  = "COMPLIANT"
+        eudr_summary = (
+            f"Farming started {_fmt_start(farming_start)} (post-2020) but no forest was present. "
+            "Land was not forested — EUDR Compliant."
+        )
 
     risk_flags = []
-    if forest_cleared:
-        risk_flags.append(f"Hansen: forest loss detected in {hansen_data['loss_year']}")
+    if forest_was_cleared and not pre_2020:
+        loss_yr = hansen_data.get("loss_year")
+        if loss_yr:
+            risk_flags.append(f"Hansen GFC: forest loss recorded in {loss_yr}")
     if detection.get("forest_present_before_clearing"):
-        risk_flags.append("Satellite: forest signature present before clearing event")
+        risk_flags.append("Satellite: forest signal detected before land clearing event")
     if detection.get("cloud_gap_months", 0) > 6:
-        risk_flags.append(f"Data quality: {detection['cloud_gap_months']} months with cloud cover gaps")
+        risk_flags.append(f"Data quality: {detection['cloud_gap_months']} cloud-gap months in timeseries")
 
     return {
         "farming_start_month":           farming_start,
@@ -1022,6 +1012,7 @@ async def run_eudr_farming_analysis(
         "land_clearing_month":           clearing_month,
         "clearing_confidence":           detection.get("clearing_confidence"),
         "pre_2020_farming_confirmed":    pre_2020,
+        "forest_was_cleared":            forest_was_cleared,
         "forest_present_before_clearing": detection.get("forest_present_before_clearing"),
         "eudr_status":                   eudr_status,
         "eudr_summary":                  eudr_summary,

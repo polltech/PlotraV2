@@ -12183,80 +12183,83 @@ class PlotraDashboard {
 
     _renderFarmingAnalysisPanel(container, data) {
         const statusColors = {
-            COMPLIANT:        { bg: 'success', icon: 'check-circle-fill', label: 'EUDR Compliant' },
-            RISK:             { bg: 'danger',  icon: 'x-circle-fill',     label: 'EUDR Risk' },
-            INVESTIGATE:      { bg: 'warning', icon: 'exclamation-triangle-fill', label: 'Investigate' },
-            INSUFFICIENT_DATA:{ bg: 'secondary',icon:'question-circle-fill', label: 'Insufficient Data' },
-            PENDING_REVIEW:   { bg: 'info',    icon: 'info-circle-fill',  label: 'Pending Review' },
+            COMPLIANT:        { bg: 'success', icon: 'check-circle-fill',        label: 'EUDR Compliant' },
+            NON_COMPLIANT:    { bg: 'danger',  icon: 'x-circle-fill',            label: 'EUDR Non-Compliant' },
+            INSUFFICIENT_DATA:{ bg: 'secondary',icon:'question-circle-fill',     label: 'Insufficient Data' },
         };
-        const sc      = statusColors[data.eudr_status] || statusColors['PENDING_REVIEW'];
-        const conf    = c => c === 'HIGH' ? 'text-success fw-semibold' : c === 'MEDIUM' ? 'text-warning fw-semibold' : 'text-muted';
+        const sc       = statusColors[data.eudr_status] || statusColors['INSUFFICIENT_DATA'];
+        const conf     = c => c === 'HIGH' ? 'text-success fw-semibold' : c === 'MEDIUM' ? 'text-warning fw-semibold' : 'text-muted';
         const fmtMonth = m => m ? (() => { const [y,mo] = m.split('-'); return `${new Date(+y,+mo-1).toLocaleString('default',{month:'long'})} ${y}`; })() : '—';
         const hansen   = data.hansen || {};
         const dq       = data.data_quality || {};
         const chartData = data.chart_data || [];
         const uid       = `fa-${data.parcel_id?.slice(0,8) || Math.random().toString(36).slice(2)}`;
 
+        const startLabel = (() => {
+            if (data.predates_coverage && !data.farming_start_month) return 'Before 1990';
+            if (!data.farming_start_month) return '—';
+            return fmtMonth(data.farming_start_month);
+        })();
+        const startSub = (() => {
+            if (data.farming_start_source === 'hansen_proxy')     return 'estimated via Hansen loss year';
+            if (data.farming_start_source === 'pre_1990_unknown') return 'predates all satellite data';
+            if (data.farming_start_source === 'landsat5')         return `Landsat 5 · ${data.farming_start_confidence || '—'} confidence`;
+            if (data.farming_start_source === 'landsat8')         return `Landsat 8 · ${data.farming_start_confidence || '—'} confidence`;
+            return `Sentinel-2 · ${data.farming_start_confidence || '—'} confidence`;
+        })();
+
         const riskBadges = (data.eudr_risk_flags || []).map(f =>
             `<span class="badge bg-danger-subtle text-danger border border-danger-subtle me-1 mb-1 fw-normal small">${f}</span>`
         ).join('');
 
         container.innerHTML = `
-            <!-- Verdict banner -->
+            <!-- Two-question EUDR flags -->
+            <div class="row g-2 mb-3">
+                <!-- Q1: Farming before Dec 2020? -->
+                <div class="col-12 col-md-6">
+                    <div class="card border-2 ${data.pre_2020_farming_confirmed ? 'border-success' : 'border-danger'} h-100">
+                        <div class="card-body py-3 px-3 d-flex align-items-center gap-3">
+                            <i class="bi bi-${data.pre_2020_farming_confirmed ? 'check-circle-fill text-success' : 'x-circle-fill text-danger'} fs-2 flex-shrink-0"></i>
+                            <div>
+                                <div class="fw-semibold">Farming before December 2020?</div>
+                                <div class="fs-5 fw-bold ${data.pre_2020_farming_confirmed ? 'text-success' : 'text-danger'}">
+                                    ${data.pre_2020_farming_confirmed ? 'YES' : data.eudr_status === 'INSUFFICIENT_DATA' ? 'UNKNOWN' : 'NO'}
+                                </div>
+                                <div class="small text-muted">${data.pre_2020_farming_confirmed ? `Detected from ${startLabel}` : startLabel !== '—' ? `First detected ${startLabel}` : 'Could not determine from satellite data'}</div>
+                                <div class="small text-muted">${startSub}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- Q2: Forest cleared to make the farm? -->
+                <div class="col-12 col-md-6">
+                    <div class="card border-2 ${data.forest_was_cleared ? 'border-danger' : 'border-success'} h-100">
+                        <div class="card-body py-3 px-3 d-flex align-items-center gap-3">
+                            <i class="bi bi-${data.forest_was_cleared ? 'tree-fill text-danger' : 'check-circle-fill text-success'} fs-2 flex-shrink-0"></i>
+                            <div>
+                                <div class="fw-semibold">Forest cleared to create this farm?</div>
+                                <div class="fs-5 fw-bold ${data.forest_was_cleared ? 'text-danger' : 'text-success'}">
+                                    ${data.forest_was_cleared ? 'YES' : data.eudr_status === 'INSUFFICIENT_DATA' ? 'UNKNOWN' : 'NO'}
+                                </div>
+                                <div class="small text-muted">${
+                                    data.forest_was_cleared
+                                        ? `${hansen.loss_year ? `Forest loss year: ${hansen.loss_year}` : ''} · Treecover 2000: ${hansen.treecover2000 != null ? hansen.treecover2000 + '%' : '—'}`
+                                        : 'No forest detected on this land'
+                                }</div>
+                                <div class="small text-muted">${data.land_clearing_month ? `Clearing event: ${fmtMonth(data.land_clearing_month)}` : ''}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- EUDR verdict banner -->
             <div class="alert alert-${sc.bg} d-flex align-items-start gap-3 mb-3 py-2">
                 <i class="bi bi-${sc.icon} fs-3 mt-1 flex-shrink-0"></i>
                 <div class="flex-grow-1">
                     <div class="fw-bold fs-6 mb-1">${sc.label}</div>
                     <div class="mb-2 small">${data.eudr_summary || '—'}</div>
                     ${riskBadges}
-                </div>
-            </div>
-
-            <!-- Key dates row -->
-            <div class="row g-2 mb-3">
-                <div class="col-6 col-md-3">
-                    <div class="card border-0 bg-light h-100">
-                        <div class="card-body py-2 px-3">
-                            <div class="text-muted small mb-1"><i class="bi bi-calendar-check me-1"></i>Farming Started</div>
-                            <div class="fw-bold">${data.predates_coverage && !data.farming_start_month ? 'Before 2017' : fmtMonth(data.farming_start_month)}</div>
-                            <div class="small ${conf(data.farming_start_confidence)}">${
-                                data.farming_start_source === 'hansen_proxy'     ? '<span class="text-warning">via Hansen loss year</span>' :
-                                data.farming_start_source === 'pre_1990_unknown' ? '<span class="text-muted">predates all satellite data</span>' :
-                                data.farming_start_source === 'landsat5'         ? `<span class="text-muted">Landsat 5</span> · ${data.farming_start_confidence || '—'} confidence` :
-                                data.farming_start_source === 'landsat8'         ? `<span class="text-muted">Landsat 8</span> · ${data.farming_start_confidence || '—'} confidence` :
-                                data.farming_start_confidence ? `${data.farming_start_confidence} confidence` : '—'
-                            }</div>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-6 col-md-3">
-                    <div class="card border-0 bg-light h-100">
-                        <div class="card-body py-2 px-3">
-                            <div class="text-muted small mb-1"><i class="bi bi-tree me-1"></i>Land Clearing</div>
-                            <div class="fw-bold">${fmtMonth(data.land_clearing_month)}</div>
-                            <div class="small ${conf(data.clearing_confidence)}">${data.clearing_confidence || '—'} confidence</div>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-6 col-md-3">
-                    <div class="card border-0 bg-light h-100">
-                        <div class="card-body py-2 px-3">
-                            <div class="text-muted small mb-1"><i class="bi bi-tree-fill me-1"></i>Previously Forested</div>
-                            <div class="fw-bold ${hansen.was_forested ? 'text-danger' : 'text-success'}">${hansen.was_forested == null ? '—' : hansen.was_forested ? 'Yes (forested)' : 'No forest detected'}</div>
-                            <div class="small text-muted">${hansen.loss_year ? `Loss year: ${hansen.loss_year}` : `Cover 2000: ${hansen.treecover2000 != null ? hansen.treecover2000 + '%' : '—'}`}</div>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-6 col-md-3">
-                    <div class="card border-0 bg-light h-100">
-                        <div class="card-body py-2 px-3">
-                            <div class="text-muted small mb-1"><i class="bi bi-shield-check me-1"></i>Pre-2020 Farming</div>
-                            <div class="fw-bold ${data.pre_2020_farming_confirmed ? 'text-success' : 'text-danger'}">
-                                ${data.pre_2020_farming_confirmed ? 'Confirmed ✓' : 'Not confirmed'}
-                            </div>
-                            <div class="small text-muted">${dq.cloud_gap_months || 0} cloud-gap months</div>
-                        </div>
-                    </div>
                 </div>
             </div>
 

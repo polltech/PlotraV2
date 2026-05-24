@@ -802,6 +802,7 @@ async def get_parcel_farming_analysis(
         "land_clearing_month":           row.land_clearing_month,
         "clearing_confidence":           row.clearing_confidence,
         "pre_2020_farming_confirmed":    bool(row.pre_2020_farming_confirmed),
+        "forest_was_cleared":            bool(row.hansen_was_forested or row.forest_present_before_clearing),
         "forest_present_before_clearing": bool(row.forest_present_before_clearing),
         "eudr_status":                   row.eudr_status,
         "eudr_summary":                  row.eudr_summary,
