@@ -142,9 +142,11 @@
             display: flex; justify-content: space-between; align-items: center;
         }
         .lp-logo-wrap { display: flex; align-items: center; gap: 10px; text-decoration: none; }
-        .lp-logo-wrap img { height: 40px; width: 40px; border-radius: 8px; object-fit: cover; }
-        .lp-logo-name { font-size: 22px; font-weight: 800; color: rgba(255,255,255,.85); letter-spacing: -.5px; transition: color .2s; }
-        .lp-logo-wrap:hover .lp-logo-name { color: var(--lp-amber); }
+        .lp-logo-wrap img { height: 52px; width: auto; border-radius: 0; object-fit: contain; }
+        .lp-logo-name { font-size: 22px; font-weight: 800; color: #ffffff; letter-spacing: -.5px; transition: color .2s; }
+        .lp-logo-wrap:hover .lp-logo-name { color: #c8956c; }
+        .sidebar-logo-title { color: #ffffff; transition: color .2s; }
+        .navbar-brand:hover .sidebar-logo-title { color: #c8956c; }
         .lp-nav-btns { display: flex; gap: 10px; align-items: center; }
         .lp-nav-btn {
             display: inline-flex; align-items: center; justify-content: center; gap: 5px;
@@ -429,7 +431,7 @@
                 <div class="modal-body px-5 py-5 position-relative">
                     <button type="button" class="btn-close modal-close-btn" data-bs-dismiss="modal" aria-label="Close"></button>
                     <div class="mb-4 text-center">
-                        <img src="logo-po.png" alt="Plotra Logo" style="height: 32px; margin-bottom: 20px;">
+                        <img src="logo-po.png" alt="Plotra Logo" style="height: 56px; width: auto; margin-bottom: 20px;">
                     </div>
 
                     <form id="loginForm" novalidate>
@@ -581,7 +583,7 @@
                 <div class="modal-body px-4 py-4 position-relative">
                     <button type="button" class="btn-close modal-close-btn" data-bs-dismiss="modal" aria-label="Close"></button>
                     <div class="mb-4 text-center">
-                        <img src="logo-po.png" alt="Plotra Logo" style="height: 32px; margin-bottom: 20px;">
+                        <img src="logo-po.png" alt="Plotra Logo" style="height: 56px; width: auto; margin-bottom: 20px;">
                     </div>
 
                     <form id="registerForm" novalidate>
@@ -2091,9 +2093,9 @@
             <div class="sidebar-header d-flex align-items-center justify-content-between">
                 <a href="#" class="navbar-brand d-flex align-items-center gap-2">
                     <div class="logo-main">
-                        <img src="logo-po.png" alt="Plotra" style="height: 32px;">
+                        <img src="logo-po.png" alt="Plotra" style="height: 44px; width: auto;">
                     </div>
-                    <h4 class="logo-title mb-0" style="color: #daa520;">Plotra</h5>
+                    <h4 class="logo-title mb-0 sidebar-logo-title">Plotra</h4>
                 </a>
             </div>
             <div class="sidebar-body pt-0 data-scrollbar">
