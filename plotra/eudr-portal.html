@@ -107,8 +107,16 @@ nav {
   align-items: center;
   justify-content: center;
   padding: 100px 5% 60px;
-  background: var(--off-white);
+  background: url('images/mountains-covered-with-trees-vegetation.jpg') center center / cover no-repeat;
+  position: relative;
 }
+#screen-role::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(26,48,40,0.55);
+}
+#screen-role > * { position: relative; z-index: 1; }
 #screen-role.active { display: flex; }
 
 .role-header {
@@ -175,20 +183,28 @@ nav {
   background: var(--white);
   border: 2px solid var(--cream);
   border-radius: 12px;
-  padding: 40px 36px;
+  padding: 0;
   cursor: pointer;
   transition: all 0.3s ease;
   position: relative;
   overflow: hidden;
 }
-.role-card::before {
-  content: '';
-  position: absolute;
-  top: 0; left: 0; right: 0;
-  height: 4px;
+.role-card-img {
+  width: 100%;
+  height: 180px;
+  overflow: hidden;
+  position: relative;
 }
-.role-card.exporter::before { background: var(--forest); }
-.role-card.importer::before { background: var(--coffee); }
+.role-card-img img {
+  width: 100%; height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: transform 0.4s ease;
+}
+.role-card:hover .role-card-img img { transform: scale(1.05); }
+.role-card-body {
+  padding: 28px 32px 32px;
+}
 .role-card:hover {
   border-color: transparent;
   box-shadow: 0 16px 48px rgba(0,0,0,0.12);
@@ -923,16 +939,24 @@ nav {
 <div id="screen-role" class="screen">
   <div class="role-cards">
     <div class="role-card exporter" onclick="startRole('exporter')">
-      <div class="role-icon">☕</div>
-      <div class="role-card-title">I am an Exporter</div>
-      <p class="role-card-desc">Coffee growers, cooperatives, and exporters submitting farm-level compliance data, consignment details, and geolocation polygons to meet EUDR requirements.</p>
-      <button class="role-card-btn" onclick="startRole('exporter'); event.stopPropagation()">View Details →</button>
+      <div class="role-card-img">
+        <img src="images/view-land-plot-real-estate-business-development.jpg" alt="Coffee farm land">
+      </div>
+      <div class="role-card-body">
+        <div class="role-card-title">I am an Exporter</div>
+        <p class="role-card-desc">Coffee growers, cooperatives, and exporters submitting farm-level compliance data, consignment details, and geolocation polygons to meet EUDR requirements.</p>
+        <button class="role-card-btn" onclick="startRole('exporter'); event.stopPropagation()">View Details</button>
+      </div>
     </div>
     <div class="role-card importer" onclick="startRole('importer')">
-      <div class="role-icon">🇪🇺</div>
-      <div class="role-card-title">I am an Importer</div>
-      <p class="role-card-desc">EU operators and importers reviewing consignments, completing due diligence risk assessments, and archiving compliance records as required by EUDR Article 9.</p>
-      <button class="role-card-btn" onclick="startRole('importer'); event.stopPropagation()">View Details →</button>
+      <div class="role-card-img">
+        <img src="images/vertical-green-forest-hills-kordun-croatia.jpg" alt="Green forest hills">
+      </div>
+      <div class="role-card-body">
+        <div class="role-card-title">I am an Importer</div>
+        <p class="role-card-desc">EU operators and importers reviewing consignments, completing due diligence risk assessments, and archiving compliance records as required by EUDR Article 9.</p>
+        <button class="role-card-btn" onclick="startRole('importer'); event.stopPropagation()">View Details</button>
+      </div>
     </div>
   </div>
 </div>
