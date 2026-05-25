@@ -285,13 +285,22 @@ nav {
 
 /* ── FORM SCREEN ── */
 .form-screen {
-  background: var(--off-white);
-  padding: 80px 0 60px;
+  background: url('images/bg-portal.jpg') center center / cover no-repeat;
+  padding: 80px 24px 60px;
+  min-height: 100vh;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
 }
 .form-container {
-  max-width: 760px;
-  margin: 0 auto;
-  padding: 0 24px;
+  width: 100%;
+  max-width: 560px;
+  background: var(--white);
+  border: 1px solid var(--cream);
+  border-radius: 12px;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.18);
+  padding: 36px 40px 40px;
+  margin-top: 20px;
 }
 
 /* Step progress indicator */
@@ -390,7 +399,7 @@ nav {
 .form-panel.active { display: block; }
 
 .panel-header {
-  margin-bottom: 28px;
+  display: none;
 }
 .panel-eyebrow {
   font-family: 'DM Mono', monospace;
@@ -414,11 +423,11 @@ nav {
 
 /* Form fields */
 .form-section {
-  background: var(--white);
-  border: 1px solid var(--cream);
-  border-radius: 10px;
-  padding: 28px;
-  margin-bottom: 20px;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 0;
+  margin-bottom: 24px;
 }
 .form-section-title {
   font-family: 'DM Mono', monospace;
@@ -426,8 +435,8 @@ nav {
   letter-spacing: 2px;
   text-transform: uppercase;
   color: var(--mid-grey);
-  margin-bottom: 20px;
-  padding-bottom: 12px;
+  margin-bottom: 16px;
+  padding-bottom: 10px;
   border-bottom: 1px solid var(--cream);
 }
 .form-row {
@@ -908,8 +917,8 @@ nav {
 @media (max-width: 640px) {
   .role-cards { grid-template-columns: 1fr; gap: 18px; }
   .role-card { padding: 28px 22px; }
-  .form-container { padding: 0 14px; }
-  .form-section { padding: 20px 16px; }
+  .form-container { padding: 24px 20px; }
+  .form-section { padding: 0; }
   .form-nav-row { flex-direction: column-reverse; gap: 10px; }
   .form-nav-row .btn { width: 100%; justify-content: center; }
   .step-dots { overflow-x: auto; padding-bottom: 4px; }
