@@ -16,6 +16,7 @@ from app.models.sustainability import (
 from app.models.system import SystemConfig, RequiredDocument
 from app.models.otp import OTPVerification
 from app.models.notification import Notification
+from app.models.eudr_portal import EUDRExporterSubmission, EUDRImporterSubmission
 
 __all__ = [
     "Base",
@@ -64,4 +65,6 @@ __all__ = [
     "RequiredDocument",
     "OTPVerification",
     "Notification",
+    "EUDRExporterSubmission",
+    "EUDRImporterSubmission",
 ]

@@ -1,0 +1,2490 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EUDR Coffee Submission Portal — Plotra</title>
+<link rel="icon" type="image/png" href="logo-plotra.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;0,700;1,400&family=DM+Mono:wght@300;400;500&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --coffee: #6F4E37;
+  --coffee-dark: #4A3728;
+  --coffee-light: #8B6C4E;
+  --coffee-lighter: #A0856D;
+  --white: #ffffff;
+  --off-white: #f9f8f6;
+  --light-cream: #f5f3f0;
+  --cream: #ebe7e2;
+  --charcoal: #2d2a26;
+  --mid-grey: #6b6b65;
+  --light-grey: #c8c4bc;
+  --sage: #7aab8e;
+  --sage-light: #a8c9b5;
+  --forest: #1a3028;
+  --forest-mid: #2c5040;
+  --forest-light: #3d6b55;
+  --earth: #8b6e4e;
+  --earth-light: #c4a882;
+  --accent-gold: #c9a227;
+  --accent-rust: #a04e2a;
+  --error: #c0392b;
+  --error-light: #fdf2f2;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: 'Outfit', sans-serif;
+  background: var(--off-white);
+  color: var(--charcoal);
+  font-size: 16px;
+  line-height: 1.6;
+  overflow-x: hidden;
+}
+
+/* ── NAV ── */
+nav {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 100;
+  background: rgba(111,78,55,0.97);
+  backdrop-filter: blur(12px);
+  border-bottom: 2px solid var(--coffee-dark);
+  padding: 0 5%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 64px;
+}
+.nav-back {
+  color: var(--light-cream);
+  text-decoration: none;
+  font-size: 13px;
+  font-family: 'DM Mono', monospace;
+  letter-spacing: 0.5px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: color 0.2s;
+}
+.nav-back:hover { color: var(--white); }
+.nav-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+}
+.nav-logo-mark {
+  display: flex;
+  align-items: center;
+}
+.nav-logo-mark img { height: 52px; width: auto; object-fit: contain; }
+.nav-name {
+  display: none;
+}
+.nav-badge {
+  font-family: 'DM Mono', monospace;
+  font-size: 9px;
+  background: rgba(255,255,255,0.15);
+  color: var(--light-cream);
+  padding: 2px 8px;
+  border-radius: 20px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+/* ── SCREENS ── */
+.screen { display: none; min-height: 100vh; padding-top: 64px; }
+.screen.active { display: block; }
+.form-screen.active { display: flex; }
+
+/* ── ROLE SELECTION ── */
+#screen-role {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 100px 5% 60px;
+  background: url('bg-portal.jpg') center center / cover no-repeat;
+  position: relative;
+}
+#screen-role::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(26,48,40,0.55);
+}
+#screen-role > * { position: relative; z-index: 1; }
+#screen-role.active { display: flex; }
+
+.role-header {
+  text-align: center;
+  margin-bottom: 56px;
+}
+.role-eyebrow {
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--coffee-lighter);
+  letter-spacing: 2.5px;
+  text-transform: uppercase;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+.role-eyebrow::before, .role-eyebrow::after {
+  content: '';
+  display: block;
+  width: 24px;
+  height: 2px;
+  background: var(--coffee-lighter);
+}
+.role-title {
+  font-family: 'Lora', serif;
+  font-size: clamp(28px, 4vw, 44px);
+  font-weight: 700;
+  color: var(--charcoal);
+  margin-bottom: 12px;
+  line-height: 1.2;
+}
+.role-sub {
+  color: var(--mid-grey);
+  font-size: 15px;
+  max-width: 520px;
+  margin: 0 auto;
+}
+.role-regulation {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+  background: var(--cream);
+  border: 1px solid var(--light-grey);
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  color: var(--mid-grey);
+  letter-spacing: 0.5px;
+}
+
+.role-cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 28px;
+  max-width: 860px;
+  width: 100%;
+}
+.role-card {
+  background: var(--white);
+  border: 2px solid var(--cream);
+  border-radius: 12px;
+  padding: 0;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+.role-card-img {
+  width: 100%;
+  height: 180px;
+  overflow: hidden;
+  position: relative;
+}
+.role-card-img img {
+  width: 100%; height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: transform 0.4s ease;
+}
+.role-card:hover .role-card-img img { transform: scale(1.05); }
+.role-card-body {
+  padding: 28px 32px 32px;
+}
+.role-card:hover {
+  border-color: transparent;
+  box-shadow: 0 16px 48px rgba(0,0,0,0.12);
+  transform: translateY(-4px);
+}
+.role-card.exporter:hover { border-color: var(--forest-mid); }
+.role-card.importer:hover { border-color: var(--coffee-light); }
+
+.role-icon {
+  width: 56px; height: 56px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 20px;
+  font-size: 26px;
+}
+.role-card.exporter .role-icon { background: rgba(26,48,40,0.1); }
+.role-card.importer .role-icon { background: rgba(111,78,55,0.1); }
+
+.role-card-title {
+  font-family: 'Lora', serif;
+  font-size: 22px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+.role-card.exporter .role-card-title { color: var(--forest); }
+.role-card.importer .role-card-title { color: var(--coffee-dark); }
+
+.role-card-region {
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  margin-bottom: 14px;
+  padding: 3px 10px;
+  border-radius: 20px;
+  display: inline-block;
+}
+.role-card.exporter .role-card-region { background: rgba(26,48,40,0.08); color: var(--forest-mid); }
+.role-card.importer .role-card-region { background: rgba(111,78,55,0.08); color: var(--coffee-light); }
+
+.role-card-desc {
+  font-size: 14px;
+  color: var(--mid-grey);
+  line-height: 1.65;
+  margin-bottom: 28px;
+}
+.role-card-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 22px;
+  border-radius: 4px;
+  font-size: 13.5px;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  border: none;
+  transition: all 0.25s;
+}
+.role-card.exporter .role-card-btn {
+  background: var(--forest);
+  color: var(--white);
+}
+.role-card.exporter .role-card-btn:hover {
+  background: var(--forest-mid);
+  transform: translateX(3px);
+}
+.role-card.importer .role-card-btn {
+  background: var(--coffee);
+  color: var(--white);
+}
+.role-card.importer .role-card-btn:hover {
+  background: var(--coffee-light);
+  transform: translateX(3px);
+}
+
+/* ── FORM SCREEN ── */
+.form-screen {
+  background: url('bg-portal.jpg') center center / cover no-repeat;
+  padding: 80px 24px 60px;
+  min-height: 100vh;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+}
+.form-container {
+  width: 100%;
+  max-width: 560px;
+  background: var(--white);
+  border: 1px solid var(--cream);
+  border-radius: 12px;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.18);
+  padding: 36px 40px 40px;
+  margin: 20px auto 0;
+}
+
+/* Step progress indicator */
+.step-progress {
+  display: none;
+}
+.step-progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+.step-progress-label {
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--mid-grey);
+}
+.step-progress-count {
+  font-family: 'DM Mono', monospace;
+  font-size: 12px;
+  color: var(--mid-grey);
+}
+.step-dots {
+  display: flex;
+  align-items: center;
+  gap: 0;
+}
+.step-dot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+  position: relative;
+}
+.step-dot:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  width: 100%;
+  height: 2px;
+  background: var(--cream);
+  z-index: 0;
+  transition: background 0.3s;
+}
+.step-dot.completed:not(:last-child)::after { background: var(--coffee-lighter); }
+.step-dot-circle {
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: 'DM Mono', monospace;
+  border: 2px solid var(--cream);
+  background: var(--white);
+  color: var(--light-grey);
+  position: relative;
+  z-index: 1;
+  transition: all 0.3s;
+}
+.step-dot.completed .step-dot-circle {
+  background: var(--coffee-lighter);
+  border-color: var(--coffee-lighter);
+  color: var(--white);
+}
+.step-dot.active .step-dot-circle {
+  background: var(--forest);
+  border-color: var(--forest);
+  color: var(--white);
+  box-shadow: 0 0 0 4px rgba(26,48,40,0.12);
+}
+.step-dot-label {
+  font-size: 10px;
+  font-family: 'DM Mono', monospace;
+  color: var(--light-grey);
+  margin-top: 6px;
+  text-align: center;
+  white-space: nowrap;
+  letter-spacing: 0.3px;
+}
+.step-dot.active .step-dot-label { color: var(--forest); font-weight: 500; }
+.step-dot.completed .step-dot-label { color: var(--coffee-lighter); }
+
+/* mobile: hide labels */
+@media (max-width: 600px) {
+  .step-dot-label { display: none; }
+  .step-progress-label { display: none; }
+}
+
+/* ── FORM PANEL ── */
+.form-panel { display: none; }
+.form-panel.active { display: block; }
+
+.panel-header {
+  display: none;
+}
+.panel-eyebrow {
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--coffee-lighter);
+  margin-bottom: 6px;
+}
+.panel-title {
+  font-family: 'Lora', serif;
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--charcoal);
+  margin-bottom: 6px;
+}
+.panel-desc {
+  font-size: 14px;
+  color: var(--mid-grey);
+}
+
+/* Form fields */
+.form-section {
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 0;
+  margin-bottom: 24px;
+}
+.form-section-title {
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--mid-grey);
+  margin-bottom: 16px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--cream);
+}
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+.form-row.single { grid-template-columns: 1fr; }
+.form-row.triple { grid-template-columns: 1fr 1fr 1fr; }
+@media (max-width: 600px) {
+  .form-row, .form-row.triple { grid-template-columns: 1fr; }
+}
+
+.form-field { display: flex; flex-direction: column; gap: 5px; }
+.form-field label {
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: var(--mid-grey);
+}
+.form-field label .req { color: var(--accent-rust); margin-left: 2px; }
+.form-field input,
+.form-field select,
+.form-field textarea {
+  font-family: 'Outfit', sans-serif;
+  font-size: 14.5px;
+  color: var(--charcoal);
+  background: var(--off-white);
+  border: 1.5px solid var(--cream);
+  border-radius: 6px;
+  padding: 10px 14px;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  width: 100%;
+}
+.form-field input:focus,
+.form-field select:focus,
+.form-field textarea:focus {
+  border-color: var(--forest-light);
+  box-shadow: 0 0 0 3px rgba(61,107,85,0.1);
+  background: var(--white);
+}
+.form-field input.error,
+.form-field select.error,
+.form-field textarea.error {
+  border-color: var(--error);
+  background: var(--error-light);
+}
+.form-field .field-hint {
+  font-size: 11.5px;
+  color: var(--mid-grey);
+  font-family: 'DM Mono', monospace;
+}
+.form-field .field-error {
+  font-size: 12px;
+  color: var(--error);
+  display: none;
+}
+.form-field .field-error.visible { display: block; }
+
+/* File upload */
+.file-upload-wrap {
+  position: relative;
+}
+.file-upload-input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+  z-index: 2;
+}
+.file-upload-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--off-white);
+  border: 1.5px dashed var(--light-grey);
+  border-radius: 6px;
+  padding: 12px 16px;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 13.5px;
+  color: var(--mid-grey);
+}
+.file-upload-label:hover {
+  border-color: var(--forest-light);
+  background: var(--light-cream);
+  color: var(--forest);
+}
+.file-upload-label .upload-icon { font-size: 18px; }
+.file-name-display {
+  font-size: 12px;
+  color: var(--forest);
+  font-family: 'DM Mono', monospace;
+  margin-top: 4px;
+}
+
+/* Drag-drop polygon upload */
+.dropzone {
+  border: 2px dashed var(--light-grey);
+  border-radius: 10px;
+  padding: 48px 24px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s;
+  position: relative;
+  background: var(--off-white);
+}
+.dropzone input[type="file"] {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.dropzone:hover, .dropzone.dragover {
+  border-color: var(--forest-light);
+  background: var(--light-cream);
+}
+.dropzone-icon { font-size: 36px; margin-bottom: 12px; }
+.dropzone-title {
+  font-family: 'Lora', serif;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--charcoal);
+  margin-bottom: 6px;
+}
+.dropzone-sub {
+  font-size: 13px;
+  color: var(--mid-grey);
+}
+.dropzone-formats {
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  color: var(--coffee-lighter);
+  margin-top: 10px;
+  letter-spacing: 0.5px;
+}
+.dropzone-file-display {
+  display: none;
+  margin-top: 16px;
+  padding: 10px 16px;
+  background: var(--white);
+  border: 1px solid var(--sage-light);
+  border-radius: 6px;
+  font-family: 'DM Mono', monospace;
+  font-size: 12px;
+  color: var(--forest);
+  text-align: left;
+}
+
+/* Checkboxes */
+.checkbox-list { display: flex; flex-direction: column; gap: 14px; }
+.checkbox-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  cursor: pointer;
+  padding: 12px 16px;
+  border: 1.5px solid var(--cream);
+  border-radius: 8px;
+  transition: all 0.2s;
+}
+.checkbox-item:hover { border-color: var(--sage-light); background: var(--light-cream); }
+.checkbox-item input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  min-width: 18px;
+  accent-color: var(--forest);
+  margin-top: 1px;
+  cursor: pointer;
+}
+.checkbox-item .checkbox-text {
+  font-size: 14px;
+  color: var(--charcoal);
+  line-height: 1.5;
+}
+.checkbox-item.required-check.error {
+  border-color: var(--error);
+  background: var(--error-light);
+}
+
+/* Radio group */
+.radio-group { display: flex; gap: 12px; flex-wrap: wrap; }
+.radio-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 16px;
+  border: 1.5px solid var(--cream);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13.5px;
+  transition: all 0.2s;
+}
+.radio-option:hover { border-color: var(--forest-light); }
+.radio-option input[type="radio"] { accent-color: var(--forest); }
+.radio-option.selected { border-color: var(--forest); background: rgba(26,48,40,0.05); }
+
+/* Signature field */
+.signature-field input {
+  font-family: 'Lora', serif;
+  font-size: 18px;
+  font-style: italic;
+  color: var(--forest);
+  border-bottom: 2px solid var(--light-grey);
+  border-top: none;
+  border-left: none;
+  border-right: none;
+  border-radius: 0;
+  background: transparent;
+  padding: 8px 4px;
+}
+.signature-field input:focus {
+  border-bottom-color: var(--forest);
+  box-shadow: none;
+}
+
+/* Cooperative modules */
+.coop-count-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 24px;
+  background: var(--light-cream);
+  border: 1px solid var(--cream);
+  border-radius: 8px;
+  padding: 16px 20px;
+}
+.coop-count-row label {
+  font-family: 'DM Mono', monospace;
+  font-size: 12px;
+  letter-spacing: 0.5px;
+  color: var(--charcoal);
+  flex: 1;
+}
+.coop-count-row input {
+  width: 80px;
+  font-family: 'DM Mono', monospace;
+  font-size: 20px;
+  text-align: center;
+  border: 2px solid var(--cream);
+  border-radius: 6px;
+  padding: 6px;
+  background: var(--white);
+}
+.coop-modules { display: flex; flex-direction: column; gap: 16px; }
+.coop-module {
+  border: 1.5px solid var(--cream);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--white);
+}
+.coop-module-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 20px;
+  background: var(--light-cream);
+  cursor: pointer;
+  border-bottom: 1px solid var(--cream);
+  transition: background 0.2s;
+}
+.coop-module-header:hover { background: var(--cream); }
+.coop-module-title {
+  font-family: 'DM Mono', monospace;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--forest);
+}
+.coop-module-toggle {
+  font-size: 16px;
+  color: var(--mid-grey);
+  transition: transform 0.2s;
+}
+.coop-module.open .coop-module-toggle { transform: rotate(180deg); }
+.coop-module-body {
+  display: none;
+  padding: 20px;
+}
+.coop-module.open .coop-module-body { display: block; }
+
+/* Summary (step 7 / review) */
+.summary-section {
+  background: var(--white);
+  border: 1px solid var(--cream);
+  border-radius: 10px;
+  padding: 24px;
+  margin-bottom: 16px;
+}
+.summary-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--cream);
+}
+.summary-section-title {
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--mid-grey);
+}
+.summary-edit-btn {
+  font-size: 12px;
+  color: var(--forest);
+  cursor: pointer;
+  font-family: 'DM Mono', monospace;
+  border: none;
+  background: none;
+  padding: 3px 10px;
+  border: 1px solid var(--sage-light);
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+.summary-edit-btn:hover { background: var(--light-cream); }
+.summary-row {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 8px;
+  font-size: 14px;
+}
+.summary-key {
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  color: var(--mid-grey);
+  min-width: 180px;
+  padding-top: 1px;
+}
+.summary-val { color: var(--charcoal); flex: 1; }
+
+/* Success screen */
+.success-screen {
+  text-align: center;
+  padding: 60px 24px;
+  max-width: 560px;
+  margin: 0 auto;
+}
+.success-icon {
+  font-size: 56px;
+  margin-bottom: 20px;
+}
+.success-title {
+  font-family: 'Lora', serif;
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--forest);
+  margin-bottom: 10px;
+}
+.success-desc {
+  font-size: 15px;
+  color: var(--mid-grey);
+  margin-bottom: 28px;
+  line-height: 1.7;
+}
+.success-ref {
+  background: var(--light-cream);
+  border: 1px solid var(--cream);
+  border-radius: 8px;
+  padding: 16px 24px;
+  margin-bottom: 28px;
+  font-family: 'DM Mono', monospace;
+  font-size: 13px;
+  color: var(--charcoal);
+}
+.success-ref .ref-label {
+  font-size: 10px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--mid-grey);
+  margin-bottom: 4px;
+}
+.success-ref .ref-number {
+  font-size: 20px;
+  font-weight: 500;
+  color: var(--forest);
+  letter-spacing: 2px;
+}
+.success-note {
+  font-size: 12px;
+  color: var(--mid-grey);
+  font-family: 'DM Mono', monospace;
+  background: rgba(201,162,39,0.08);
+  border: 1px solid rgba(201,162,39,0.3);
+  border-radius: 6px;
+  padding: 12px 16px;
+  margin-top: 20px;
+  text-align: left;
+  line-height: 1.6;
+}
+
+/* Nav buttons */
+.form-nav-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 28px;
+  padding-top: 20px;
+  border-top: 1px solid var(--cream);
+}
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 24px;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 600;
+  font-family: 'Outfit', sans-serif;
+  cursor: pointer;
+  border: none;
+  transition: all 0.25s;
+  text-decoration: none;
+}
+.btn-primary {
+  background: var(--forest);
+  color: var(--white);
+}
+.btn-primary:hover { background: var(--forest-mid); transform: translateY(-1px); box-shadow: 0 4px 14px rgba(26,48,40,0.25); }
+.btn-coffee {
+  background: var(--coffee);
+  color: var(--white);
+}
+.btn-coffee:hover { background: var(--coffee-light); transform: translateY(-1px); box-shadow: 0 4px 14px rgba(111,78,55,0.25); }
+.btn-outline {
+  background: transparent;
+  color: var(--mid-grey);
+  border: 1.5px solid var(--light-grey);
+}
+.btn-outline:hover { border-color: var(--charcoal); color: var(--charcoal); }
+.btn-success {
+  background: var(--forest-mid);
+  color: var(--white);
+  font-size: 15px;
+  padding: 13px 32px;
+}
+.btn-success:hover { background: var(--forest); transform: translateY(-2px); box-shadow: 0 6px 20px rgba(26,48,40,0.3); }
+.btn-ghost {
+  background: transparent;
+  color: var(--forest);
+  border: 1.5px solid var(--sage-light);
+  font-size: 13px;
+}
+.btn-ghost:hover { background: var(--light-cream); }
+.btn-lg { padding: 14px 36px; font-size: 15.5px; }
+
+/* Consignment reference hint */
+.ref-hint {
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  color: var(--coffee-lighter);
+  margin-top: 3px;
+}
+
+/* Risk level visual */
+.risk-indicator {
+  display: flex;
+  gap: 10px;
+  margin-top: 6px;
+}
+.risk-bar {
+  flex: 1;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--cream);
+}
+.risk-bar.active-low { background: var(--sage); }
+.risk-bar.active-standard { background: var(--accent-gold); }
+.risk-bar.active-high { background: var(--accent-rust); }
+
+/* Responsive */
+@media (max-width: 640px) {
+  .role-cards { grid-template-columns: 1fr; gap: 18px; }
+  .role-card { padding: 28px 22px; }
+  .form-container { padding: 24px 20px; }
+  .form-section { padding: 0; }
+  .form-nav-row { flex-direction: column-reverse; gap: 10px; }
+  .form-nav-row .btn { width: 100%; justify-content: center; }
+  .step-dots { overflow-x: auto; padding-bottom: 4px; }
+}
+</style>
+</head>
+<body>
+
+<!-- ── NAV ── -->
+<nav>
+  <a href="index.html" class="nav-back">← Back to Plotra</a>
+  <a href="index.html" class="nav-brand">
+    <div class="nav-logo-mark">
+      <img src="logo-plotra.png" alt="Plotra" onerror="this.style.display='none'">
+    </div>
+    <span class="nav-name">Plotra</span>
+  </a>
+</nav>
+
+<!-- ══════════════════════════════════════════
+     SCREEN: ROLE SELECTION
+══════════════════════════════════════════ -->
+<div id="screen-role" class="screen">
+  <div class="role-cards">
+    <div class="role-card exporter" onclick="startRole('exporter')">
+      <div class="role-card-body">
+        <div class="role-card-title">I am an Exporter</div>
+        <p class="role-card-desc">Coffee growers, cooperatives, and exporters submitting farm-level compliance data, consignment details, and geolocation polygons to meet EUDR requirements.</p>
+        <button class="role-card-btn" onclick="startRole('exporter'); event.stopPropagation()">View Details</button>
+      </div>
+    </div>
+    <div class="role-card importer" onclick="startRole('importer')">
+      <div class="role-card-body">
+        <div class="role-card-title">I am an Importer</div>
+        <p class="role-card-desc">EU operators and importers reviewing consignments, completing due diligence risk assessments, and archiving compliance records as required by EUDR Article 9.</p>
+        <button class="role-card-btn" onclick="startRole('importer'); event.stopPropagation()">View Details</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     SCREEN: EXPORTER FORM
+══════════════════════════════════════════ -->
+<div id="screen-exporter" class="screen form-screen">
+  <div class="form-container">
+
+    <!-- Step progress -->
+    <div class="step-progress" id="exp-progress">
+      <div class="step-progress-header">
+        <span class="step-progress-label">Exporter — EUDR Submission</span>
+        <span class="step-progress-count" id="exp-step-count">Step 1 of 7</span>
+      </div>
+      <div class="step-dots" id="exp-step-dots"></div>
+    </div>
+
+    <!-- Step 1: KYC -->
+    <div class="form-panel active" id="exp-step-1">
+      <div class="panel-header">
+        <div class="panel-eyebrow">Step 1 of 7</div>
+        <h2 class="panel-title">Know Your Customer</h2>
+        <p class="panel-desc">Personal identification details for the individual submitting this declaration.</p>
+      </div>
+      <div class="form-section">
+        <div class="form-section-title">Personal Details</div>
+        <div class="form-row">
+          <div class="form-field">
+            <label>Full Name <span class="req">*</span></label>
+            <input type="text" id="exp_full_name" placeholder="As on official ID">
+            <span class="field-error" id="err_exp_full_name">Required</span>
+          </div>
+          <div class="form-field">
+            <label>National ID / Passport No. <span class="req">*</span></label>
+            <input type="text" id="exp_id_number" placeholder="ID or passport number">
+            <span class="field-error" id="err_exp_id_number">Required</span>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-field">
+            <label>Phone Number <span class="req">*</span></label>
+            <input type="tel" id="exp_phone" placeholder="+254 700 000 000">
+            <span class="field-error" id="err_exp_phone">Required</span>
+          </div>
+          <div class="form-field">
+            <label>Email Address <span class="req">*</span></label>
+            <input type="email" id="exp_email" placeholder="you@example.com">
+            <span class="field-error" id="err_exp_email">Required</span>
+          </div>
+        </div>
+        <div class="form-row single">
+          <div class="form-field">
+            <label>Country of Residence <span class="req">*</span></label>
+            <select id="exp_country">
+              <option value="">— Select country —</option>
+              <option>Kenya</option><option>Uganda</option><option>Ethiopia</option><option>Tanzania</option><option>Rwanda</option><option>Burundi</option><option>Other</option>
+            </select>
+            <span class="field-error" id="err_exp_country">Required</span>
+          </div>
+        </div>
+      </div>
+      <div class="form-section">
+        <div class="form-section-title">Identity Document Upload</div>
+        <div class="form-field">
+          <label>Government-issued ID <span class="req">*</span></label>
+          <div class="file-upload-wrap">
+            <input type="file" class="file-upload-input" id="exp_id_doc" accept="image/*,.pdf" onchange="showFileName(this,'exp_id_doc_name')">
+            <label class="file-upload-label" for="exp_id_doc">
+              <span class="upload-icon">📎</span>
+              <span>Click to upload national ID, passport, or equivalent</span>
+            </label>
+          </div>
+          <div class="file-name-display" id="exp_id_doc_name"></div>
+          <span class="field-hint">Accepted: JPG, PNG, PDF — max 10MB</span>
+        </div>
+      </div>
+      <div class="form-nav-row">
+        <button class="btn btn-outline" onclick="goRole()">← Change Role</button>
+        <button class="btn btn-primary" onclick="expNext(1)">Continue →</button>
+      </div>
+    </div>
+
+    <!-- Step 2: Company Profile -->
+    <div class="form-panel" id="exp-step-2">
+      <div class="panel-header">
+        <div class="panel-eyebrow">Step 2 of 7</div>
+        <h2 class="panel-title">Company / Exporter Profile</h2>
+        <p class="panel-desc">Business registration details of the exporting entity.</p>
+      </div>
+      <div class="form-section">
+        <div class="form-section-title">Business Details</div>
+        <div class="form-row">
+          <div class="form-field">
+            <label>Company Name <span class="req">*</span></label>
+            <input type="text" id="exp_company_name" placeholder="Registered company name">
+            <span class="field-error" id="err_exp_company_name">Required</span>
+          </div>
+          <div class="form-field">
+            <label>Business Registration No. <span class="req">*</span></label>
+            <input type="text" id="exp_reg_number" placeholder="e.g. CPR/2021/000001">
+            <span class="field-error" id="err_exp_reg_number">Required</span>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-field">
+            <label>Country <span class="req">*</span></label>
+            <select id="exp_company_country">
+              <option value="">— Select country —</option>
+              <option>Kenya</option><option>Uganda</option><option>Ethiopia</option><option>Tanzania</option><option>Rwanda</option><option>Other</option>
+            </select>
+            <span class="field-error" id="err_exp_company_country">Required</span>
+          </div>
+          <div class="form-field">
+            <label>City / Town <span class="req">*</span></label>
+            <input type="text" id="exp_city" placeholder="City">
+            <span class="field-error" id="err_exp_city">Required</span>
+          </div>
+        </div>
+        <div class="form-row single">
+          <div class="form-field">
+            <label>Physical Address <span class="req">*</span></label>
+            <input type="text" id="exp_address" placeholder="Street address">
+            <span class="field-error" id="err_exp_address">Required</span>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-field">
+            <label>Postal Code</label>
+            <input type="text" id="exp_postal" placeholder="Postal / ZIP code">
+          </div>
+          <div class="form-field">
+            <label>Contact Person Name <span class="req">*</span></label>
+            <input type="text" id="exp_contact_name" placeholder="Primary contact">
+            <span class="field-error" id="err_exp_contact_name">Required</span>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-field">
+            <label>Contact Phone <span class="req">*</span></label>
+            <input type="tel" id="exp_contact_phone" placeholder="+254 ...">
+            <span class="field-error" id="err_exp_contact_phone">Required</span>
+          </div>
+          <div class="form-field">
+            <label>Contact Email <span class="req">*</span></label>
+            <input type="email" id="exp_contact_email" placeholder="contact@company.com">
+            <span class="field-error" id="err_exp_contact_email">Required</span>
+          </div>
+        </div>
+      </div>
+      <div class="form-section">
+        <div class="form-section-title">Company Document</div>
+        <div class="form-field">
+          <label>Certificate of Incorporation</label>
+          <div class="file-upload-wrap">
+            <input type="file" class="file-upload-input" id="exp_cert" accept=".pdf,image/*" onchange="showFileName(this,'exp_cert_name')">
+            <label class="file-upload-label" for="exp_cert">
+              <span class="upload-icon">📎</span>
+              <span>Upload certificate of incorporation or business license</span>
+            </label>
+          </div>
+          <div class="file-name-display" id="exp_cert_name"></div>
+        </div>
+      </div>
+      <div class="form-nav-row">
+        <button class="btn btn-outline" onclick="expBack(2)">← Back</button>
+        <button class="btn btn-primary" onclick="expNext(2)">Continue →</button>
+      </div>
+    </div>
+
+    <!-- Step 3: Consignment Details -->
+    <div class="form-panel" id="exp-step-3">
+      <div class="panel-header">
+        <div class="panel-eyebrow">Step 3 of 7</div>
+        <h2 class="panel-title">Consignment Details</h2>
+        <p class="panel-desc">Information about the specific coffee shipment being declared.</p>
+      </div>
+      <div class="form-section">
+        <div class="form-section-title">Shipment Information</div>
+        <div class="form-row">
+          <div class="form-field">
+            <label>Consignment Reference <span class="req">*</span></label>
+            <input type="text" id="exp_consignment_ref" placeholder="PLT-2025-000001">
+            <div class="ref-hint">Format: PLT-YYYY-XXXXXX</div>
+            <span class="field-error" id="err_exp_consignment_ref">Required</span>
+          </div>
+          <div class="form-field">
+            <label>Coffee Variety <span class="req">*</span></label>
+            <select id="exp_coffee_variety">
+              <option value="">— Select —</option>
+              <option>Arabica</option>
+              <option>Robusta</option>
+              <option>Mixed (Arabica + Robusta)</option>
+            </select>
+            <span class="field-error" id="err_exp_coffee_variety">Required</span>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-field">
+            <label>Total Quantity (kg) <span class="req">*</span></label>
+            <input type="number" id="exp_quantity" placeholder="e.g. 20000" min="1">
+            <span class="field-error" id="err_exp_quantity">Required</span>
+          </div>
+          <div class="form-field">
+            <label>Harvest Year <span class="req">*</span></label>
+            <select id="exp_harvest_year">
+              <option value="">— Select year —</option>
+              <option>2026</option><option>2025</option><option>2024</option><option>2023</option>
+              <option>2022</option><option>2021</option><option>2020</option><option>2019</option><option>2018</option>
+            </select>
+            <span class="field-error" id="err_exp_harvest_year">Required</span>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-field">
+            <label>Origin Country <span class="req">*</span></label>
+            <select id="exp_origin_country">
+              <option value="">— Select —</option>
+              <option>Kenya</option><option>Uganda</option><option>Ethiopia</option><option>Tanzania</option><option>Rwanda</option><option>Burundi</option><option>Other</option>
+            </select>
+            <span class="field-error" id="err_exp_origin_country">Required</span>
+          </div>
+          <div class="form-field">
+            <label>Origin Region / County <span class="req">*</span></label>
+            <input type="text" id="exp_origin_region" placeholder="e.g. Nyeri, Kirinyaga">
+            <span class="field-error" id="err_exp_origin_region">Required</span>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-field">
+            <label>HS Code</label>
+            <input type="text" id="exp_hs_code" value="0901.11" placeholder="0901.11">
+            <span class="field-hint">0901.11 = Green coffee, not decaffeinated</span>
+          </div>
+          <div class="form-field">
+            <label>Export Destination <span class="req">*</span></label>
+            <select id="exp_destination">
+              <option value="">— Select country —</option>
+              <option>Belgium</option><option>Germany</option><option>Netherlands</option><option>France</option><option>Italy</option><option>Spain</option><option>Sweden</option><option>Denmark</option><option>Finland</option><option>Austria</option><option>Other EU Member State</option>
+            </select>
+            <span class="field-error" id="err_exp_destination">Required</span>
+          </div>
+        </div>
+      </div>
+      <div class="form-nav-row">
+        <button class="btn btn-outline" onclick="expBack(3)">← Back</button>
+        <button class="btn btn-primary" onclick="expNext(3)">Continue →</button>
+      </div>
+    </div>
+
+    <!-- Step 4: Cooperative Modules -->
+    <div class="form-panel" id="exp-step-4">
+      <div class="panel-header">
+        <div class="panel-eyebrow">Step 4 of 7</div>
+        <h2 class="panel-title">Cooperative Modules</h2>
+        <p class="panel-desc">Enter details for each cooperative that supplied coffee for this consignment.</p>
+      </div>
+      <div class="form-section">
+        <div class="coop-count-row">
+          <label>How many cooperatives supplied this consignment?</label>
+          <input type="number" id="coop_count" min="1" max="20" value="1" onchange="buildCoopModules()" oninput="buildCoopModules()">
+        </div>
+        <div class="coop-modules" id="coop-modules-container"></div>
+      </div>
+      <div class="form-nav-row">
+        <button class="btn btn-outline" onclick="expBack(4)">← Back</button>
+        <button class="btn btn-primary" onclick="expNext(4)">Continue →</button>
+      </div>
+    </div>
+
+    <!-- Step 5: Polygon Upload -->
+    <div class="form-panel" id="exp-step-5">
+      <div class="panel-header">
+        <div class="panel-eyebrow">Step 5 of 7</div>
+        <h2 class="panel-title">Farm Polygon Upload</h2>
+        <p class="panel-desc">Upload the geospatial boundaries of all farm parcels included in this consignment.</p>
+      </div>
+      <div class="form-section">
+        <div class="form-section-title">Geospatial File</div>
+        <div class="dropzone" id="dropzone" ondragover="dz_over(event)" ondragleave="dz_leave(event)" ondrop="dz_drop(event)">
+          <input type="file" id="exp_polygon_file" accept=".geojson,.kml,.kmz,.zip" onchange="dz_select(this)">
+          <div class="dropzone-icon">🗺️</div>
+          <div class="dropzone-title">Drag &amp; drop your file here</div>
+          <div class="dropzone-sub">or click to browse</div>
+          <div class="dropzone-formats">GeoJSON · KML · KMZ · ZIP (Shapefile)</div>
+          <div class="dropzone-file-display" id="dz-file-info"></div>
+        </div>
+        <p style="font-size:12.5px;color:var(--mid-grey);margin-top:12px;line-height:1.6">
+          Upload GeoJSON, KML, or zipped Shapefile covering all farm parcels for this consignment. Files should use WGS84 (EPSG:4326) coordinate reference system.
+        </p>
+      </div>
+      <div class="form-section">
+        <div class="form-section-title">Manual Centroid (optional fallback)</div>
+        <div class="form-row">
+          <div class="form-field">
+            <label>Latitude</label>
+            <input type="number" id="exp_lat" placeholder="-0.4167" step="any" min="-90" max="90">
+            <span class="field-hint">Decimal degrees, e.g. -0.4167</span>
+          </div>
+          <div class="form-field">
+            <label>Longitude</label>
+            <input type="number" id="exp_lon" placeholder="36.9500" step="any" min="-180" max="180">
+            <span class="field-hint">Decimal degrees, e.g. 36.9500</span>
+          </div>
+        </div>
+      </div>
+      <div class="form-nav-row">
+        <button class="btn btn-outline" onclick="expBack(5)">← Back</button>
+        <button class="btn btn-primary" onclick="expNext(5)">Continue →</button>
+      </div>
+    </div>
+
+    <!-- Step 6: Compliance Declarations -->
+    <div class="form-panel" id="exp-step-6">
+      <div class="panel-header">
+        <div class="panel-eyebrow">Step 6 of 7</div>
+        <h2 class="panel-title">Compliance Declarations</h2>
+        <p class="panel-desc">You must confirm each statement below before submitting your declaration.</p>
+      </div>
+      <div class="form-section">
+        <div class="form-section-title">Required Confirmations</div>
+        <div class="checkbox-list">
+          <label class="checkbox-item required-check" id="chk_exp_1_wrap">
+            <input type="checkbox" id="chk_exp_1">
+            <span class="checkbox-text">I confirm this coffee was not produced on land deforested after <strong>December 31, 2020</strong>, as per EUDR Regulation (EU) 2023/1115.</span>
+          </label>
+          <label class="checkbox-item required-check" id="chk_exp_2_wrap">
+            <input type="checkbox" id="chk_exp_2">
+            <span class="checkbox-text">I confirm all cooperatives listed in this submission have been informed of EUDR requirements and have provided necessary data.</span>
+          </label>
+          <label class="checkbox-item required-check" id="chk_exp_3_wrap">
+            <input type="checkbox" id="chk_exp_3">
+            <span class="checkbox-text">I confirm the farm polygons uploaded represent the actual production areas for this consignment.</span>
+          </label>
+          <label class="checkbox-item required-check" id="chk_exp_4_wrap">
+            <input type="checkbox" id="chk_exp_4">
+            <span class="checkbox-text">I confirm all consignment details provided in this submission are accurate and complete to the best of my knowledge.</span>
+          </label>
+          <label class="checkbox-item required-check" id="chk_exp_5_wrap">
+            <input type="checkbox" id="chk_exp_5">
+            <span class="checkbox-text">I confirm I have the legal authority to submit this declaration on behalf of the company named in this submission.</span>
+          </label>
+          <label class="checkbox-item required-check" id="chk_exp_6_wrap">
+            <input type="checkbox" id="chk_exp_6">
+            <span class="checkbox-text">I understand that providing false or misleading declarations may result in regulatory penalties under EU law.</span>
+          </label>
+        </div>
+      </div>
+      <div class="form-section">
+        <div class="form-section-title">Digital Signature</div>
+        <div class="form-row">
+          <div class="form-field signature-field">
+            <label>Type your full name as signature <span class="req">*</span></label>
+            <input type="text" id="exp_signature" placeholder="Your full legal name">
+            <span class="field-error" id="err_exp_signature">Signature required</span>
+          </div>
+          <div class="form-field">
+            <label>Date <span class="req">*</span></label>
+            <input type="date" id="exp_sign_date">
+            <span class="field-error" id="err_exp_sign_date">Required</span>
+          </div>
+        </div>
+      </div>
+      <div class="form-nav-row">
+        <button class="btn btn-outline" onclick="expBack(6)">← Back</button>
+        <button class="btn btn-primary" onclick="expNext(6)">Review &amp; Submit →</button>
+      </div>
+    </div>
+
+    <!-- Step 7: Review & Submit -->
+    <div class="form-panel" id="exp-step-7">
+      <div class="panel-header">
+        <div class="panel-eyebrow">Step 7 of 7</div>
+        <h2 class="panel-title">Review &amp; Submit</h2>
+        <p class="panel-desc">Review your submission below. Click <em>Edit</em> on any section to make changes.</p>
+      </div>
+      <div id="exp-summary"></div>
+      <div style="text-align:center;margin-top:32px">
+        <button class="btn btn-success btn-lg" onclick="expSubmit()">✓ Submit Declaration</button>
+      </div>
+      <div class="form-nav-row" style="border-top:none;padding-top:0;margin-top:16px">
+        <button class="btn btn-outline" onclick="expBack(7)">← Back</button>
+        <span></span>
+      </div>
+    </div>
+
+    <!-- Step 7 success -->
+    <div class="form-panel" id="exp-success">
+      <div class="success-screen">
+        <div class="success-icon">✅</div>
+        <div class="success-title">Declaration Submitted</div>
+        <p class="success-desc">Your EUDR compliance declaration has been successfully submitted. The importer will be notified to review your consignment.</p>
+        <div class="success-ref">
+          <div class="ref-label">Submission Reference</div>
+          <div class="ref-number" id="exp-ref-number">PLT---------</div>
+        </div>
+        <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
+          <button class="btn btn-ghost" onclick="window.print()">⬇ Download Summary</button>
+          <button class="btn btn-primary" onclick="location.href='plotra_website.html'">Back to Plotra</button>
+        </div>
+        <div class="success-note">📌 Keep this reference number for your records. The importer will link their due diligence review to this submission reference.</div>
+      </div>
+    </div>
+
+  </div><!-- /form-container -->
+</div><!-- /screen-exporter -->
+
+<!-- ══════════════════════════════════════════
+     SCREEN: IMPORTER FORM
+══════════════════════════════════════════ -->
+<div id="screen-importer" class="screen form-screen">
+  <div class="form-container">
+
+    <!-- Step progress -->
+    <div class="step-progress" id="imp-progress">
+      <div class="step-progress-header">
+        <span class="step-progress-label">Importer — EUDR Due Diligence</span>
+        <span class="step-progress-count" id="imp-step-count">Step 1 of 7</span>
+      </div>
+      <div class="step-dots" id="imp-step-dots"></div>
+    </div>
+
+    <!-- Step 1: KYC -->
+    <div class="form-panel active" id="imp-step-1">
+      <div class="panel-header">
+        <div class="panel-eyebrow">Step 1 of 7</div>
+        <h2 class="panel-title">Know Your Customer</h2>
+        <p class="panel-desc">Identity details for the EU responsible person submitting this due diligence statement.</p>
+      </div>
+      <div class="form-section">
+        <div class="form-section-title">Personal Details</div>
+        <div class="form-row">
+          <div class="form-field">
+            <label>Full Name <span class="req">*</span></label>
+            <input type="text" id="imp_full_name" placeholder="As on official ID">
+            <span class="field-error" id="err_imp_full_name">Required</span>
+          </div>
+          <div class="form-field">
+            <label>Role / Title <span class="req">*</span></label>
+            <input type="text" id="imp_role" placeholder="e.g. Compliance Officer">
+            <span class="field-error" id="err_imp_role">Required</span>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-field">
+            <label>Passport / EU National ID <span class="req">*</span></label>
+            <input type="text" id="imp_id_number" placeholder="Document number">
+            <span class="field-error" id="err_imp_id_number">Required</span>
+          </div>
+          <div class="form-field">
+            <label>Phone Number <span class="req">*</span></label>
+            <input type="tel" id="imp_phone" placeholder="+32 ...">
+            <span class="field-error" id="err_imp_phone">Required</span>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-field">
+            <label>Email Address <span class="req">*</span></label>
+            <input type="email" id="imp_email" placeholder="you@company.eu">
+            <span class="field-error" id="err_imp_email">Required</span>
+          </div>
+          <div class="form-field">
+            <label>EU Member State <span class="req">*</span></label>
+            <select id="imp_member_state">
+              <option value="">— Select —</option>
+              <option>Austria</option><option>Belgium</option><option>Bulgaria</option><option>Croatia</option>
+              <option>Cyprus</option><option>Czech Republic</option><option>Denmark</option><option>Estonia</option>
+              <option>Finland</option><option>France</option><option>Germany</option><option>Greece</option>
+              <option>Hungary</option><option>Ireland</option><option>Italy</option><option>Latvia</option>
+              <option>Lithuania</option><option>Luxembourg</option><option>Malta</option><option>Netherlands</option>
+              <option>Poland</option><option>Portugal</option><option>Romania</option><option>Slovakia</option>
+              <option>Slovenia</option><option>Spain</option><option>Sweden</option>
+            </select>
+            <span class="field-error" id="err_imp_member_state">Required</span>
+          </div>
+        </div>
+      </div>
+      <div class="form-section">
+        <div class="form-section-title">Identity Document Upload</div>
+        <div class="form-field">
+          <label>Identity Document</label>
+          <div class="file-upload-wrap">
+            <input type="file" class="file-upload-input" id="imp_id_doc" accept="image/*,.pdf" onchange="showFileName(this,'imp_id_doc_name')">
+            <label class="file-upload-label" for="imp_id_doc">
+              <span class="upload-icon">📎</span>
+              <span>Upload passport or EU national identity card</span>
+            </label>
+          </div>
+          <div class="file-name-display" id="imp_id_doc_name"></div>
+        </div>
+      </div>
+      <div class="form-nav-row">
+        <button class="btn btn-outline" onclick="goRole()">← Change Role</button>
+        <button class="btn btn-coffee" onclick="impNext(1)">Continue →</button>
+      </div>
+    </div>
+
+    <!-- Step 2: EU Operator Profile -->
+    <div class="form-panel" id="imp-step-2">
+      <div class="panel-header">
+        <div class="panel-eyebrow">Step 2 of 7</div>
+        <h2 class="panel-title">EU Operator Profile</h2>
+        <p class="panel-desc">Details of the EU company placing the commodity on the market.</p>
+      </div>
+      <div class="form-section">
+        <div class="form-section-title">Company Details</div>
+        <div class="form-row">
+          <div class="form-field">
+            <label>Company Name <span class="req">*</span></label>
+            <input type="text" id="imp_company_name" placeholder="Registered EU company name">
+            <span class="field-error" id="err_imp_company_name">Required</span>
+          </div>
+          <div class="form-field">
+            <label>EORI Number <span class="req">*</span></label>
+            <input type="text" id="imp_eori" placeholder="BE123456789012345">
+            <span class="field-hint">Format: 2-letter country code + up to 15 digits</span>
+            <span class="field-error" id="err_imp_eori">Required</span>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-field">
+            <label>VAT Number</label>
+            <input type="text" id="imp_vat" placeholder="BE0123456789">
+          </div>
+          <div class="form-field">
+            <label>Country <span class="req">*</span></label>
+            <select id="imp_company_country">
+              <option value="">— Select —</option>
+              <option>Austria</option><option>Belgium</option><option>Bulgaria</option><option>Croatia</option>
+              <option>Cyprus</option><option>Czech Republic</option><option>Denmark</option><option>Estonia</option>
+              <option>Finland</option><option>France</option><option>Germany</option><option>Greece</option>
+              <option>Hungary</option><option>Ireland</option><option>Italy</option><option>Latvia</option>
+              <option>Lithuania</option><option>Luxembourg</option><option>Malta</option><option>Netherlands</option>
+              <option>Poland</option><option>Portugal</option><option>Romania</option><option>Slovakia</option>
+              <option>Slovenia</option><option>Spain</option><option>Sweden</option>
+            </select>
+            <span class="field-error" id="err_imp_company_country">Required</span>
+          </div>
+        </div>
+        <div class="form-row single">
+          <div class="form-field">
+            <label>Registered Address <span class="req">*</span></label>
+            <input type="text" id="imp_address" placeholder="Street address">
+            <span class="field-error" id="err_imp_address">Required</span>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-field">
+            <label>City <span class="req">*</span></label>
+            <input type="text" id="imp_city" placeholder="City">
+            <span class="field-error" id="err_imp_city">Required</span>
+          </div>
+          <div class="form-field">
+            <label>Postal Code</label>
+            <input type="text" id="imp_postal" placeholder="Postal code">
+          </div>
+        </div>
+      </div>
+      <div class="form-section">
+        <div class="form-section-title">Operator Document</div>
+        <div class="form-field">
+          <label>Import License / Operator Registration</label>
+          <div class="file-upload-wrap">
+            <input type="file" class="file-upload-input" id="imp_license" accept=".pdf,image/*" onchange="showFileName(this,'imp_license_name')">
+            <label class="file-upload-label" for="imp_license">
+              <span class="upload-icon">📎</span>
+              <span>Upload import license or operator registration document</span>
+            </label>
+          </div>
+          <div class="file-name-display" id="imp_license_name"></div>
+        </div>
+      </div>
+      <div class="form-nav-row">
+        <button class="btn btn-outline" onclick="impBack(2)">← Back</button>
+        <button class="btn btn-coffee" onclick="impNext(2)">Continue →</button>
+      </div>
+    </div>
+
+    <!-- Step 3: Supplier / Exporter -->
+    <div class="form-panel" id="imp-step-3">
+      <div class="panel-header">
+        <div class="panel-eyebrow">Step 3 of 7</div>
+        <h2 class="panel-title">Supplier / Exporter Details</h2>
+        <p class="panel-desc">Details of the supplier or exporter who originated this consignment.</p>
+      </div>
+      <div class="form-section">
+        <div class="form-section-title">Exporter Information</div>
+        <div class="form-row">
+          <div class="form-field">
+            <label>Exporter / Supplier Name <span class="req">*</span></label>
+            <input type="text" id="imp_exporter_name" placeholder="Company or cooperative name">
+            <span class="field-error" id="err_imp_exporter_name">Required</span>
+          </div>
+          <div class="form-field">
+            <label>Exporter Country <span class="req">*</span></label>
+            <select id="imp_exporter_country">
+              <option value="">— Select —</option>
+              <option>Kenya</option><option>Uganda</option><option>Ethiopia</option><option>Tanzania</option><option>Rwanda</option><option>Burundi</option><option>Other</option>
+            </select>
+            <span class="field-error" id="err_imp_exporter_country">Required</span>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-field">
+            <label>Exporter Email</label>
+            <input type="email" id="imp_exporter_email" placeholder="exporter@company.co.ke">
+          </div>
+          <div class="form-field">
+            <label>Consignment Reference <span class="req">*</span></label>
+            <input type="text" id="imp_consignment_ref" placeholder="PLT-2025-000001">
+            <span class="field-hint">Reference from the exporter's EUDR submission</span>
+            <span class="field-error" id="err_imp_consignment_ref">Required</span>
+          </div>
+        </div>
+        <div class="form-row single">
+          <div class="form-field">
+            <label>Link / Reference to Exporter's EUDR Submission</label>
+            <input type="text" id="imp_exporter_submission_ref" placeholder="e.g. Plotra submission ID or URL">
+          </div>
+        </div>
+      </div>
+      <div class="form-nav-row">
+        <button class="btn btn-outline" onclick="impBack(3)">← Back</button>
+        <button class="btn btn-coffee" onclick="impNext(3)">Continue →</button>
+      </div>
+    </div>
+
+    <!-- Step 4: Consignment Review -->
+    <div class="form-panel" id="imp-step-4">
+      <div class="panel-header">
+        <div class="panel-eyebrow">Step 4 of 7</div>
+        <h2 class="panel-title">Consignment Review</h2>
+        <p class="panel-desc">Verify and supplement the consignment details for the EU side of the shipment.</p>
+      </div>
+      <div class="form-section">
+        <div class="form-section-title">Product &amp; Origin</div>
+        <div class="form-row">
+          <div class="form-field">
+            <label>Coffee Variety <span class="req">*</span></label>
+            <select id="imp_coffee_variety">
+              <option value="">— Select —</option>
+              <option>Arabica</option><option>Robusta</option><option>Mixed</option>
+            </select>
+            <span class="field-error" id="err_imp_coffee_variety">Required</span>
+          </div>
+          <div class="form-field">
+            <label>Quantity (kg) <span class="req">*</span></label>
+            <input type="number" id="imp_quantity" placeholder="e.g. 20000" min="1">
+            <span class="field-error" id="err_imp_quantity">Required</span>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-field">
+            <label>Harvest Year <span class="req">*</span></label>
+            <select id="imp_harvest_year">
+              <option value="">— Select —</option>
+              <option>2026</option><option>2025</option><option>2024</option><option>2023</option>
+              <option>2022</option><option>2021</option><option>2020</option><option>2019</option><option>2018</option>
+            </select>
+            <span class="field-error" id="err_imp_harvest_year">Required</span>
+          </div>
+          <div class="form-field">
+            <label>Country of Origin <span class="req">*</span></label>
+            <select id="imp_origin_country">
+              <option value="">— Select —</option>
+              <option>Kenya</option><option>Uganda</option><option>Ethiopia</option><option>Tanzania</option><option>Rwanda</option><option>Other</option>
+            </select>
+            <span class="field-error" id="err_imp_origin_country">Required</span>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-field">
+            <label>Origin Region</label>
+            <input type="text" id="imp_origin_region" placeholder="Region or county">
+          </div>
+          <div class="form-field">
+            <label>Arrival Date at EU Port <span class="req">*</span></label>
+            <input type="date" id="imp_arrival_date">
+            <span class="field-error" id="err_imp_arrival_date">Required</span>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-field">
+            <label>EU Port of Entry <span class="req">*</span></label>
+            <input type="text" id="imp_port" placeholder="e.g. Port of Antwerp">
+            <span class="field-error" id="err_imp_port">Required</span>
+          </div>
+          <div class="form-field"></div>
+        </div>
+        <div class="form-row single">
+          <div class="form-field">
+            <label>Notes / Observations</label>
+            <textarea id="imp_consignment_notes" rows="3" placeholder="Any observations, discrepancies, or additional information about this consignment..."></textarea>
+          </div>
+        </div>
+      </div>
+      <div class="form-nav-row">
+        <button class="btn btn-outline" onclick="impBack(4)">← Back</button>
+        <button class="btn btn-coffee" onclick="impNext(4)">Continue →</button>
+      </div>
+    </div>
+
+    <!-- Step 5: Risk Assessment -->
+    <div class="form-panel" id="imp-step-5">
+      <div class="panel-header">
+        <div class="panel-eyebrow">Step 5 of 7</div>
+        <h2 class="panel-title">Risk Assessment</h2>
+        <p class="panel-desc">Assess the deforestation and supply chain risk for this consignment.</p>
+      </div>
+      <div class="form-section">
+        <div class="form-section-title">Risk Factors</div>
+        <div class="form-row">
+          <div class="form-field">
+            <label>Country Risk Level <span class="req">*</span></label>
+            <select id="imp_country_risk" onchange="updateRiskBars()">
+              <option value="">— Select —</option>
+              <option value="low">Low — Country on EU Low-Risk Annex</option>
+              <option value="standard">Standard — No special classification</option>
+              <option value="high">High — Country on EU High-Risk Annex</option>
+            </select>
+            <div class="risk-indicator" id="risk-bars">
+              <div class="risk-bar" id="rb1"></div>
+              <div class="risk-bar" id="rb2"></div>
+              <div class="risk-bar" id="rb3"></div>
+            </div>
+            <span class="field-error" id="err_imp_country_risk">Required</span>
+          </div>
+          <div class="form-field">
+            <label>Supply Chain Complexity <span class="req">*</span></label>
+            <select id="imp_chain_complexity">
+              <option value="">— Select —</option>
+              <option>Simple — Direct from exporter</option>
+              <option>Medium — Via trader or broker</option>
+              <option>Complex — Multiple intermediaries</option>
+            </select>
+            <span class="field-error" id="err_imp_chain_complexity">Required</span>
+          </div>
+        </div>
+      </div>
+      <div class="form-section">
+        <div class="form-section-title">Evidence Checklist</div>
+        <div class="checkbox-list">
+          <label class="checkbox-item">
+            <input type="checkbox" id="chk_imp_ev1">
+            <span class="checkbox-text">Exporter has provided EUDR-compliant due diligence documentation</span>
+          </label>
+          <label class="checkbox-item">
+            <input type="checkbox" id="chk_imp_ev2">
+            <span class="checkbox-text">Farm-level geolocation data has been reviewed and validated</span>
+          </label>
+          <label class="checkbox-item">
+            <input type="checkbox" id="chk_imp_ev3">
+            <span class="checkbox-text">No deforestation evidence found in satellite or remote sensing analysis</span>
+          </label>
+          <label class="checkbox-item">
+            <input type="checkbox" id="chk_imp_ev4">
+            <span class="checkbox-text">Cooperative / farmer records match the stated production volumes</span>
+          </label>
+          <label class="checkbox-item">
+            <input type="checkbox" id="chk_imp_ev5">
+            <span class="checkbox-text">Third-party certification documentation reviewed (if applicable)</span>
+          </label>
+        </div>
+      </div>
+      <div class="form-section">
+        <div class="form-section-title">Risk Conclusion <span class="req" style="font-family:sans-serif">*</span></div>
+        <div class="radio-group" id="risk-conclusion-group">
+          <label class="radio-option" id="rc_compliant">
+            <input type="radio" name="risk_conclusion" value="COMPLIANT" onchange="updateRadioStyle('risk-conclusion-group')"> COMPLIANT
+          </label>
+          <label class="radio-option" id="rc_review">
+            <input type="radio" name="risk_conclusion" value="NEEDS_FURTHER_REVIEW" onchange="updateRadioStyle('risk-conclusion-group')"> Needs Further Review
+          </label>
+          <label class="radio-option" id="rc_noncompliant">
+            <input type="radio" name="risk_conclusion" value="NON_COMPLIANT" onchange="updateRadioStyle('risk-conclusion-group')"> NON-COMPLIANT
+          </label>
+        </div>
+        <span class="field-error" id="err_imp_risk_conclusion" style="margin-top:8px;display:none">Please select a risk conclusion</span>
+        <div class="form-field" style="margin-top:16px">
+          <label>Notes</label>
+          <textarea id="imp_risk_notes" rows="3" placeholder="Supporting notes for your risk assessment..."></textarea>
+        </div>
+      </div>
+      <div class="form-nav-row">
+        <button class="btn btn-outline" onclick="impBack(5)">← Back</button>
+        <button class="btn btn-coffee" onclick="impNext(5)">Continue →</button>
+      </div>
+    </div>
+
+    <!-- Step 6: Due Diligence Approval -->
+    <div class="form-panel" id="imp-step-6">
+      <div class="panel-header">
+        <div class="panel-eyebrow">Step 6 of 7</div>
+        <h2 class="panel-title">Due Diligence Approval</h2>
+        <p class="panel-desc">Final sign-off by the EU responsible person for this due diligence statement.</p>
+      </div>
+      <div class="form-section">
+        <div class="form-section-title">Reviewer Details</div>
+        <div class="form-row">
+          <div class="form-field">
+            <label>Reviewer Full Name <span class="req">*</span></label>
+            <input type="text" id="imp_reviewer_name" placeholder="Full legal name">
+            <span class="field-error" id="err_imp_reviewer_name">Required</span>
+          </div>
+          <div class="form-field">
+            <label>Reviewer Title / Role <span class="req">*</span></label>
+            <input type="text" id="imp_reviewer_title" placeholder="e.g. Head of Compliance">
+            <span class="field-error" id="err_imp_reviewer_title">Required</span>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-field">
+            <label>Review Date <span class="req">*</span></label>
+            <input type="date" id="imp_review_date">
+            <span class="field-error" id="err_imp_review_date">Required</span>
+          </div>
+          <div class="form-field">
+            <label>Internal Reference Number</label>
+            <input type="text" id="imp_internal_ref" placeholder="e.g. DDS-2025-001">
+          </div>
+        </div>
+      </div>
+      <div class="form-section">
+        <div class="form-section-title">Approval Declarations</div>
+        <div class="checkbox-list">
+          <label class="checkbox-item required-check" id="chk_imp_1_wrap">
+            <input type="checkbox" id="chk_imp_1">
+            <span class="checkbox-text">I have reviewed all supplied documentation and am satisfied it meets the requirements of EUDR Regulation (EU) 2023/1115.</span>
+          </label>
+          <label class="checkbox-item required-check" id="chk_imp_2_wrap">
+            <input type="checkbox" id="chk_imp_2">
+            <span class="checkbox-text">I take full responsibility for this due diligence statement as the EU responsible person named in this submission.</span>
+          </label>
+          <label class="checkbox-item required-check" id="chk_imp_3_wrap">
+            <input type="checkbox" id="chk_imp_3">
+            <span class="checkbox-text">I understand this record may be audited by competent national authorities and must be retained for at least 5 years.</span>
+          </label>
+        </div>
+      </div>
+      <div class="form-section">
+        <div class="form-section-title">Digital Signature</div>
+        <div class="form-row">
+          <div class="form-field signature-field">
+            <label>Type your full name as signature <span class="req">*</span></label>
+            <input type="text" id="imp_signature" placeholder="Your full legal name">
+            <span class="field-error" id="err_imp_signature">Signature required</span>
+          </div>
+        </div>
+      </div>
+      <div class="form-nav-row">
+        <button class="btn btn-outline" onclick="impBack(6)">← Back</button>
+        <button class="btn btn-coffee" onclick="impNext(6)">Review &amp; Archive →</button>
+      </div>
+    </div>
+
+    <!-- Step 7: Archive & Confirmation -->
+    <div class="form-panel" id="imp-step-7">
+      <div class="panel-header">
+        <div class="panel-eyebrow">Step 7 of 7</div>
+        <h2 class="panel-title">Archive &amp; Confirmation</h2>
+        <p class="panel-desc">Review your due diligence record before final submission.</p>
+      </div>
+      <div id="imp-summary"></div>
+      <div style="text-align:center;margin-top:32px;display:flex;flex-direction:column;align-items:center;gap:14px">
+        <button class="btn btn-success btn-lg" onclick="impSubmit()">✓ Submit Due Diligence Statement</button>
+        <button class="btn btn-ghost" onclick="console.log('Submit to EU DDS Portal — placeholder')">
+          🇪🇺 Submit to EU DDS Portal
+        </button>
+        <p style="font-size:11.5px;color:var(--mid-grey);font-family:'DM Mono',monospace">EU DDS Portal submission is a placeholder — integrate your national competent authority system</p>
+      </div>
+      <div class="form-nav-row" style="border-top:none;padding-top:0;margin-top:16px">
+        <button class="btn btn-outline" onclick="impBack(7)">← Back</button>
+        <span></span>
+      </div>
+    </div>
+
+    <!-- Success -->
+    <div class="form-panel" id="imp-success">
+      <div class="success-screen">
+        <div class="success-icon">🏛️</div>
+        <div class="success-title">Due Diligence Statement Archived</div>
+        <p class="success-desc">Your EUDR due diligence statement has been successfully submitted and archived. Retain this record for at least 5 years.</p>
+        <div class="success-ref">
+          <div class="ref-label">Submission Reference</div>
+          <div class="ref-number" id="imp-ref-number">DDS---------</div>
+        </div>
+        <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
+          <button class="btn btn-ghost" onclick="window.print()">⬇ Download Record</button>
+          <button class="btn btn-coffee" onclick="location.href='plotra_website.html'">Back to Plotra</button>
+        </div>
+        <div class="success-note">📌 EUDR Article 9 requires this record to be retained for a minimum of <strong>5 years</strong> from the date of submission and made available to competent authorities on request.</div>
+      </div>
+    </div>
+
+  </div><!-- /form-container -->
+</div><!-- /screen-importer -->
+
+<!-- ══════════════════════════════════════════
+     JAVASCRIPT
+══════════════════════════════════════════ -->
+<script>
+// ── Step labels ──
+const EXP_STEPS = ['KYC','Company','Consignment','Cooperatives','Polygons','Declarations','Review'];
+const IMP_STEPS = ['KYC','Operator','Supplier','Consignment','Risk','Approval','Archive'];
+
+let expStep = 1;
+let impStep = 1;
+
+// ── Init on load ──
+window.addEventListener('DOMContentLoaded', () => {
+  buildStepDots('exp-step-dots', EXP_STEPS, expStep);
+  buildStepDots('imp-step-dots', IMP_STEPS, impStep);
+  buildCoopModules();
+  prefillDates();
+  restoreDrafts();
+
+  const params = new URLSearchParams(location.search);
+  const role = params.get('role');
+  if (role === 'exporter') startRole('exporter');
+  else if (role === 'importer') startRole('importer');
+  else showScreen('role');
+});
+
+// ── Screen routing ──
+function showScreen(name) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  const el = document.getElementById('screen-' + name);
+  if (el) el.classList.add('active');
+  window.scrollTo(0, 0);
+}
+
+function startRole(role) {
+  const params = new URLSearchParams(location.search);
+  params.set('role', role);
+  history.replaceState(null, '', '?' + params.toString());
+  showScreen(role);
+}
+
+function goRole() {
+  history.replaceState(null, '', location.pathname);
+  showScreen('role');
+}
+
+// ── Step dots builder ──
+function buildStepDots(containerId, labels, current) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  container.innerHTML = '';
+  labels.forEach((label, i) => {
+    const step = i + 1;
+    const dot = document.createElement('div');
+    dot.className = 'step-dot' + (step < current ? ' completed' : step === current ? ' active' : '');
+    dot.innerHTML = `
+      <div class="step-dot-circle">${step < current ? '✓' : step}</div>
+      <div class="step-dot-label">${label}</div>`;
+    container.appendChild(dot);
+  });
+}
+
+function updateProgress(prefix, labels, step) {
+  buildStepDots(prefix + '-step-dots', labels, step);
+  const el = document.getElementById(prefix + '-step-count');
+  if (el) el.textContent = 'Step ' + step + ' of ' + labels.length;
+}
+
+// ── Panel switcher ──
+function showPanel(prefix, num) {
+  document.querySelectorAll(`#screen-${prefix} .form-panel`).forEach(p => p.classList.remove('active'));
+  const panel = document.getElementById(prefix + '-step-' + num) || document.getElementById(prefix + '-success');
+  if (panel) { panel.classList.add('active'); window.scrollTo(0, 0); }
+}
+
+// ── Exporter navigation ──
+function expNext(step) {
+  if (!validateStep('exp', step)) return;
+  saveExpDraft();
+  expStep = step + 1;
+  if (step === 6) buildExpSummary();
+  showPanel('exporter', expStep);
+  updateProgress('exp', EXP_STEPS, Math.min(expStep, 7));
+}
+function expBack(step) {
+  expStep = step - 1;
+  showPanel('exporter', expStep);
+  updateProgress('exp', EXP_STEPS, expStep);
+}
+
+// ── Importer navigation ──
+function impNext(step) {
+  if (!validateStep('imp', step)) return;
+  saveImpDraft();
+  impStep = step + 1;
+  if (step === 6) buildImpSummary();
+  showPanel('importer', impStep);
+  updateProgress('imp', IMP_STEPS, Math.min(impStep, 7));
+}
+function impBack(step) {
+  impStep = step - 1;
+  showPanel('importer', impStep);
+  updateProgress('imp', IMP_STEPS, impStep);
+}
+
+// ── Validation ──
+const EXP_REQUIRED = {
+  1: ['exp_full_name','exp_id_number','exp_phone','exp_email','exp_country'],
+  2: ['exp_company_name','exp_reg_number','exp_company_country','exp_city','exp_address','exp_contact_name','exp_contact_phone','exp_contact_email'],
+  3: ['exp_consignment_ref','exp_coffee_variety','exp_quantity','exp_harvest_year','exp_origin_country','exp_origin_region','exp_destination'],
+  4: [],
+  5: [],
+  6: ['exp_signature','exp_sign_date'],
+};
+const EXP_CHECKS = { 6: ['chk_exp_1','chk_exp_2','chk_exp_3','chk_exp_4','chk_exp_5','chk_exp_6'] };
+
+const IMP_REQUIRED = {
+  1: ['imp_full_name','imp_role','imp_id_number','imp_phone','imp_email','imp_member_state'],
+  2: ['imp_company_name','imp_eori','imp_company_country','imp_address','imp_city'],
+  3: ['imp_exporter_name','imp_exporter_country','imp_consignment_ref'],
+  4: ['imp_coffee_variety','imp_quantity','imp_harvest_year','imp_origin_country','imp_arrival_date','imp_port'],
+  5: ['imp_country_risk','imp_chain_complexity'],
+  6: ['imp_reviewer_name','imp_reviewer_title','imp_review_date','imp_signature'],
+};
+const IMP_CHECKS = { 6: ['chk_imp_1','chk_imp_2','chk_imp_3'] };
+const IMP_RADIO = { 5: { name: 'risk_conclusion', errId: 'err_imp_risk_conclusion' } };
+
+function validateStep(prefix, step) {
+  let valid = true;
+  const required = prefix === 'exp' ? EXP_REQUIRED[step] : IMP_REQUIRED[step];
+  (required || []).forEach(id => {
+    const el = document.getElementById(id);
+    const err = document.getElementById('err_' + id);
+    if (!el) return;
+    const empty = (el.tagName === 'SELECT' ? el.value === '' : el.value.trim() === '');
+    el.classList.toggle('error', empty);
+    if (err) err.classList.toggle('visible', empty);
+    if (empty) valid = false;
+  });
+
+  // Checkboxes
+  const checks = prefix === 'exp' ? EXP_CHECKS[step] : IMP_CHECKS[step];
+  (checks || []).forEach(id => {
+    const cb = document.getElementById(id);
+    const wrap = document.getElementById(id + '_wrap');
+    if (cb && !cb.checked) {
+      valid = false;
+      if (wrap) wrap.classList.add('error');
+    } else if (wrap) wrap.classList.remove('error');
+  });
+
+  // Radio
+  const radio = prefix === 'imp' ? IMP_RADIO[step] : null;
+  if (radio) {
+    const sel = document.querySelector(`input[name="${radio.name}"]:checked`);
+    const errEl = document.getElementById(radio.errId);
+    if (!sel) { valid = false; if (errEl) errEl.style.display = 'block'; }
+    else if (errEl) errEl.style.display = 'none';
+  }
+
+  if (!valid) {
+    const firstErr = document.querySelector(`#${prefix === 'exp' ? 'screen-exporter' : 'screen-importer'} .error`);
+    if (firstErr) firstErr.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+  return valid;
+}
+
+// ── Cooperative modules ──
+function buildCoopModules() {
+  const n = Math.min(20, Math.max(1, parseInt(document.getElementById('coop_count').value) || 1));
+  const container = document.getElementById('coop-modules-container');
+  const existing = container.children.length;
+
+  // Add modules if needed
+  while (container.children.length < n) {
+    const idx = container.children.length + 1;
+    container.appendChild(createCoopModule(idx));
+  }
+  // Remove extra
+  while (container.children.length > n) {
+    container.removeChild(container.lastChild);
+  }
+  // Re-label
+  Array.from(container.children).forEach((m, i) => {
+    const title = m.querySelector('.coop-module-title');
+    if (title) title.textContent = 'Cooperative ' + (i + 1);
+  });
+}
+
+function createCoopModule(idx) {
+  const div = document.createElement('div');
+  div.className = 'coop-module open';
+  div.innerHTML = `
+    <div class="coop-module-header" onclick="toggleCoop(this)">
+      <span class="coop-module-title">Cooperative ${idx}</span>
+      <span class="coop-module-toggle">▾</span>
+    </div>
+    <div class="coop-module-body">
+      <div class="form-row">
+        <div class="form-field">
+          <label>Cooperative Name <span class="req">*</span></label>
+          <input type="text" class="coop_name" placeholder="Name of cooperative">
+        </div>
+        <div class="form-field">
+          <label>Registration Number</label>
+          <input type="text" class="coop_reg" placeholder="Registration / society no.">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-field">
+          <label>Region / District</label>
+          <input type="text" class="coop_region" placeholder="e.g. Kirinyaga">
+        </div>
+        <div class="form-field">
+          <label>County / Province</label>
+          <input type="text" class="coop_county" placeholder="e.g. Central">
+        </div>
+      </div>
+      <div class="form-row triple">
+        <div class="form-field">
+          <label>Member Farmers</label>
+          <input type="number" class="coop_farmers" placeholder="Count" min="1">
+        </div>
+        <div class="form-field">
+          <label>Total Farm Area (ha)</label>
+          <input type="number" class="coop_area" placeholder="Hectares" min="0" step="0.1">
+        </div>
+        <div class="form-field">
+          <label>Primary Certification</label>
+          <select class="coop_cert">
+            <option value="">None</option>
+            <option>Organic</option>
+            <option>Rainforest Alliance</option>
+            <option>UTZ</option>
+            <option>Fairtrade</option>
+            <option>4C</option>
+          </select>
+        </div>
+      </div>
+    </div>`;
+  return div;
+}
+
+function toggleCoop(header) {
+  header.parentElement.classList.toggle('open');
+}
+
+// ── File display ──
+function showFileName(input, displayId) {
+  const el = document.getElementById(displayId);
+  if (!el) return;
+  if (input.files && input.files[0]) {
+    const f = input.files[0];
+    const size = f.size > 1024*1024 ? (f.size/(1024*1024)).toFixed(1)+' MB' : (f.size/1024).toFixed(0)+' KB';
+    el.textContent = '📎 ' + f.name + ' (' + size + ')';
+  } else { el.textContent = ''; }
+}
+
+// ── Drag & drop dropzone ──
+function dz_over(e) { e.preventDefault(); document.getElementById('dropzone').classList.add('dragover'); }
+function dz_leave(e) { document.getElementById('dropzone').classList.remove('dragover'); }
+function dz_drop(e) {
+  e.preventDefault();
+  document.getElementById('dropzone').classList.remove('dragover');
+  const file = e.dataTransfer.files[0];
+  if (file) showDzFile(file);
+}
+function dz_select(input) {
+  if (input.files && input.files[0]) showDzFile(input.files[0]);
+}
+function showDzFile(f) {
+  const info = document.getElementById('dz-file-info');
+  const size = f.size > 1024*1024 ? (f.size/(1024*1024)).toFixed(2)+' MB' : (f.size/1024).toFixed(0)+' KB';
+  info.style.display = 'block';
+  info.innerHTML = '🗺️ <strong>' + f.name + '</strong> — ' + size;
+}
+
+// ── Risk bars ──
+function updateRiskBars() {
+  const val = document.getElementById('imp_country_risk').value;
+  ['rb1','rb2','rb3'].forEach(id => {
+    document.getElementById(id).className = 'risk-bar';
+  });
+  if (val === 'low') document.getElementById('rb1').classList.add('active-low');
+  else if (val === 'standard') {
+    document.getElementById('rb1').classList.add('active-standard');
+    document.getElementById('rb2').classList.add('active-standard');
+  } else if (val === 'high') {
+    document.getElementById('rb1').classList.add('active-high');
+    document.getElementById('rb2').classList.add('active-high');
+    document.getElementById('rb3').classList.add('active-high');
+  }
+}
+
+// ── Radio style ──
+function updateRadioStyle(groupId) {
+  const group = document.getElementById(groupId);
+  if (!group) return;
+  group.querySelectorAll('.radio-option').forEach(opt => {
+    const r = opt.querySelector('input[type=radio]');
+    opt.classList.toggle('selected', r && r.checked);
+  });
+}
+
+// ── Prefill dates ──
+function prefillDates() {
+  const today = new Date().toISOString().split('T')[0];
+  const sd = document.getElementById('exp_sign_date');
+  const rd = document.getElementById('imp_review_date');
+  if (sd) sd.value = today;
+  if (rd) rd.value = today;
+}
+
+// ── LocalStorage draft ──
+function gatherExp() {
+  const data = {};
+  ['exp_full_name','exp_id_number','exp_phone','exp_email','exp_country',
+   'exp_company_name','exp_reg_number','exp_company_country','exp_city','exp_address','exp_postal',
+   'exp_contact_name','exp_contact_phone','exp_contact_email',
+   'exp_consignment_ref','exp_coffee_variety','exp_quantity','exp_harvest_year',
+   'exp_origin_country','exp_origin_region','exp_hs_code','exp_destination',
+   'exp_lat','exp_lon','exp_signature','exp_sign_date'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) data[id] = el.value;
+  });
+  data.coop_count = document.getElementById('coop_count').value;
+  return data;
+}
+function gatherImp() {
+  const data = {};
+  ['imp_full_name','imp_role','imp_id_number','imp_phone','imp_email','imp_member_state',
+   'imp_company_name','imp_eori','imp_vat','imp_company_country','imp_address','imp_city','imp_postal',
+   'imp_exporter_name','imp_exporter_country','imp_exporter_email','imp_consignment_ref','imp_exporter_submission_ref',
+   'imp_coffee_variety','imp_quantity','imp_harvest_year','imp_origin_country','imp_origin_region',
+   'imp_arrival_date','imp_port','imp_consignment_notes',
+   'imp_country_risk','imp_chain_complexity','imp_risk_notes',
+   'imp_reviewer_name','imp_reviewer_title','imp_review_date','imp_internal_ref','imp_signature'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) data[id] = el.value;
+  });
+  const rc = document.querySelector('input[name="risk_conclusion"]:checked');
+  data.risk_conclusion = rc ? rc.value : '';
+  return data;
+}
+function saveExpDraft() { try { localStorage.setItem('eudr_exporter_draft', JSON.stringify(gatherExp())); } catch(e){} }
+function saveImpDraft() { try { localStorage.setItem('eudr_importer_draft', JSON.stringify(gatherImp())); } catch(e){} }
+
+function restoreDrafts() {
+  try {
+    const ed = JSON.parse(localStorage.getItem('eudr_exporter_draft') || '{}');
+    Object.entries(ed).forEach(([id, val]) => {
+      const el = document.getElementById(id);
+      if (el) el.value = val;
+    });
+    if (ed.coop_count) buildCoopModules();
+  } catch(e){}
+  try {
+    const id2 = JSON.parse(localStorage.getItem('eudr_importer_draft') || '{}');
+    Object.entries(id2).forEach(([id, val]) => {
+      const el = document.getElementById(id);
+      if (el) el.value = val;
+    });
+    if (id2.risk_conclusion) {
+      const r = document.querySelector(`input[name="risk_conclusion"][value="${id2.risk_conclusion}"]`);
+      if (r) { r.checked = true; updateRadioStyle('risk-conclusion-group'); }
+    }
+    updateRiskBars();
+  } catch(e){}
+}
+
+// ── Summary builder ──
+function sv(id) {
+  const el = document.getElementById(id);
+  if (!el) return '—';
+  const v = el.value.trim();
+  return v || '—';
+}
+
+function summarySection(title, rows, editStep, prefix) {
+  const rowsHtml = rows.map(([k,v]) =>
+    `<div class="summary-row"><span class="summary-key">${k}</span><span class="summary-val">${v || '—'}</span></div>`
+  ).join('');
+  const fn = prefix === 'exp' ? `expBack(${editStep+1});expStep=${editStep};showPanel('exporter',${editStep});updateProgress('exp',EXP_STEPS,${editStep})` :
+    `impBack(${editStep+1});impStep=${editStep};showPanel('importer',${editStep});updateProgress('imp',IMP_STEPS,${editStep})`;
+  return `<div class="summary-section">
+    <div class="summary-section-header">
+      <span class="summary-section-title">${title}</span>
+      <button class="summary-edit-btn" onclick="${fn}">Edit</button>
+    </div>
+    ${rowsHtml}
+  </div>`;
+}
+
+function buildExpSummary() {
+  const coops = [];
+  document.querySelectorAll('#coop-modules-container .coop-module').forEach((m,i) => {
+    const name = m.querySelector('.coop_name').value || '(unnamed)';
+    coops.push(`Cooperative ${i+1}: ${name}`);
+  });
+
+  document.getElementById('exp-summary').innerHTML =
+    summarySection('KYC — Personal', [
+      ['Full Name', sv('exp_full_name')], ['ID / Passport', sv('exp_id_number')],
+      ['Phone', sv('exp_phone')], ['Email', sv('exp_email')], ['Country', sv('exp_country')]
+    ], 1, 'exp') +
+    summarySection('Company Profile', [
+      ['Company Name', sv('exp_company_name')], ['Reg. Number', sv('exp_reg_number')],
+      ['Country', sv('exp_company_country')], ['Address', sv('exp_address') + ', ' + sv('exp_city')],
+      ['Contact', sv('exp_contact_name') + ' · ' + sv('exp_contact_phone')]
+    ], 2, 'exp') +
+    summarySection('Consignment', [
+      ['Reference', sv('exp_consignment_ref')], ['Coffee', sv('exp_coffee_variety')],
+      ['Quantity', sv('exp_quantity') + ' kg'], ['Harvest Year', sv('exp_harvest_year')],
+      ['Origin', sv('exp_origin_region') + ', ' + sv('exp_origin_country')],
+      ['HS Code', sv('exp_hs_code')], ['Destination', sv('exp_destination')]
+    ], 3, 'exp') +
+    summarySection('Cooperatives', coops.map((c,i) => ['', c]), 4, 'exp') +
+    summarySection('Compliance', [
+      ['Signature', sv('exp_signature')], ['Date', sv('exp_sign_date')]
+    ], 6, 'exp');
+}
+
+function buildImpSummary() {
+  const rc = document.querySelector('input[name="risk_conclusion"]:checked');
+  document.getElementById('imp-summary').innerHTML =
+    summarySection('KYC — Personal', [
+      ['Full Name', sv('imp_full_name')], ['Role', sv('imp_role')],
+      ['Email', sv('imp_email')], ['EU Member State', sv('imp_member_state')]
+    ], 1, 'imp') +
+    summarySection('EU Operator Profile', [
+      ['Company', sv('imp_company_name')], ['EORI', sv('imp_eori')],
+      ['Country', sv('imp_company_country')], ['Address', sv('imp_address') + ', ' + sv('imp_city')]
+    ], 2, 'imp') +
+    summarySection('Supplier / Exporter', [
+      ['Exporter', sv('imp_exporter_name')], ['Country', sv('imp_exporter_country')],
+      ['Consignment Ref', sv('imp_consignment_ref')]
+    ], 3, 'imp') +
+    summarySection('Consignment', [
+      ['Coffee', sv('imp_coffee_variety')], ['Quantity', sv('imp_quantity') + ' kg'],
+      ['Origin', sv('imp_origin_country')], ['Port of Entry', sv('imp_port')],
+      ['Arrival Date', sv('imp_arrival_date')]
+    ], 4, 'imp') +
+    summarySection('Risk Assessment', [
+      ['Country Risk', sv('imp_country_risk')], ['Supply Chain', sv('imp_chain_complexity')],
+      ['Conclusion', rc ? rc.value : '—']
+    ], 5, 'imp') +
+    summarySection('Approval', [
+      ['Reviewer', sv('imp_reviewer_name') + ' · ' + sv('imp_reviewer_title')],
+      ['Review Date', sv('imp_review_date')], ['Signature', sv('imp_signature')]
+    ], 6, 'imp');
+}
+
+// ── API base URL (same logic as api.js) ──
+function getApiUrl() {
+  if (window.API_URL) return window.API_URL;
+  if (window.location.protocol === 'file:') return 'http://localhost:8000/api/v2';
+  return '/api/v2';
+}
+
+// ── Gather cooperative modules ──
+function gatherCoops() {
+  const coops = [];
+  document.querySelectorAll('#coop-modules-container .coop-module').forEach(m => {
+    coops.push({
+      name: (m.querySelector('.coop_name') || {}).value || '',
+      reg_number: (m.querySelector('.coop_reg') || {}).value || '',
+      region: (m.querySelector('.coop_region') || {}).value || '',
+      county: (m.querySelector('.coop_county') || {}).value || '',
+      member_count: (m.querySelector('.coop_members') || {}).value || '',
+      farm_area_ha: (m.querySelector('.coop_area') || {}).value || '',
+      certification: (m.querySelector('.coop_cert') || {}).value || ''
+    });
+  });
+  return coops;
+}
+
+// ── Gather checkbox values ──
+function chk(id) { const el = document.getElementById(id); return el ? el.checked : false; }
+
+// ── Exporter submit ──
+async function expSubmit() {
+  const btn = document.querySelector('#exp-panel-7 .btn-primary');
+  if (btn) { btn.disabled = true; btn.textContent = 'Submitting...'; }
+
+  const payload = {
+    kyc: {
+      full_name: document.getElementById('exp_full_name')?.value || '',
+      national_id: document.getElementById('exp_id_number')?.value || '',
+      phone: document.getElementById('exp_phone')?.value || '',
+      email: document.getElementById('exp_email')?.value || '',
+      country: document.getElementById('exp_country')?.value || '',
+      id_document_name: document.getElementById('exp_id_doc')?.files?.[0]?.name || ''
+    },
+    company: {
+      company_name: document.getElementById('exp_company_name')?.value || '',
+      reg_number: document.getElementById('exp_reg_number')?.value || '',
+      country: document.getElementById('exp_company_country')?.value || '',
+      address: document.getElementById('exp_address')?.value || '',
+      city: document.getElementById('exp_city')?.value || '',
+      postal: document.getElementById('exp_postal')?.value || '',
+      contact_name: document.getElementById('exp_contact_name')?.value || '',
+      contact_phone: document.getElementById('exp_contact_phone')?.value || '',
+      contact_email: document.getElementById('exp_contact_email')?.value || '',
+      cert_document_name: document.getElementById('exp_incorp_doc')?.files?.[0]?.name || ''
+    },
+    consignment: {
+      consignment_ref: document.getElementById('exp_consignment_ref')?.value || '',
+      coffee_variety: document.getElementById('exp_coffee_variety')?.value || '',
+      quantity_kg: document.getElementById('exp_quantity')?.value || '',
+      harvest_year: document.getElementById('exp_harvest_year')?.value || '',
+      origin_country: document.getElementById('exp_origin_country')?.value || '',
+      origin_region: document.getElementById('exp_origin_region')?.value || '',
+      hs_code: document.getElementById('exp_hs_code')?.value || '',
+      destination_country: document.getElementById('exp_destination')?.value || ''
+    },
+    cooperatives: gatherCoops(),
+    polygon: {
+      polygon_filename: document.getElementById('polygon_file')?.files?.[0]?.name || '',
+      lat: document.getElementById('exp_lat')?.value || '',
+      lon: document.getElementById('exp_lon')?.value || ''
+    },
+    declarations: {
+      d1: chk('exp_decl_1'), d2: chk('exp_decl_2'), d3: chk('exp_decl_3'),
+      d4: chk('exp_decl_4'), d5: chk('exp_decl_5'), d6: chk('exp_decl_6'),
+      signature: document.getElementById('exp_signature')?.value || '',
+      sign_date: document.getElementById('exp_sign_date')?.value || ''
+    }
+  };
+
+  try {
+    const res = await fetch(getApiUrl() + '/eudr/portal/exporter', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    document.getElementById('exp-ref-number').textContent = data.reference_number;
+    try { localStorage.removeItem('eudr_exporter_draft'); } catch(e) {}
+    showPanel('exporter', 'success');
+    updateProgress('exp', EXP_STEPS, 8);
+    window.scrollTo(0, 0);
+  } catch (err) {
+    console.error('Exporter submit error:', err);
+    alert('Submission failed. Please check your connection and try again.');
+    if (btn) { btn.disabled = false; btn.textContent = 'Submit Declaration'; }
+  }
+}
+
+// ── Importer submit ──
+async function impSubmit() {
+  const btn = document.querySelector('#imp-panel-7 .btn-coffee');
+  if (btn) { btn.disabled = true; btn.textContent = 'Submitting...'; }
+
+  const rcEl = document.querySelector('input[name="risk_conclusion"]:checked');
+
+  const payload = {
+    kyc: {
+      full_name: document.getElementById('imp_full_name')?.value || '',
+      role: document.getElementById('imp_role')?.value || '',
+      id_number: document.getElementById('imp_id_number')?.value || '',
+      phone: document.getElementById('imp_phone')?.value || '',
+      email: document.getElementById('imp_email')?.value || '',
+      member_state: document.getElementById('imp_member_state')?.value || '',
+      identity_doc_name: document.getElementById('imp_id_doc')?.files?.[0]?.name || ''
+    },
+    operator: {
+      company_name: document.getElementById('imp_company_name')?.value || '',
+      eori: document.getElementById('imp_eori')?.value || '',
+      vat: document.getElementById('imp_vat')?.value || '',
+      country: document.getElementById('imp_company_country')?.value || '',
+      address: document.getElementById('imp_address')?.value || '',
+      city: document.getElementById('imp_city')?.value || '',
+      postal: document.getElementById('imp_postal')?.value || '',
+      license_doc_name: document.getElementById('imp_license_doc')?.files?.[0]?.name || ''
+    },
+    supplier: {
+      exporter_name: document.getElementById('imp_exporter_name')?.value || '',
+      exporter_country: document.getElementById('imp_exporter_country')?.value || '',
+      exporter_email: document.getElementById('imp_exporter_email')?.value || '',
+      consignment_ref: document.getElementById('imp_consignment_ref')?.value || '',
+      submission_ref: document.getElementById('imp_exporter_submission_ref')?.value || ''
+    },
+    consignment_review: {
+      coffee_variety: document.getElementById('imp_coffee_variety')?.value || '',
+      quantity_kg: document.getElementById('imp_quantity')?.value || '',
+      harvest_year: document.getElementById('imp_harvest_year')?.value || '',
+      origin_country: document.getElementById('imp_origin_country')?.value || '',
+      origin_region: document.getElementById('imp_origin_region')?.value || '',
+      arrival_date: document.getElementById('imp_arrival_date')?.value || '',
+      port: document.getElementById('imp_port')?.value || '',
+      notes: document.getElementById('imp_consignment_notes')?.value || ''
+    },
+    risk_assessment: {
+      country_risk: document.getElementById('imp_country_risk')?.value || '',
+      chain_complexity: document.getElementById('imp_chain_complexity')?.value || '',
+      evidence_1: chk('imp_ev1'), evidence_2: chk('imp_ev2'), evidence_3: chk('imp_ev3'),
+      evidence_4: chk('imp_ev4'), evidence_5: chk('imp_ev5'),
+      risk_conclusion: rcEl ? rcEl.value : '',
+      notes: document.getElementById('imp_risk_notes')?.value || ''
+    },
+    due_diligence: {
+      reviewer_name: document.getElementById('imp_reviewer_name')?.value || '',
+      reviewer_title: document.getElementById('imp_reviewer_title')?.value || '',
+      review_date: document.getElementById('imp_review_date')?.value || '',
+      approval_1: chk('imp_app1'), approval_2: chk('imp_app2'), approval_3: chk('imp_app3'),
+      signature: document.getElementById('imp_signature')?.value || '',
+      internal_ref: document.getElementById('imp_internal_ref')?.value || ''
+    }
+  };
+
+  try {
+    const res = await fetch(getApiUrl() + '/eudr/portal/importer', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    document.getElementById('imp-ref-number').textContent = data.reference_number;
+    try { localStorage.removeItem('eudr_importer_draft'); } catch(e) {}
+    showPanel('importer', 'success');
+    updateProgress('imp', IMP_STEPS, 8);
+    window.scrollTo(0, 0);
+  } catch (err) {
+    console.error('Importer submit error:', err);
+    alert('Submission failed. Please check your connection and try again.');
+    if (btn) { btn.disabled = false; btn.textContent = 'Submit Due Diligence'; }
+  }
+}
+</script>
+</body>
+</html>
