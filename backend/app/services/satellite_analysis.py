@@ -1843,7 +1843,7 @@ class SatelliteAnalysisEngine:
             from app.services.ml_classifier import (
                 MODEL_PATH, FEATURE_NAMES, delete_cached_model,
             )
-            import xgboost as xgb
+            import xgboost as xgb  # type: ignore
             if os.path.exists(MODEL_PATH):
                 clf = xgb.XGBClassifier()
                 clf.load_model(MODEL_PATH)
