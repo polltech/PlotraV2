@@ -280,6 +280,20 @@ class FarmCreateMobile(BaseModel):
 
     notes: Optional[str] = None
 
+    # ── Advanced / Tab-2 fields (stored in admin_notes JSON) ──────────────────
+    cooperative_member_no: Optional[str] = None
+    data_consent: Optional[bool] = None
+    intercropped_species: Optional[List[str]] = None
+    shade_trees: Optional[bool] = None
+    shade_canopy_percent: Optional[int] = None
+    agroforestry_start_year: Optional[int] = None
+    last_pruning_date: Optional[str] = None
+    last_harvesting_date: Optional[str] = None
+    recent_planting: Optional[str] = None
+    farm_established_year: Optional[int] = None
+    previous_land_use: Optional[str] = None
+    ngo_support: Optional[str] = None
+
 
 def _random_suffix(n: int = 4) -> str:
     return "".join(random.choices(string.ascii_uppercase + string.digits, k=n))
@@ -387,6 +401,19 @@ async def create_farm_mobile(
         "violation_details": payload.violation_details,
         "notes": payload.notes,
         "source": "mobile_app",
+        # Advanced / Tab-2
+        "cooperative_member_no": payload.cooperative_member_no,
+        "data_consent": payload.data_consent,
+        "intercropped_species": payload.intercropped_species,
+        "shade_trees": payload.shade_trees,
+        "shade_canopy_percent": payload.shade_canopy_percent,
+        "agroforestry_start_year": payload.agroforestry_start_year,
+        "last_pruning_date": payload.last_pruning_date,
+        "last_harvesting_date": payload.last_harvesting_date,
+        "recent_planting": payload.recent_planting,
+        "farm_established_year": payload.farm_established_year,
+        "previous_land_use": payload.previous_land_use,
+        "ngo_support": payload.ngo_support,
     }
 
     farm = Farm(
