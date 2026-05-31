@@ -15,7 +15,8 @@ import time
 import uuid
 from collections import defaultdict
 from datetime import datetime
-from typing import List, Optional
+import json
+from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Header, Request
 from pydantic import BaseModel, Field
@@ -215,12 +216,69 @@ async def setup_defaults(db: AsyncSession = Depends(get_db)):
 # ── Create farm (mobile add-farm flow) ────────────────────────────────────────
 
 class FarmCreateMobile(BaseModel):
+    # ── Required ──────────────────────────────────────────────────────────────
     farm_name: str = Field(..., min_length=1)
     county: str = Field(..., min_length=1)
+
+    # ── Farm basics (stored in Farm model columns) ─────────────────────────────
     sub_county: Optional[str] = None
-    coffee_trees: Optional[int] = None
+    ward: Optional[str] = None
+    farm_code: Optional[str] = None
     land_use_type: Optional[str] = "agroforestry"
-    farm_code: Optional[str] = None  # if provided, use as-is; else auto-generate
+    total_area_hectares: Optional[float] = None
+    coffee_area_hectares: Optional[float] = None
+    coffee_varieties: Optional[List[str]] = None
+    years_farming: Optional[int] = None
+    average_annual_production_kg: Optional[float] = None
+
+    # ── Land & parcel details (stored in admin_notes JSON) ─────────────────────
+    farm_type: Optional[str] = None          # owned/leased/communal/inherited
+    land_reg_number: Optional[str] = None
+    altitude_m: Optional[float] = None
+    soil_type: Optional[str] = None
+    terrain: Optional[str] = None
+
+    # ── Coffee farming details (stored in admin_notes JSON) ────────────────────
+    coffee_trees: Optional[int] = None
+    year_coffee_planted: Optional[int] = None
+    farm_status: Optional[str] = None        # active/rehabilitating/abandoned
+    planting_method: Optional[str] = None
+    irrigation_used: Optional[bool] = None
+    irrigation_type: Optional[str] = None
+
+    # ── Farmer info (stored in admin_notes JSON) ───────────────────────────────
+    farmer_first_name: Optional[str] = None
+    farmer_last_name: Optional[str] = None
+    farmer_phone: Optional[str] = None
+    national_id: Optional[str] = None
+    gender: Optional[str] = None
+    date_of_birth: Optional[str] = None
+    cooperative_name: Optional[str] = None
+
+    # ── EUDR declarations (stored in admin_notes JSON) ─────────────────────────
+    mixed_farming: Optional[bool] = None
+    other_crops: Optional[List[str]] = None
+    livestock: Optional[bool] = None
+    livestock_types: Optional[List[str]] = None
+    crop_rotation: Optional[bool] = None
+
+    trees_planted_last_5y: Optional[bool] = None
+    tree_species: Optional[List[str]] = None
+    trees_planted_count: Optional[int] = None
+    tree_planting_reasons: Optional[List[str]] = None
+
+    trees_cleared_last_5y: Optional[bool] = None
+    reason_for_clearing: Optional[str] = None
+    current_canopy_cover: Optional[str] = None
+
+    # ── Consent & certifications (stored in admin_notes JSON) ─────────────────
+    satellite_consent: Optional[bool] = None
+    historical_imagery_consent: Optional[bool] = None
+    certifications: Optional[List[str]] = None
+    previous_violations: Optional[bool] = None
+    violation_details: Optional[str] = None
+
+    notes: Optional[str] = None
 
 
 def _random_suffix(n: int = 4) -> str:
@@ -282,6 +340,55 @@ async def create_farm_mobile(
         else:
             farm_code = f"APP-{uuid.uuid4().hex[:10].upper()}"
 
+    # Build admin_notes JSON with all extra fields
+    meta: Dict[str, Any] = {
+        "county": payload.county,
+        "sub_county": payload.sub_county,
+        "ward": payload.ward,
+        # Land details
+        "farm_type": payload.farm_type,
+        "land_reg_number": payload.land_reg_number,
+        "altitude_m": payload.altitude_m,
+        "soil_type": payload.soil_type,
+        "terrain": payload.terrain,
+        # Coffee details
+        "coffee_trees": payload.coffee_trees,
+        "year_coffee_planted": payload.year_coffee_planted,
+        "farm_status": payload.farm_status,
+        "planting_method": payload.planting_method,
+        "irrigation_used": payload.irrigation_used,
+        "irrigation_type": payload.irrigation_type,
+        # Farmer info
+        "farmer_first_name": payload.farmer_first_name,
+        "farmer_last_name": payload.farmer_last_name,
+        "farmer_phone": payload.farmer_phone,
+        "national_id": payload.national_id,
+        "gender": payload.gender,
+        "date_of_birth": payload.date_of_birth,
+        "cooperative_name": payload.cooperative_name,
+        # EUDR declarations
+        "mixed_farming": payload.mixed_farming,
+        "other_crops": payload.other_crops,
+        "livestock": payload.livestock,
+        "livestock_types": payload.livestock_types,
+        "crop_rotation": payload.crop_rotation,
+        "trees_planted_last_5y": payload.trees_planted_last_5y,
+        "tree_species": payload.tree_species,
+        "trees_planted_count": payload.trees_planted_count,
+        "tree_planting_reasons": payload.tree_planting_reasons,
+        "trees_cleared_last_5y": payload.trees_cleared_last_5y,
+        "reason_for_clearing": payload.reason_for_clearing,
+        "current_canopy_cover": payload.current_canopy_cover,
+        # Consent & certifications
+        "satellite_consent": payload.satellite_consent,
+        "historical_imagery_consent": payload.historical_imagery_consent,
+        "certifications": payload.certifications,
+        "previous_violations": payload.previous_violations,
+        "violation_details": payload.violation_details,
+        "notes": payload.notes,
+        "source": "mobile_app",
+    }
+
     farm = Farm(
         id=str(uuid.uuid4()),
         owner_id=farmer.id,
@@ -289,29 +396,25 @@ async def create_farm_mobile(
         farm_name=payload.farm_name,
         farm_code=farm_code,
         land_use_type=lut,
-        # Location
         verification_status="admin_approved",
         coop_status="coop_approved",
         compliance_status="Under Review",
+        # Store in Farm columns where available
+        total_area_hectares=payload.total_area_hectares,
+        coffee_area_hectares=payload.coffee_area_hectares,
+        coffee_varieties=payload.coffee_varieties or [],
+        years_farming=payload.years_farming,
+        average_annual_production_kg=payload.average_annual_production_kg,
+        admin_notes=json.dumps(meta),
     )
-
-    # Store extra fields in kyc_data on the farmer (farm has no county column directly)
-    # Use farm_name to embed location context; actual location stored via parcel later
-    # Save county/sub_county/village into a notes field if available via JSON
-    # We'll repurpose the admin_notes field as a metadata store for mobile-created farms
-    farm.admin_notes = (
-        f"county={payload.county}"
-        + (f"|sub_county={payload.sub_county}" if payload.sub_county else "")
-        + (f"|coffee_trees={payload.coffee_trees}" if payload.coffee_trees else "")
-    )
-
-    if payload.coffee_trees:
-        # Store estimated coffee plants — will be saved to parcel when polygon is captured
-        farm.average_annual_production_kg = None
 
     db.add(farm)
     await db.commit()
     await db.refresh(farm)
+
+    farmer_name = " ".join(filter(None, [payload.farmer_first_name, payload.farmer_last_name])) or f"{DEFAULT_FARMER_FIRST} {DEFAULT_FARMER_LAST}"
+    farmer_phone = payload.farmer_phone or DEFAULT_FARMER_PHONE
+    coop_display = payload.cooperative_name or DEFAULT_COOP_NAME
 
     return {
         "farm_id": farm.id,
@@ -319,12 +422,24 @@ async def create_farm_mobile(
         "farm_name": farm.farm_name,
         "county": payload.county,
         "sub_county": payload.sub_county,
-        "coffee_trees": payload.coffee_trees,
+        "ward": payload.ward,
         "land_use_type": (payload.land_use_type or "agroforestry"),
+        "total_area_hectares": payload.total_area_hectares,
+        "coffee_varieties": payload.coffee_varieties,
+        "soil_type": payload.soil_type,
+        "terrain": payload.terrain,
+        "coffee_trees": payload.coffee_trees,
+        "farmer_first_name": payload.farmer_first_name,
+        "farmer_last_name": payload.farmer_last_name,
+        "farmer_phone": farmer_phone,
+        "national_id": payload.national_id,
+        "cooperative_name": coop_display,
+        "certifications": payload.certifications,
+        "satellite_consent": payload.satellite_consent,
+        "trees_cleared_last_5y": payload.trees_cleared_last_5y,
         "status": "admin_approved",
-        "farmer": f"{DEFAULT_FARMER_FIRST} {DEFAULT_FARMER_LAST}",
-        "farmer_phone": DEFAULT_FARMER_PHONE,
-        "cooperative": DEFAULT_COOP_NAME,
+        "farmer": farmer_name,
+        "cooperative": coop_display,
         "cooperative_phone": DEFAULT_OFFICER_PHONE,
     }
 
