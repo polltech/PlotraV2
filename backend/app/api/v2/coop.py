@@ -57,28 +57,37 @@ async def validate_cooperative_code(
 
 @router.get("/cooperatives/search")
 async def search_cooperatives(
-    code: str,
+    q: str = "",
+    code: str = "",
     db: AsyncSession = Depends(get_db)
 ):
     """
-    Search cooperatives by code (partial match).
+    Search cooperatives by name OR code (partial match).
     Used during farmer registration to find cooperatives.
+    Accepts ?q=<term> (name or code) or legacy ?code=<term>.
     """
-    # Search for cooperatives where code contains the search term (case-insensitive)
+    from sqlalchemy import or_
+    term = (q or code).strip()
+    if not term:
+        return {"cooperatives": []}
+
     result = await db.execute(
         select(Cooperative).where(
-            Cooperative.code.ilike(f"%{code}%")
+            or_(
+                Cooperative.code.ilike(f"%{term}%"),
+                Cooperative.name.ilike(f"%{term}%"),
+            )
         ).limit(10)
     )
     cooperatives = result.scalars().all()
-    
+
     return {
         "cooperatives": [
             {
                 "id": coop.id,
                 "code": coop.code,
                 "name": coop.name,
-                "county": coop.county
+                "county": getattr(coop, 'county', None),
             }
             for coop in cooperatives
         ]
