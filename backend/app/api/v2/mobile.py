@@ -23,7 +23,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.auth import get_password_hash
+from app.core.auth import get_password_hash, get_current_user_optional
 from app.core.config import settings
 from app.core.database import get_db
 from app.models.farm import Farm, LandParcel, LandUseType
@@ -303,17 +303,22 @@ def _random_suffix(n: int = 4) -> str:
 async def create_farm_mobile(
     payload: FarmCreateMobile,
     db: AsyncSession = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user_optional),
 ):
     """
-    Create a new farm linked to the default Polygon Farmer.
+    Create a new farm. If a valid Bearer token is present the farm is linked
+    to the authenticated user; otherwise it falls back to the default Polygon Farmer.
     Farm is auto-approved so polygon capture works immediately.
     Returns farm_id and farm_code.
     """
-    # Resolve default farmer
-    farmer_result = await db.execute(
-        select(User).where(User.email == DEFAULT_FARMER_EMAIL)
-    )
-    farmer = farmer_result.scalar_one_or_none()
+    # Resolve farmer: use logged-in user if available, else default polygon farmer
+    if current_user:
+        farmer = current_user
+    else:
+        farmer_result = await db.execute(
+            select(User).where(User.email == DEFAULT_FARMER_EMAIL)
+        )
+        farmer = farmer_result.scalar_one_or_none()
     if not farmer:
         raise HTTPException(
             status_code=409,

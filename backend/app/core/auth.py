@@ -152,6 +152,25 @@ async def get_current_user(
     return user
 
 
+async def get_current_user_optional(
+    token: str = Depends(oauth2_scheme_form),
+    db: AsyncSession = Depends(get_db)
+) -> Optional[User]:
+    """Return the current user if a valid Bearer token is present, else None."""
+    if not token:
+        return None
+    try:
+        payload = decode_token(token)
+        user_id = payload.get("sub")
+        if not user_id:
+            return None
+        result = await db.execute(select(User).where(User.id == user_id))
+        user = result.scalar_one_or_none()
+        return user if (user and user.is_active) else None
+    except Exception:
+        return None
+
+
 async def get_current_active_user(
     current_user: User = Depends(get_current_user)
 ) -> User:
