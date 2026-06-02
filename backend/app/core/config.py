@@ -130,7 +130,16 @@ class PaymentsConfig(BaseModel):
     mpesa_consumer_key: str = ""
     mpesa_consumer_secret: str = ""
     mpesa_shortcode: str = ""
+    mpesa_passkey: str = ""
+    mpesa_env: str = "sandbox"
+    mpesa_b2c_shortcode: str = ""
+    mpesa_initiator_name: str = ""
+    mpesa_initiator_password: str = ""
     escrow_enabled: bool = True
+
+    @property
+    def mpesa_base_url(self) -> str:
+        return "https://sandbox.safaricom.co.ke" if self.mpesa_env == "sandbox" else "https://api.safaricom.co.ke"
 
 
 class VerificationConfig(BaseModel):

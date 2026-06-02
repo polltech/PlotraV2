@@ -104,10 +104,21 @@ email:
   allow_credentials: true
 
 payments:
-  enabled: false
+  enabled: true
+  # M-Pesa Daraja API credentials — override with env vars in production:
+  #   PLOTRA_PAYMENTS__MPESA_CONSUMER_KEY
+  #   PLOTRA_PAYMENTS__MPESA_CONSUMER_SECRET
+  #   PLOTRA_PAYMENTS__MPESA_SHORTCODE
   mpesa_consumer_key: ""
   mpesa_consumer_secret: ""
   mpesa_shortcode: ""
+  mpesa_passkey: ""
+  # M-Pesa environment: "sandbox" or "production"
+  mpesa_env: "sandbox"
+  # B2C (Business to Customer) shortcode for farmer payouts
+  mpesa_b2c_shortcode: ""
+  mpesa_initiator_name: ""
+  mpesa_initiator_password: ""
   escrow_enabled: true
 
 verification:

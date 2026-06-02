@@ -2380,3 +2380,79 @@ async def resubmit_for_review(
 
     await db.commit()
     return {"message": "Resubmitted for review successfully"}
+
+
+# ── Wallet / Payments ─────────────────────────────────────────────────────────
+
+@router.get("/payments")
+async def get_farmer_payments(
+    current_user: User = Depends(require_farmer),
+    db: AsyncSession = Depends(get_db)
+):
+    """Return the farmer's payment history from escrow records."""
+    result = await db.execute(
+        select(PaymentEscrow)
+        .where(PaymentEscrow.payee_id == current_user.id)
+        .order_by(PaymentEscrow.escrow_date.desc())
+        .limit(50)
+    )
+    escrows = result.scalars().all()
+    return [
+        {
+            "id": e.id,
+            "reference": e.reference_number,
+            "payment_type": (e.conditions or {}).get("type", "Payment") if isinstance(e.conditions, dict) else "Payment",
+            "amount": e.amount,
+            "currency": e.currency or "KES",
+            "method": e.payment_method or "M-Pesa",
+            "status": e.status.value if hasattr(e.status, "value") else str(e.status),
+            "description": e.description,
+            "created_at": e.escrow_date.isoformat() if e.escrow_date else None,
+            "released_at": e.release_date.isoformat() if e.release_date else None,
+        }
+        for e in escrows
+    ]
+
+
+@router.post("/wallet/withdraw")
+async def request_withdrawal(
+    payload: dict,
+    current_user: User = Depends(require_farmer),
+    db: AsyncSession = Depends(get_db)
+):
+    """Submit a withdrawal request. Creates a pending escrow record for admin processing."""
+    import uuid as _uuid
+    from app.core.config import settings
+
+    amount = float(payload.get("amount", 0))
+    phone  = str(payload.get("phone", "")).strip()
+
+    if amount <= 0:
+        raise HTTPException(status_code=400, detail="Amount must be greater than zero")
+    if not phone or len(phone) < 9:
+        raise HTTPException(status_code=400, detail="A valid M-Pesa phone number is required")
+
+    ref = f"WD-{current_user.id[:8].upper()}-{_uuid.uuid4().hex[:6].upper()}"
+
+    escrow = PaymentEscrow(
+        id=str(_uuid.uuid4()),
+        reference_number=ref,
+        payee_id=current_user.id,
+        payee_name=f"{current_user.first_name} {current_user.last_name}",
+        amount=amount,
+        currency="KES",
+        status=PayoutStatus.PENDING,
+        payment_method="mpesa",
+        conditions={"type": "Withdrawal", "phone": phone, "requested_by": current_user.id},
+        description=f"Withdrawal request to {phone}",
+    )
+    db.add(escrow)
+    await db.commit()
+
+    return {
+        "message": "Withdrawal request submitted successfully",
+        "reference": ref,
+        "amount": amount,
+        "phone": phone,
+        "status": "pending",
+    }
