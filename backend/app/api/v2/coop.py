@@ -13,7 +13,11 @@ from app.core.database import get_db
 from app.core.auth import get_current_user, require_coop_admin, require_plotra_admin
 from app.models.user import User, VerificationStatus, CooperativeMember, Cooperative, UserRole
 from app.models.farm import Farm
-from app.models.traceability import Delivery, Batch, QualityGrade, DeliveryStatus
+from app.models.traceability import (
+    Delivery, Batch, QualityGrade, DeliveryStatus, BatchStatus,
+    ProcessingLog, ProcessingStepType, Consignment, ConsignmentStatus,
+    AuditEvent, AuditEventType,
+)
 from app.api.schemas import (
     UserResponse, DeliveryCreate, DeliveryResponse,
     BatchCreate, BatchResponse, MessageResponse,
@@ -1421,4 +1425,459 @@ async def get_coop_stats(
         "total_weight_kg": round(total_weight, 2),
         "quality_index": "AA / AB",
         "batch_status": "03 Ready"
+    }
+
+
+# ════════════════════════════════════════════════════════════════════════════
+#  URS — Delivery detail + status update + processing log
+# ════════════════════════════════════════════════════════════════════════════
+
+def _audit(db, event_type, entity_type, entity_id, actor_id, prev=None, nxt=None, notes=None):
+    """Helper: queue an AuditEvent (caller must commit)."""
+    db.add(AuditEvent(
+        event_type=event_type,
+        entity_type=entity_type,
+        entity_id=str(entity_id),
+        actor_id=str(actor_id),
+        previous_state=str(prev) if prev is not None else None,
+        new_state=str(nxt) if nxt is not None else None,
+        notes=notes,
+    ))
+
+
+@router.get("/deliveries/{delivery_id}")
+async def get_delivery_detail(
+    delivery_id: str,
+    current_user: User = Depends(require_coop_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Full delivery detail including processing log."""
+    delivery = await db.get(Delivery, delivery_id)
+    if not delivery:
+        raise HTTPException(status_code=404, detail="Delivery not found")
+
+    logs_res = await db.execute(
+        select(ProcessingLog)
+        .where(ProcessingLog.delivery_id == delivery_id)
+        .order_by(ProcessingLog.step_date)
+    )
+    logs = logs_res.scalars().all()
+
+    # Build farm/farmer info
+    farm = await db.get(Farm, delivery.farm_id) if delivery.farm_id else None
+    farmer = None
+    if farm:
+        farmer_res = await db.execute(select(User).where(User.id == farm.owner_id))
+        farmer = farmer_res.scalar_one_or_none()
+
+    return {
+        "id": delivery.id,
+        "delivery_number": delivery.delivery_number,
+        "status": delivery.status.value if delivery.status else "pending",
+        "farm_id": delivery.farm_id,
+        "farm_name": farm.farm_name if farm else None,
+        "farmer_name": f"{farmer.first_name} {farmer.last_name}" if farmer else None,
+        "farmer_phone": farmer.phone if farmer else None,
+        "parcel_id": delivery.parcel_id,
+        "gross_weight_kg": delivery.gross_weight_kg,
+        "tare_weight_kg": delivery.tare_weight_kg,
+        "net_weight_kg": delivery.net_weight_kg,
+        "quality_grade": delivery.quality_grade.value if delivery.quality_grade else None,
+        "moisture_content": delivery.moisture_content,
+        "cherry_type": delivery.cherry_type,
+        "eudr_eligible": delivery.eudr_eligible,
+        "crop_mix": delivery.crop_mix,
+        "notes": delivery.notes,
+        "batch_id": delivery.batch_id,
+        "reception_date": delivery.reception_date.isoformat() if delivery.reception_date else None,
+        "created_at": delivery.created_at.isoformat() if delivery.created_at else None,
+        "processing_log": [
+            {
+                "id": lg.id,
+                "step_type": lg.step_type.value,
+                "step_date": lg.step_date.isoformat() if lg.step_date else None,
+                "weight_out_kg": lg.weight_out_kg,
+                "grade": lg.grade,
+                "notes": lg.notes,
+                "logged_by_id": lg.logged_by_id,
+                "created_at": lg.created_at.isoformat() if lg.created_at else None,
+            }
+            for lg in logs
+        ],
+    }
+
+
+@router.patch("/deliveries/{delivery_id}/status")
+async def update_delivery_status(
+    delivery_id: str,
+    body: dict,
+    current_user: User = Depends(require_coop_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Update a delivery's status. body: {status, notes?}"""
+    delivery = await db.get(Delivery, delivery_id)
+    if not delivery:
+        raise HTTPException(status_code=404, detail="Delivery not found")
+
+    try:
+        new_status = DeliveryStatus(body.get("status", ""))
+    except ValueError:
+        raise HTTPException(status_code=400, detail=f"Invalid status. Valid values: {[s.value for s in DeliveryStatus]}")
+
+    prev_status = delivery.status
+    delivery.status = new_status
+    _audit(db, AuditEventType.DELIVERY_STATUS_CHANGED, "delivery", delivery_id,
+           current_user.id, prev=prev_status.value if prev_status else None,
+           nxt=new_status.value, notes=body.get("notes"))
+    await db.commit()
+    return {"delivery_id": delivery_id, "status": new_status.value}
+
+
+@router.post("/deliveries/{delivery_id}/processing")
+async def add_processing_step(
+    delivery_id: str,
+    body: dict,
+    current_user: User = Depends(require_coop_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Log a processing step for a delivery.
+    Automatically advances delivery status:
+      any step → in_processing; Packing → ready_for_batching.
+    """
+    delivery = await db.get(Delivery, delivery_id)
+    if not delivery:
+        raise HTTPException(status_code=404, detail="Delivery not found")
+
+    try:
+        step_type = ProcessingStepType(body.get("step_type", ""))
+    except ValueError:
+        raise HTTPException(status_code=400, detail=f"Invalid step_type. Valid: {[s.value for s in ProcessingStepType]}")
+
+    from datetime import datetime as _dt
+    step_date_raw = body.get("step_date")
+    step_date = _dt.fromisoformat(step_date_raw) if step_date_raw else _dt.utcnow()
+
+    log = ProcessingLog(
+        delivery_id=delivery_id,
+        step_type=step_type,
+        step_date=step_date,
+        weight_out_kg=body.get("weight_out_kg"),
+        grade=body.get("grade"),
+        notes=body.get("notes"),
+        logged_by_id=current_user.id,
+    )
+    db.add(log)
+
+    # Auto-advance delivery status
+    prev_status = delivery.status
+    if step_type == ProcessingStepType.PACKING:
+        delivery.status = DeliveryStatus.READY_FOR_BATCHING
+    elif delivery.status in (DeliveryStatus.PENDING, DeliveryStatus.RECEIVED,
+                              DeliveryStatus.WEIGHED, DeliveryStatus.QUALITY_CHECKED):
+        delivery.status = DeliveryStatus.IN_PROCESSING
+
+    _audit(db, AuditEventType.PROCESSING_STEP_ADDED, "delivery", delivery_id,
+           current_user.id, prev=prev_status.value if prev_status else None,
+           nxt=delivery.status.value, notes=f"Step: {step_type.value}")
+    await db.commit()
+    await db.refresh(log)
+    return {
+        "id": log.id,
+        "delivery_id": delivery_id,
+        "step_type": log.step_type.value,
+        "step_date": log.step_date.isoformat(),
+        "weight_out_kg": log.weight_out_kg,
+        "grade": log.grade,
+        "notes": log.notes,
+        "delivery_status": delivery.status.value,
+    }
+
+
+@router.get("/deliveries/{delivery_id}/processing")
+async def get_processing_log(
+    delivery_id: str,
+    current_user: User = Depends(require_coop_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get the full processing log for a delivery."""
+    res = await db.execute(
+        select(ProcessingLog)
+        .where(ProcessingLog.delivery_id == delivery_id)
+        .order_by(ProcessingLog.step_date)
+    )
+    logs = res.scalars().all()
+    return [
+        {
+            "id": lg.id, "step_type": lg.step_type.value,
+            "step_date": lg.step_date.isoformat() if lg.step_date else None,
+            "weight_out_kg": lg.weight_out_kg, "grade": lg.grade,
+            "notes": lg.notes, "logged_by_id": lg.logged_by_id,
+            "created_at": lg.created_at.isoformat() if lg.created_at else None,
+        }
+        for lg in logs
+    ]
+
+
+# ════════════════════════════════════════════════════════════════════════════
+#  URS — Batch detail + release
+# ════════════════════════════════════════════════════════════════════════════
+
+@router.get("/batches/{batch_id}")
+async def get_batch_detail(
+    batch_id: str,
+    current_user: User = Depends(require_coop_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Full batch detail with delivery list and EUDR eligibility."""
+    batch = await db.get(Batch, batch_id)
+    if not batch:
+        raise HTTPException(status_code=404, detail="Batch not found")
+
+    deliveries_res = await db.execute(
+        select(Delivery).where(Delivery.batch_id == batch_id)
+    )
+    deliveries = deliveries_res.scalars().all()
+
+    eudr_kg = sum(
+        (d.net_weight_kg or 0) for d in deliveries
+        if d.eudr_eligible is not False
+    )
+    unique_farms = list({d.farm_id for d in deliveries if d.farm_id})
+
+    return {
+        "id": batch.id,
+        "batch_number": batch.batch_number,
+        "lot_number": batch.lot_number,
+        "crop_year": batch.crop_year,
+        "harvest_start_date": batch.harvest_start_date.isoformat() if batch.harvest_start_date else None,
+        "harvest_end_date": batch.harvest_end_date.isoformat() if batch.harvest_end_date else None,
+        "processing_method": batch.processing_method.value if batch.processing_method else None,
+        "quality_grade": batch.quality_grade.value if batch.quality_grade else None,
+        "total_weight_kg": batch.total_weight_kg,
+        "eudr_eligible_kg": eudr_kg,
+        "total_farmers": len(unique_farms),
+        "total_parcels": batch.total_parcels,
+        "status": batch.status.value if batch.status else "draft",
+        "compliance_status": batch.compliance_status,
+        "notes": batch.notes,
+        "released_at": batch.released_at.isoformat() if batch.released_at else None,
+        "created_at": batch.created_at.isoformat() if batch.created_at else None,
+        "deliveries": [
+            {
+                "id": d.id, "delivery_number": d.delivery_number,
+                "net_weight_kg": d.net_weight_kg,
+                "status": d.status.value if d.status else None,
+                "eudr_eligible": d.eudr_eligible,
+                "quality_grade": d.quality_grade.value if d.quality_grade else None,
+            }
+            for d in deliveries
+        ],
+    }
+
+
+@router.post("/batches/{batch_id}/release")
+async def release_batch(
+    batch_id: str,
+    body: dict = None,
+    current_user: User = Depends(require_coop_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Release a batch to Plotra Admin for satellite screening — URS UC-07.
+    Pre-release validation: all deliveries must be in batched/ready_for_batching status.
+    """
+    batch = await db.get(Batch, batch_id)
+    if not batch:
+        raise HTTPException(status_code=404, detail="Batch not found")
+    if batch.status != BatchStatus.DRAFT:
+        raise HTTPException(status_code=400, detail=f"Batch is already in status '{batch.status.value}' — only Draft batches can be released")
+
+    deliveries_res = await db.execute(select(Delivery).where(Delivery.batch_id == batch_id))
+    deliveries = deliveries_res.scalars().all()
+
+    if not deliveries:
+        raise HTTPException(status_code=400, detail="Batch has no deliveries — add deliveries before releasing")
+
+    # Validation: flag any deliveries that aren't ready
+    blocked = [
+        d.delivery_number for d in deliveries
+        if d.status not in (DeliveryStatus.READY_FOR_BATCHING, DeliveryStatus.BATCHED, DeliveryStatus.PROCESSED)
+    ]
+    if blocked:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Cannot release: {len(blocked)} deliver(ies) are not in Ready/Batched status: {blocked[:5]}"
+        )
+
+    from datetime import datetime as _dt
+    prev_status = batch.status
+    batch.status = BatchStatus.RELEASED
+    batch.released_at = _dt.utcnow()
+    batch.eudr_eligible_kg = sum((d.net_weight_kg or 0) for d in deliveries if d.eudr_eligible is not False)
+    batch.total_farmers = len({d.farm_id for d in deliveries if d.farm_id})
+
+    # Mark all deliveries as batched
+    for d in deliveries:
+        d.status = DeliveryStatus.BATCHED
+        _audit(db, AuditEventType.DELIVERY_STATUS_CHANGED, "delivery", d.id,
+               current_user.id, prev=d.status.value, nxt="batched")
+
+    _audit(db, AuditEventType.BATCH_RELEASED, "batch", batch_id,
+           current_user.id, prev=prev_status.value, nxt="released",
+           notes=(body or {}).get("notes"))
+    await db.commit()
+    return {
+        "batch_id": batch_id, "status": "released",
+        "released_at": batch.released_at.isoformat(),
+        "eudr_eligible_kg": batch.eudr_eligible_kg,
+        "total_farmers": batch.total_farmers,
+    }
+
+
+@router.patch("/batches/{batch_id}/status")
+async def update_batch_status(
+    batch_id: str,
+    body: dict,
+    current_user: User = Depends(require_coop_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Admin/system endpoint to advance batch status (used by Plotra Admin after satellite review)."""
+    batch = await db.get(Batch, batch_id)
+    if not batch:
+        raise HTTPException(status_code=404, detail="Batch not found")
+    try:
+        new_status = BatchStatus(body.get("status", ""))
+    except ValueError:
+        raise HTTPException(status_code=400, detail=f"Invalid status. Valid: {[s.value for s in BatchStatus]}")
+    prev = batch.status
+    batch.status = new_status
+    _audit(db, AuditEventType.BATCH_VERIFIED if new_status == BatchStatus.VERIFIED else AuditEventType.BATCH_RELEASED,
+           "batch", batch_id, current_user.id, prev=prev.value if prev else None, nxt=new_status.value)
+    await db.commit()
+    return {"batch_id": batch_id, "status": new_status.value}
+
+
+# ════════════════════════════════════════════════════════════════════════════
+#  URS — Consignment management
+# ════════════════════════════════════════════════════════════════════════════
+
+@router.get("/consignments")
+async def list_consignments(
+    current_user: User = Depends(require_coop_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """List all consignments for the cooperative."""
+    coop_id = await _get_coop_id_for_officer(current_user, db)
+    if not coop_id:
+        return []
+    res = await db.execute(
+        select(Consignment)
+        .where(Consignment.cooperative_id == coop_id)
+        .order_by(Consignment.created_at.desc())
+    )
+    consignments = res.scalars().all()
+    return [
+        {
+            "id": c.id, "consignment_reference": c.consignment_reference,
+            "batch_ids": c.batch_ids, "destination_country": c.destination_country,
+            "importer_name": c.importer_name,
+            "expected_shipment_date": c.expected_shipment_date.isoformat() if c.expected_shipment_date else None,
+            "total_weight_kg": c.total_weight_kg,
+            "consignment_status": c.consignment_status.value if c.consignment_status else None,
+            "dds_reference": c.dds_reference, "notes": c.notes,
+            "created_at": c.created_at.isoformat() if c.created_at else None,
+        }
+        for c in consignments
+    ]
+
+
+@router.post("/consignments", status_code=201)
+async def create_consignment(
+    body: dict,
+    current_user: User = Depends(require_coop_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Create a consignment from one or more verified batches — URS UC-06."""
+    coop_id = await _get_coop_id_for_officer(current_user, db)
+    if not coop_id:
+        raise HTTPException(status_code=403, detail="No cooperative found for this officer")
+
+    batch_ids = body.get("batch_ids", [])
+    if not batch_ids:
+        raise HTTPException(status_code=400, detail="At least one batch_id is required")
+
+    # Validate all batches exist and belong to this coop
+    total_weight = 0.0
+    for bid in batch_ids:
+        b = await db.get(Batch, str(bid))
+        if not b:
+            raise HTTPException(status_code=404, detail=f"Batch {bid} not found")
+        if str(b.cooperative_id) != str(coop_id):
+            raise HTTPException(status_code=403, detail=f"Batch {bid} does not belong to your cooperative")
+        total_weight += b.total_weight_kg or 0
+
+    ref = body.get("consignment_reference", "").strip()
+    if not ref:
+        from datetime import datetime as _dt
+        ref = f"CSG-{_dt.utcnow().strftime('%Y%m%d')}-{__import__('uuid').uuid4().hex[:6].upper()}"
+
+    consignment = Consignment(
+        cooperative_id=coop_id,
+        consignment_reference=ref,
+        batch_ids=batch_ids,
+        destination_country=body.get("destination_country", "").upper(),
+        importer_name=body.get("importer_name", ""),
+        expected_shipment_date=__import__('datetime').datetime.fromisoformat(body["expected_shipment_date"]) if body.get("expected_shipment_date") else None,
+        total_weight_kg=total_weight,
+        notes=body.get("notes"),
+        created_by_id=current_user.id,
+    )
+    db.add(consignment)
+    _audit(db, AuditEventType.CONSIGNMENT_CREATED, "consignment", ref,
+           current_user.id, nxt="pending_dds")
+    await db.commit()
+    await db.refresh(consignment)
+    return {
+        "id": consignment.id, "consignment_reference": consignment.consignment_reference,
+        "batch_ids": consignment.batch_ids, "destination_country": consignment.destination_country,
+        "importer_name": consignment.importer_name, "total_weight_kg": consignment.total_weight_kg,
+        "consignment_status": consignment.consignment_status.value,
+        "created_at": consignment.created_at.isoformat() if consignment.created_at else None,
+    }
+
+
+@router.get("/consignments/{consignment_id}")
+async def get_consignment_detail(
+    consignment_id: str,
+    current_user: User = Depends(require_coop_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Full consignment detail with linked batches."""
+    c = await db.get(Consignment, consignment_id)
+    if not c:
+        raise HTTPException(status_code=404, detail="Consignment not found")
+
+    batches = []
+    for bid in (c.batch_ids or []):
+        b = await db.get(Batch, str(bid))
+        if b:
+            batches.append({
+                "id": b.id, "batch_number": b.batch_number,
+                "total_weight_kg": b.total_weight_kg,
+                "eudr_eligible_kg": b.eudr_eligible_kg,
+                "status": b.status.value if b.status else None,
+                "crop_year": b.crop_year,
+            })
+
+    return {
+        "id": c.id, "consignment_reference": c.consignment_reference,
+        "batch_ids": c.batch_ids, "destination_country": c.destination_country,
+        "importer_name": c.importer_name,
+        "expected_shipment_date": c.expected_shipment_date.isoformat() if c.expected_shipment_date else None,
+        "total_weight_kg": c.total_weight_kg,
+        "consignment_status": c.consignment_status.value if c.consignment_status else None,
+        "dds_reference": c.dds_reference, "notes": c.notes,
+        "created_at": c.created_at.isoformat() if c.created_at else None,
+        "batches": batches,
     }

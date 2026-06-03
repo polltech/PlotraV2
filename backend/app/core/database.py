@@ -79,6 +79,18 @@ async def init_db():
             "ALTER TABLE farms ADD COLUMN IF NOT EXISTS update_requested_by_name VARCHAR(150)",
             "ALTER TABLE farms ADD COLUMN IF NOT EXISTS update_request_notes TEXT",
             "ALTER TABLE farms ADD COLUMN IF NOT EXISTS update_requested_at TIMESTAMP",
+            # Delivery URS additions
+            "ALTER TABLE deliveries ADD COLUMN IF NOT EXISTS agent_id VARCHAR(36)",
+            "ALTER TABLE deliveries ADD COLUMN IF NOT EXISTS eudr_eligible BOOLEAN DEFAULT TRUE",
+            "ALTER TABLE deliveries ADD COLUMN IF NOT EXISTS crop_mix JSONB",
+            "ALTER TABLE deliveries ADD COLUMN IF NOT EXISTS notes TEXT",
+            # Batch URS additions
+            "ALTER TABLE batches ADD COLUMN IF NOT EXISTS eudr_eligible_kg FLOAT",
+            "ALTER TABLE batches ADD COLUMN IF NOT EXISTS total_farmers INTEGER",
+            "ALTER TABLE batches ADD COLUMN IF NOT EXISTS total_parcels INTEGER",
+            "ALTER TABLE batches ADD COLUMN IF NOT EXISTS notes TEXT",
+            "ALTER TABLE batches ADD COLUMN IF NOT EXISTS released_at TIMESTAMP",
+            "ALTER TABLE batches ADD COLUMN IF NOT EXISTS created_by_id VARCHAR(36)",
         ]:
             await conn.execute(__import__('sqlalchemy').text(sql))
 

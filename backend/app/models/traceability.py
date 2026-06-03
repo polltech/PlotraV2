@@ -20,11 +20,14 @@ class QualityGrade(str, enum.Enum):
 
 
 class DeliveryStatus(str, enum.Enum):
-    """Status of coffee delivery"""
+    """Status of coffee delivery — URS §4.1"""
     PENDING = "pending"
     RECEIVED = "received"
     WEIGHED = "weighed"
     QUALITY_CHECKED = "quality_checked"
+    IN_PROCESSING = "in_processing"
+    READY_FOR_BATCHING = "ready_for_batching"
+    BATCHED = "batched"
     PROCESSED = "processed"
     REJECTED = "rejected"
 
@@ -38,11 +41,44 @@ class ProcessingMethod(str, enum.Enum):
 
 
 class BatchStatus(str, enum.Enum):
-    """Batch status"""
+    """Batch status — URS §4.2"""
     DRAFT = "draft"
+    RELEASED = "released"
+    UNDER_SATELLITE_REVIEW = "under_satellite_review"
+    VERIFIED = "verified"
+    DDS_SUBMITTED = "dds_submitted"
     FINALIZED = "finalized"
     SHIPPED = "shipped"
     DELIVERED = "delivered"
+
+
+class ProcessingStepType(str, enum.Enum):
+    """Coffee processing steps — URS UC-04"""
+    SORTING = "sorting"
+    WASHING = "washing"
+    DRYING = "drying"
+    MILLING = "milling"
+    GRADING = "grading"
+    PACKING = "packing"
+
+
+class ConsignmentStatus(str, enum.Enum):
+    """Consignment status — URS UC-06"""
+    PENDING_DDS = "pending_dds"
+    DDS_READY = "dds_ready"
+    DDS_SUBMITTED = "dds_submitted"
+    REJECTED = "rejected"
+
+
+class AuditEventType(str, enum.Enum):
+    DELIVERY_CREATED = "delivery_created"
+    DELIVERY_STATUS_CHANGED = "delivery_status_changed"
+    PROCESSING_STEP_ADDED = "processing_step_added"
+    BATCH_CREATED = "batch_created"
+    BATCH_RELEASED = "batch_released"
+    BATCH_VERIFIED = "batch_verified"
+    CONSIGNMENT_CREATED = "consignment_created"
+    CONSIGNMENT_DDS_SUBMITTED = "consignment_dds_submitted"
 
 
 class Delivery(BaseModel):
@@ -90,12 +126,20 @@ class Delivery(BaseModel):
     # GPS coordinates of delivery point
     delivery_lat = Column(Float, nullable=True)
     delivery_lon = Column(Float, nullable=True)
-    
+
+    # URS additions
+    agent_id = Column(String(36), ForeignKey("users.id"), nullable=True)   # agent who recorded
+    eudr_eligible = Column(Boolean, default=True, nullable=True)            # compliant parcel flag
+    crop_mix = Column(JSON, nullable=True)                                  # {primary, secondary[]}
+    notes = Column(Text, nullable=True)                                     # intake notes
+
     # Relationships
     farm = relationship("Farm", back_populates="deliveries")
     batch = relationship("Batch", back_populates="deliveries")
     received_by = relationship("User", foreign_keys=[received_by_id])
+    agent = relationship("User", foreign_keys=[Column(String(36))])
     parcel = relationship("LandParcel")
+    processing_logs = relationship("ProcessingLog", back_populates="delivery", cascade="all, delete-orphan", order_by="ProcessingLog.step_date")
 
 
 class Batch(BaseModel):
@@ -133,19 +177,28 @@ class Batch(BaseModel):
     # EUDR traceability
     origin_farms = Column(JSON, nullable=True)  # List of farm IDs
     compliance_status = Column(String(50), default="Under Review")
-    
+    eudr_eligible_kg = Column(Float, nullable=True)   # weight from verified parcels only
+    total_farmers = Column(Integer, nullable=True)
+    total_parcels = Column(Integer, nullable=True)
+
+    # URS additions
+    notes = Column(Text, nullable=True)
+    released_at = Column(DateTime, nullable=True)
+    created_by_id = Column(String(36), ForeignKey("users.id"), nullable=True)
+
     # Status
     status = Column(Enum(BatchStatus), default=BatchStatus.DRAFT)
-    
+
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    
+
     # Relationships
     cooperative = relationship("Cooperative", back_populates="batches")
     deliveries = relationship("Delivery", back_populates="batch")
     warehouse = relationship("Warehouse", back_populates="batches")
     satellite_observations = relationship("SatelliteObservation", back_populates="batch")
+    created_by = relationship("User", foreign_keys=[created_by_id])
     
     # QR Code for traceability
     qr_code_path = Column(String(500), nullable=True)
@@ -226,3 +279,56 @@ class Warehouse(BaseModel):
         if self.total_capacity_bags and self.current_capacity_bags is not None:
             return (self.current_capacity_bags / self.total_capacity_bags) * 100
         return 0.0
+
+
+# ── URS additions ─────────────────────────────────────────────────────────────
+
+class ProcessingLog(BaseModel):
+    """Immutable log of a processing step applied to one delivery — URS UC-04."""
+    __tablename__ = "processing_logs"
+
+    delivery_id = Column(String(36), ForeignKey("deliveries.id"), nullable=False, index=True)
+    step_type = Column(Enum(ProcessingStepType), nullable=False)
+    step_date = Column(DateTime, nullable=False)
+    weight_out_kg = Column(Float, nullable=True)
+    grade = Column(String(20), nullable=True)
+    notes = Column(Text, nullable=True)
+    logged_by_id = Column(String(36), ForeignKey("users.id"), nullable=False)
+
+    delivery = relationship("Delivery", back_populates="processing_logs")
+    logged_by = relationship("User", foreign_keys=[logged_by_id])
+
+
+class Consignment(BaseModel):
+    """Groups one or more verified batches for export — URS UC-06."""
+    __tablename__ = "consignments"
+
+    cooperative_id = Column(String(36), ForeignKey("cooperatives.id"), nullable=False, index=True)
+    consignment_reference = Column(String(100), unique=True, nullable=False)
+    batch_ids = Column(JSON, nullable=False, default=list)
+    destination_country = Column(String(5), nullable=False)
+    importer_name = Column(String(255), nullable=False)
+    expected_shipment_date = Column(DateTime, nullable=True)
+    total_weight_kg = Column(Float, nullable=True)
+    consignment_status = Column(Enum(ConsignmentStatus), default=ConsignmentStatus.PENDING_DDS)
+    dds_reference = Column(String(100), nullable=True)
+    notes = Column(Text, nullable=True)
+    created_by_id = Column(String(36), ForeignKey("users.id"), nullable=False)
+
+    cooperative = relationship("Cooperative")
+    created_by = relationship("User", foreign_keys=[created_by_id])
+
+
+class AuditEvent(BaseModel):
+    """Immutable audit trail for all delivery/batch/consignment state changes — URS NF-05."""
+    __tablename__ = "audit_events"
+
+    event_type = Column(Enum(AuditEventType), nullable=False)
+    entity_type = Column(String(50), nullable=False)   # 'delivery' | 'batch' | 'consignment'
+    entity_id = Column(String(36), nullable=False, index=True)
+    actor_id = Column(String(36), ForeignKey("users.id"), nullable=False)
+    previous_state = Column(String(100), nullable=True)
+    new_state = Column(String(100), nullable=True)
+    notes = Column(Text, nullable=True)
+
+    actor = relationship("User", foreign_keys=[actor_id])
