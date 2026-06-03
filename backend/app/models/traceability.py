@@ -137,7 +137,7 @@ class Delivery(BaseModel):
     farm = relationship("Farm", back_populates="deliveries")
     batch = relationship("Batch", back_populates="deliveries")
     received_by = relationship("User", foreign_keys=[received_by_id])
-    agent = relationship("User", foreign_keys=[Column(String(36))])
+    agent = relationship("User", foreign_keys=[agent_id])
     parcel = relationship("LandParcel")
     processing_logs = relationship("ProcessingLog", back_populates="delivery", cascade="all, delete-orphan", order_by="ProcessingLog.step_date")
 
