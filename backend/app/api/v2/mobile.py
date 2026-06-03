@@ -325,11 +325,19 @@ async def create_farm_mobile(
             detail="Default Polygon Farmer not found. Call /mobile/setup first.",
         )
 
-    # Resolve cooperative
-    coop_result = await db.execute(
-        select(Cooperative).where(Cooperative.code == DEFAULT_COOP_CODE)
-    )
-    coop = coop_result.scalar_one_or_none()
+    # Resolve cooperative: use the logged-in farmer's cooperative first,
+    # only fall back to the default cooperative if the user has none.
+    coop = None
+    if current_user and current_user.cooperative_id:
+        coop_result = await db.execute(
+            select(Cooperative).where(Cooperative.id == current_user.cooperative_id)
+        )
+        coop = coop_result.scalar_one_or_none()
+    if not coop:
+        coop_result = await db.execute(
+            select(Cooperative).where(Cooperative.code == DEFAULT_COOP_CODE)
+        )
+        coop = coop_result.scalar_one_or_none()
 
     # Parse land use type
     land_use_map = {
@@ -444,9 +452,13 @@ async def create_farm_mobile(
     await db.commit()
     await db.refresh(farm)
 
-    farmer_name = " ".join(filter(None, [payload.farmer_first_name, payload.farmer_last_name])) or f"{DEFAULT_FARMER_FIRST} {DEFAULT_FARMER_LAST}"
-    farmer_phone = payload.farmer_phone or DEFAULT_FARMER_PHONE
-    coop_display = payload.cooperative_name or DEFAULT_COOP_NAME
+    # Prefer real user data over payload placeholders
+    farmer_name = " ".join(filter(None, [
+        payload.farmer_first_name or (current_user.first_name if current_user else None),
+        payload.farmer_last_name  or (current_user.last_name  if current_user else None),
+    ])) or f"{DEFAULT_FARMER_FIRST} {DEFAULT_FARMER_LAST}"
+    farmer_phone = payload.farmer_phone or (current_user.phone if current_user else None) or DEFAULT_FARMER_PHONE
+    coop_display = coop.name if coop else (payload.cooperative_name or DEFAULT_COOP_NAME)
 
     return {
         "farm_id": farm.id,
