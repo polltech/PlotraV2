@@ -27,12 +27,20 @@ router = APIRouter(tags=["Tier 1: Farmer APIs"])
 
 @router.get("/profile", response_model=UserResponse)
 async def get_farmer_profile(
-    current_user: User = Depends(require_farmer)
+    current_user: User = Depends(require_farmer),
+    db: AsyncSession = Depends(get_db)
 ):
     """
-    Get current farmer's profile.
+    Get current farmer's profile, including cooperative name.
     """
-    return current_user
+    from app.models.user import Cooperative
+    resp = UserResponse.model_validate(current_user)
+    if current_user.cooperative_id:
+        result = await db.execute(
+            select(Cooperative.name).where(Cooperative.id == current_user.cooperative_id)
+        )
+        resp.cooperative_name = result.scalar_one_or_none()
+    return resp
 
 
 @router.put("/profile", response_model=UserResponse)

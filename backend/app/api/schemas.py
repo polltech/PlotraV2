@@ -258,6 +258,7 @@ class UserResponse(BaseModel):
     admin_notes: Optional[str] = None
     page_permissions: Optional[list] = None
     cooperative_id: Optional[str] = None
+    cooperative_name: Optional[str] = None
     # Update request tracking
     update_requested: Optional[bool] = None
     update_request_notes: Optional[str] = None

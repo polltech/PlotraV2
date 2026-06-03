@@ -453,12 +453,21 @@ async def register_user(
 
 @router.get("/me", response_model=UserResponse)
 async def get_current_user_info(
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
 ):
     """
-    Get current authenticated user's profile.
+    Get current authenticated user's profile, including cooperative name.
     """
-    return current_user
+    from sqlalchemy import select
+    from app.models.user import Cooperative
+    resp = UserResponse.model_validate(current_user)
+    if current_user.cooperative_id:
+        result = await db.execute(
+            select(Cooperative.name).where(Cooperative.id == current_user.cooperative_id)
+        )
+        resp.cooperative_name = result.scalar_one_or_none()
+    return resp
 
 
 @router.get("/me/membership")
