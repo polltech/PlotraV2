@@ -252,7 +252,7 @@ def load_or_train_model(force_retrain: bool = False):
         return _model
 
     try:
-        import xgboost as xgb
+        import xgboost as xgb  # pyright: ignore[reportMissingImports]
     except ImportError:
         logger.warning("[XGB] xgboost not installed — rule-based fallback active")
         return None
@@ -340,7 +340,7 @@ def retrain_with_real_observations(observations: List[Dict]) -> Dict:
     """
     global _model
     try:
-        import xgboost as xgb
+        import xgboost as xgb  # pyright: ignore[reportMissingImports]
         import numpy as np
     except ImportError:
         return {"success": False, "error": "xgboost not installed"}
