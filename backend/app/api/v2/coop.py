@@ -1847,6 +1847,50 @@ async def create_consignment(
     }
 
 
+@router.patch("/consignments/{consignment_id}/status")
+async def update_consignment_status(
+    consignment_id: str,
+    body: dict,
+    current_user: User = Depends(require_coop_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Update consignment status (e.g. dds_ready, dds_submitted)."""
+    c = await db.get(Consignment, consignment_id)
+    if not c:
+        raise HTTPException(status_code=404, detail="Consignment not found")
+    try:
+        new_status = ConsignmentStatus(body.get("status", ""))
+    except ValueError:
+        raise HTTPException(status_code=400, detail=f"Invalid status. Valid: {[s.value for s in ConsignmentStatus]}")
+    prev = c.consignment_status
+    c.consignment_status = new_status
+    if body.get("dds_reference"):
+        c.dds_reference = body["dds_reference"]
+    _audit(db, AuditEventType.CONSIGNMENT_DDS_SUBMITTED if new_status == ConsignmentStatus.DDS_SUBMITTED else AuditEventType.CONSIGNMENT_CREATED,
+           "consignment", consignment_id, current_user.id,
+           prev=prev.value if prev else None, nxt=new_status.value)
+    await db.commit()
+    return {"consignment_id": consignment_id, "status": new_status.value, "dds_reference": c.dds_reference}
+
+
+@router.post("/members/{user_id}/reject")
+async def reject_farmer(
+    user_id: str,
+    body: dict = None,
+    current_user: User = Depends(require_coop_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Reject a farmer's cooperative membership application."""
+    farmer = await db.get(User, user_id)
+    if not farmer:
+        raise HTTPException(status_code=404, detail="Farmer not found")
+    farmer.coop_status = "coop_rejected"
+    farmer.coop_notes = (body or {}).get("reason", "Rejected by cooperative officer")
+    farmer.coop_verified_by_name = f"{current_user.first_name} {current_user.last_name}"
+    await db.commit()
+    return {"user_id": user_id, "coop_status": "coop_rejected"}
+
+
 @router.get("/consignments/{consignment_id}")
 async def get_consignment_detail(
     consignment_id: str,

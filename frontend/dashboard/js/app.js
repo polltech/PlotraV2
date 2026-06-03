@@ -538,6 +538,8 @@ class PlotraDashboard {
             { id: 'farm-approvals', icon: 'bi-geo-alt-fill', label: 'Farm Approvals' },
             { id: 'farmer-approvals', icon: 'bi-shield-check', label: 'Farmer Approvals' },
             { id: 'deliveries', icon: 'bi-box-seam', label: 'Deliveries' },
+            { id: 'batches', icon: 'bi-layers', label: 'Batches' },
+            { id: 'consignments', icon: 'bi-airplane', label: 'Consignments' },
             { id: 'coop-team', icon: 'bi-people-fill', label: 'Cooperative Team' },
             { id: 'profile', icon: 'bi-person-circle', label: 'My Profile' }
         ];
@@ -1737,6 +1739,10 @@ class PlotraDashboard {
                 case 'batches':
                     if (title) title.textContent = 'Batches';
                     await this.loadBatches(content);
+                    break;
+                case 'consignments':
+                    if (title) title.textContent = 'Consignments';
+                    await this.loadConsignments(content);
                     break;
                 case 'verification':
                     if (title) title.textContent = 'Verification';
@@ -4744,102 +4750,115 @@ class PlotraDashboard {
         const role = (this.currentUser?.role || '').toUpperCase();
         const isCoop = ['COOPERATIVE_OFFICER', 'FACTOR', 'COOP_ADMIN', 'COOP_OFFICER'].includes(role);
         const isAdmin = ['PLATFORM_ADMIN', 'SUPER_ADMIN', 'ADMIN', 'PLOTRA_ADMIN'].includes(role);
-        const isFarmer = !isCoop && !isAdmin;
-
-        const headerLabel = isCoop ? 'Farm Deliveries — Monitoring' : isAdmin ? 'All Deliveries' : 'My Deliveries';
-        const cols = isCoop || isAdmin
-            ? `<th>Delivery #</th><th>Farmer</th><th>Farm</th><th>Gross (kg)</th><th>Net (kg)</th><th>Grade</th><th>Moisture</th><th>Status</th><th>Date</th>`
-            : `<th>Delivery #</th><th>Farm</th><th>Net Weight</th><th>Grade</th><th>Status</th><th>Date</th>`;
-        const colspan = isCoop || isAdmin ? 9 : 6;
+        const colspan = isCoop || isAdmin ? 10 : 6;
 
         content.innerHTML = `
-            <div class="row g-4 mb-4">
-                ${isCoop ? `
-                <div class="col-md-3"><div class="card border-0 shadow-sm text-center"><div class="card-body py-3">
-                    <div class="text-muted small text-uppercase mb-1">Total Deliveries</div>
-                    <h3 class="mb-0" id="deliv-total">—</h3>
-                </div></div></div>
-                <div class="col-md-3"><div class="card border-0 shadow-sm text-center"><div class="card-body py-3">
-                    <div class="text-muted small text-uppercase mb-1">Total Weight (kg)</div>
-                    <h3 class="mb-0 text-success" id="deliv-weight">—</h3>
-                </div></div></div>
-                <div class="col-md-3"><div class="card border-0 shadow-sm text-center"><div class="card-body py-3">
-                    <div class="text-muted small text-uppercase mb-1">Pending</div>
-                    <h3 class="mb-0 text-warning" id="deliv-pending">—</h3>
-                </div></div></div>
-                <div class="col-md-3"><div class="card border-0 shadow-sm text-center"><div class="card-body py-3">
-                    <div class="text-muted small text-uppercase mb-1">Processed</div>
-                    <h3 class="mb-0 text-primary" id="deliv-processed">—</h3>
-                </div></div></div>
-                ` : ''}
-                <div class="col-12">
-                    <div class="card border-0 shadow-sm">
-                        <div class="card-header d-flex justify-content-between align-items-center" style="background:linear-gradient(135deg,#2c1a0e,#6f4e37);color:white;">
-                            <h5 class="mb-0"><i class="bi bi-box-seam me-2"></i>${headerLabel}</h5>
-                            ${isCoop ? `
-                            <button class="btn btn-sm" style="background:#daa520;color:#3d2515;" onclick="app.showRecordDeliveryModal()">
-                                <i class="bi bi-plus-circle me-1"></i>Record Delivery
-                            </button>` : ''}
-                        </div>
-                        <div class="card-body p-0">
-                            <div class="table-responsive">
-                                <table class="table table-hover mb-0">
-                                    <thead class="table-light">
-                                        <tr>${cols}</tr>
-                                    </thead>
-                                    <tbody id="deliveries-list">
-                                        <tr><td colspan="${colspan}" class="text-center py-4">
-                                            <div class="spinner-border spinner-border-sm me-2"></div>Loading deliveries...
-                                        </td></tr>
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
+        <div class="row g-3 mb-4" id="deliv-stats" style="display:${isCoop?'flex':'none'}!important">
+            <div class="col-6 col-md-2"><div class="card border-0 shadow-sm text-center"><div class="card-body py-2">
+                <div class="text-muted small mb-1">Total</div><h4 class="mb-0" id="ds-total">—</h4>
+            </div></div></div>
+            <div class="col-6 col-md-2"><div class="card border-0 shadow-sm text-center"><div class="card-body py-2">
+                <div class="text-muted small mb-1">Total kg</div><h4 class="mb-0 text-success" id="ds-weight">—</h4>
+            </div></div></div>
+            <div class="col-6 col-md-2"><div class="card border-0 shadow-sm text-center"><div class="card-body py-2">
+                <div class="text-muted small mb-1">Received</div><h4 class="mb-0 text-info" id="ds-received">—</h4>
+            </div></div></div>
+            <div class="col-6 col-md-2"><div class="card border-0 shadow-sm text-center"><div class="card-body py-2">
+                <div class="text-muted small mb-1">In Processing</div><h4 class="mb-0 text-warning" id="ds-processing">—</h4>
+            </div></div></div>
+            <div class="col-6 col-md-2"><div class="card border-0 shadow-sm text-center"><div class="card-body py-2">
+                <div class="text-muted small mb-1">Ready / Batched</div><h4 class="mb-0 text-primary" id="ds-ready">—</h4>
+            </div></div></div>
+            <div class="col-6 col-md-2"><div class="card border-0 shadow-sm text-center"><div class="card-body py-2">
+                <div class="text-muted small mb-1">Rejected</div><h4 class="mb-0 text-danger" id="ds-rejected">—</h4>
+            </div></div></div>
+        </div>
+        <div class="card border-0 shadow-sm">
+            <div class="card-header d-flex justify-content-between align-items-center" style="background:linear-gradient(135deg,#2c1a0e,#6f4e37);color:white;">
+                <h5 class="mb-0"><i class="bi bi-box-seam me-2"></i>${isCoop ? 'Deliveries — Processing Workflow' : isAdmin ? 'All Deliveries' : 'My Deliveries'}</h5>
+                <div class="d-flex gap-2">
+                    ${isCoop ? `<button class="btn btn-sm" style="background:#daa520;color:#3d2515;" onclick="app.showRecordDeliveryModal()">
+                        <i class="bi bi-plus-circle me-1"></i>Record Delivery</button>` : ''}
                 </div>
             </div>
-        `;
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Delivery #</th>
+                                ${isCoop || isAdmin ? '<th>Farmer</th><th>Farm</th>' : '<th>Farm</th>'}
+                                <th>Net (kg)</th>
+                                <th>Grade</th>
+                                <th>Moisture</th>
+                                <th>Processing</th>
+                                <th>Status</th>
+                                <th>Date</th>
+                                ${isCoop ? '<th>Actions</th>' : ''}
+                            </tr>
+                        </thead>
+                        <tbody id="deliveries-list">
+                            <tr><td colspan="${colspan}" class="text-center py-4">
+                                <div class="spinner-border spinner-border-sm me-2"></div>Loading...
+                            </td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        <!-- Delivery Detail Panel (hidden by default) -->
+        <div id="delivery-detail-panel" class="card border-0 shadow-sm mt-4" style="display:none">
+            <div class="card-header d-flex justify-content-between align-items-center bg-light">
+                <h6 class="mb-0" id="ddp-title">Delivery Detail</h6>
+                <button class="btn btn-sm btn-outline-secondary" onclick="document.getElementById('delivery-detail-panel').style.display='none'">
+                    <i class="bi bi-x"></i> Close
+                </button>
+            </div>
+            <div class="card-body" id="ddp-body">Loading...</div>
+        </div>`;
 
         try {
             const deliveries = await api.getDeliveries();
             const list = document.getElementById('deliveries-list');
 
             if (isCoop) {
-                const total = deliveries.length;
-                const weight = deliveries.reduce((s, d) => s + (d.net_weight_kg || 0), 0);
-                const pending = deliveries.filter(d => d.status?.toLowerCase() === 'pending').length;
-                const processed = deliveries.filter(d => ['received','processed','completed'].includes(d.status?.toLowerCase())).length;
-                document.getElementById('deliv-total').textContent = total;
-                document.getElementById('deliv-weight').textContent = weight.toFixed(1);
-                document.getElementById('deliv-pending').textContent = pending;
-                document.getElementById('deliv-processed').textContent = processed;
+                const wt = deliveries.reduce((s, d) => s + (d.net_weight_kg || 0), 0);
+                document.getElementById('ds-total').textContent = deliveries.length;
+                document.getElementById('ds-weight').textContent = wt.toFixed(1);
+                document.getElementById('ds-received').textContent = deliveries.filter(d => ['received','pending'].includes((d.status||'').toLowerCase())).length;
+                document.getElementById('ds-processing').textContent = deliveries.filter(d => d.status === 'in_processing').length;
+                document.getElementById('ds-ready').textContent = deliveries.filter(d => ['ready_for_batching','batched'].includes(d.status)).length;
+                document.getElementById('ds-rejected').textContent = deliveries.filter(d => d.status === 'rejected').length;
             }
+
+            const statusLabel = s => (s || 'pending').replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
 
             if (deliveries && deliveries.length > 0) {
                 list.innerHTML = deliveries.map(d => {
                     const sc = this.getDeliveryStatusClass(d.status);
-                    if (isCoop || isAdmin) {
-                        return `<tr>
-                            <td class="fw-semibold">${d.delivery_number || 'D-'+d.id}</td>
-                            <td>${d.farmer_name || d.farmer_id || '—'}</td>
-                            <td>${d.farm_name || 'Farm #'+d.farm_id}</td>
-                            <td>${d.gross_weight_kg || 0}</td>
-                            <td class="fw-bold">${d.net_weight_kg || 0}</td>
-                            <td><span class="badge bg-soft-primary text-primary">${d.quality_grade || 'N/A'}</span></td>
-                            <td>${d.moisture_content ? d.moisture_content+'%' : '—'}</td>
-                            <td><span class="badge ${sc}">${d.status || 'pending'}</span></td>
-                            <td>${new Date(d.created_at).toLocaleDateString()}</td>
-                        </tr>`;
-                    } else {
-                        return `<tr>
-                            <td class="fw-semibold">${d.delivery_number || 'D-'+d.id}</td>
-                            <td>${d.farm_name || 'Farm #'+d.farm_id}</td>
-                            <td class="fw-bold">${d.net_weight_kg || 0} kg</td>
-                            <td><span class="badge bg-soft-primary text-primary">${d.quality_grade || 'N/A'}</span></td>
-                            <td><span class="badge ${sc}">${d.status || 'pending'}</span></td>
-                            <td>${new Date(d.created_at).toLocaleDateString()}</td>
-                        </tr>`;
-                    }
+                    const logCount = d.processing_log?.length || 0;
+                    const lastStep = d.processing_log?.[logCount-1]?.step_type || '';
+                    const processingBadge = lastStep
+                        ? `<span class="badge bg-soft-info text-info">${statusLabel(lastStep)}</span>`
+                        : `<span class="text-muted small">—</span>`;
+                    return `<tr style="cursor:pointer" onclick="app.showDeliveryDetail('${d.id}')">
+                        <td class="fw-semibold text-primary">${d.delivery_number || 'D-'+d.id}</td>
+                        ${isCoop || isAdmin ? `<td>${d.farmer_name||'—'}</td><td>${d.farm_name||'Farm #'+d.farm_id}</td>` : `<td>${d.farm_name||'Farm #'+d.farm_id}</td>`}
+                        <td class="fw-bold">${(d.net_weight_kg||0).toFixed(1)}</td>
+                        <td><span class="badge bg-soft-primary text-primary">${d.quality_grade||'N/A'}</span></td>
+                        <td>${d.moisture_content ? d.moisture_content+'%' : '—'}</td>
+                        <td>${processingBadge}</td>
+                        <td><span class="badge ${sc}">${statusLabel(d.status)}</span></td>
+                        <td>${new Date(d.created_at).toLocaleDateString()}</td>
+                        ${isCoop ? `<td onclick="event.stopPropagation()">
+                            <button class="btn btn-xs btn-outline-primary me-1" title="Add Processing Step" onclick="app.showAddProcessingStep('${d.id}')">
+                                <i class="bi bi-plus-circle"></i>
+                            </button>
+                            <button class="btn btn-xs btn-outline-secondary" title="View Detail" onclick="app.showDeliveryDetail('${d.id}')">
+                                <i class="bi bi-eye"></i>
+                            </button>
+                        </td>` : ''}
+                    </tr>`;
                 }).join('');
             } else {
                 list.innerHTML = `<tr><td colspan="${colspan}" class="text-center py-5 text-muted">
@@ -4848,7 +4867,185 @@ class PlotraDashboard {
         } catch (error) {
             console.error(error);
             const list = document.getElementById('deliveries-list');
-            if (list) list.innerHTML = `<tr><td colspan="${colspan}" class="text-center py-4 text-danger">Error: ${error.message}</td></tr>`;
+            if (list) list.innerHTML = `<tr><td colspan="${colspan}" class="text-danger text-center py-4">Error: ${error.message}</td></tr>`;
+        }
+    }
+
+    async showDeliveryDetail(deliveryId) {
+        const panel = document.getElementById('delivery-detail-panel');
+        const body = document.getElementById('ddp-body');
+        const title = document.getElementById('ddp-title');
+        if (!panel) return;
+        panel.style.display = 'block';
+        body.innerHTML = '<div class="text-center py-4"><div class="spinner-border spinner-border-sm"></div> Loading delivery detail...</div>';
+        panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        try {
+            const d = await api.getDelivery(deliveryId);
+            title.textContent = `Delivery: ${d.delivery_number || deliveryId}`;
+            const statusLabel = s => (s||'pending').replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
+            const sc = this.getDeliveryStatusClass(d.status);
+            const logs = d.processing_log || [];
+            const STEP_ICONS = {sorting:'funnel',washing:'droplet',drying:'sun',milling:'gear',grading:'ribbon',packing:'box'};
+            body.innerHTML = `
+            <div class="row g-3 mb-3">
+                <div class="col-md-4">
+                    <div class="p-3 bg-light rounded-3">
+                        <div class="small text-muted mb-1">Farmer</div>
+                        <div class="fw-bold">${d.farmer_name||'—'}</div>
+                        <div class="small">${d.farmer_phone||''}</div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="p-3 bg-light rounded-3">
+                        <div class="small text-muted mb-1">Farm</div>
+                        <div class="fw-bold">${d.farm_name||'—'}</div>
+                        <div class="small">Net: <strong>${(d.net_weight_kg||0).toFixed(2)} kg</strong> · Grade: <strong>${d.quality_grade||'—'}</strong></div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="p-3 rounded-3" style="background:${d.eudr_eligible===false?'#fff5f5':'#f0fdf4'}">
+                        <div class="small text-muted mb-1">EUDR Status</div>
+                        <span class="badge ${sc}">${statusLabel(d.status)}</span>
+                        ${d.eudr_eligible!==false ? '<span class="badge bg-soft-success text-success ms-1"><i class="bi bi-shield-check"></i> EUDR Eligible</span>' : '<span class="badge bg-soft-danger text-danger ms-1">Not Eligible</span>'}
+                    </div>
+                </div>
+            </div>
+            <!-- Status Update -->
+            <div class="mb-3 p-3 border rounded-3">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h6 class="mb-0">Update Status</h6>
+                </div>
+                <div class="d-flex gap-2 flex-wrap">
+                    ${['received','in_processing','ready_for_batching','batched','rejected'].map(s =>
+                        `<button class="btn btn-sm ${d.status===s?'btn-primary':'btn-outline-secondary'}" onclick="app.updateDeliveryStatus('${d.id}','${s}')">${statusLabel(s)}</button>`
+                    ).join('')}
+                </div>
+            </div>
+            <!-- Processing Log -->
+            <div class="mb-3">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h6 class="mb-0">Processing Log (${logs.length} steps)</h6>
+                    <button class="btn btn-sm btn-outline-primary" onclick="app.showAddProcessingStep('${d.id}')">
+                        <i class="bi bi-plus-circle me-1"></i>Add Step
+                    </button>
+                </div>
+                ${logs.length === 0
+                    ? '<div class="text-muted small p-3 bg-light rounded-3 text-center">No processing steps logged yet.</div>'
+                    : `<div class="timeline">
+                    ${logs.map((lg,i) => `
+                        <div class="d-flex gap-3 mb-3">
+                            <div class="flex-shrink-0 d-flex flex-column align-items-center">
+                                <div class="rounded-circle d-flex align-items-center justify-content-center" style="width:36px;height:36px;background:#dbeafe">
+                                    <i class="bi bi-${STEP_ICONS[lg.step_type]||'check-circle'} text-primary"></i>
+                                </div>
+                                ${i < logs.length-1 ? '<div style="width:2px;flex:1;background:#e2e8f0;margin-top:4px;margin-bottom:-8px"></div>' : ''}
+                            </div>
+                            <div class="flex-grow-1 pb-3">
+                                <div class="d-flex justify-content-between">
+                                    <strong>${statusLabel(lg.step_type)}</strong>
+                                    <small class="text-muted">${new Date(lg.step_date).toLocaleDateString()}</small>
+                                </div>
+                                ${lg.weight_out_kg ? `<div class="small">Weight out: <strong>${lg.weight_out_kg} kg</strong></div>` : ''}
+                                ${lg.grade ? `<div class="small">Grade: <strong>${lg.grade}</strong></div>` : ''}
+                                ${lg.notes ? `<div class="small text-muted fst-italic">${lg.notes}</div>` : ''}
+                            </div>
+                        </div>`).join('')}
+                    </div>`}
+            </div>
+            ${d.notes ? `<div class="p-3 bg-light rounded-3"><div class="small text-muted mb-1">Notes</div><div>${d.notes}</div></div>` : ''}`;
+        } catch (e) {
+            body.innerHTML = `<div class="text-danger">Error loading delivery: ${e.message}</div>`;
+        }
+    }
+
+    async updateDeliveryStatus(deliveryId, newStatus) {
+        try {
+            await api.updateDeliveryStatus(deliveryId, newStatus);
+            this.showToast(`Status updated to: ${newStatus.replace(/_/g,' ')}`, 'success');
+            await this.showDeliveryDetail(deliveryId);
+            this.loadPage('deliveries');
+        } catch (e) {
+            this.showToast(e.message, 'error');
+        }
+    }
+
+    showAddProcessingStep(deliveryId) {
+        const today = new Date().toISOString().slice(0,10);
+        const modalHtml = `
+        <div class="modal fade" id="processingStepModal" tabindex="-1">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header" style="background:linear-gradient(135deg,#2c1a0e,#6f4e37);color:white;">
+                        <h5 class="modal-title"><i class="bi bi-gear-wide-connected me-2"></i>Add Processing Step</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Step Type <span class="text-danger">*</span></label>
+                            <select class="form-select" id="ps-type">
+                                <option value="sorting">Sorting</option>
+                                <option value="washing">Washing / Wet Processing</option>
+                                <option value="drying">Drying</option>
+                                <option value="milling">Milling / Hulling</option>
+                                <option value="grading">Grading</option>
+                                <option value="packing" selected>Packing (→ Ready for Batching)</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Step Date <span class="text-danger">*</span></label>
+                            <input type="date" class="form-control" id="ps-date" value="${today}">
+                        </div>
+                        <div class="row g-2 mb-3">
+                            <div class="col-6">
+                                <label class="form-label fw-semibold">Weight Out (kg)</label>
+                                <input type="number" class="form-control" id="ps-weight" placeholder="Optional" step="0.01">
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label fw-semibold">Grade</label>
+                                <select class="form-select" id="ps-grade">
+                                    <option value="">— optional —</option>
+                                    <option>AA</option><option>AB</option><option>PB</option><option>C</option><option>AAAA</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Notes</label>
+                            <textarea class="form-control" id="ps-notes" rows="2" placeholder="e.g. Drying on raised beds, 14 days. Target moisture: 11%"></textarea>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button class="btn btn-primary" onclick="app.handleAddProcessingStep('${deliveryId}')">
+                            <i class="bi bi-save me-1"></i>Save Step
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>`;
+        document.getElementById('processingStepModal')?.remove();
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+        new bootstrap.Modal(document.getElementById('processingStepModal')).show();
+    }
+
+    async handleAddProcessingStep(deliveryId) {
+        const data = {
+            step_type: document.getElementById('ps-type').value,
+            step_date: document.getElementById('ps-date').value,
+            weight_out_kg: parseFloat(document.getElementById('ps-weight').value) || null,
+            grade: document.getElementById('ps-grade').value || null,
+            notes: document.getElementById('ps-notes').value.trim() || null,
+        };
+        if (!data.step_type || !data.step_date) { this.showToast('Step type and date are required.', 'warning'); return; }
+        try {
+            const res = await api.addProcessingStep(deliveryId, data);
+            bootstrap.Modal.getInstance(document.getElementById('processingStepModal')).hide();
+            this.showToast(`Step '${data.step_type}' logged. Delivery now: ${res.delivery_status?.replace(/_/g,' ')}`, 'success');
+            if (document.getElementById('delivery-detail-panel')?.style.display !== 'none') {
+                await this.showDeliveryDetail(deliveryId);
+            }
+            this.loadPage('deliveries');
+        } catch (e) {
+            this.showToast(e.message, 'error');
         }
     }
 
@@ -4948,27 +5145,207 @@ class PlotraDashboard {
 
     async handleCreateBatch() {
         try {
-            const checkedDeliveries = Array.from(document.querySelectorAll('.batch-delivery-check:checked')).map(cb => parseInt(cb.value));
-            if (checkedDeliveries.length === 0) {
+            const checks = Array.from(document.querySelectorAll('.batch-deliv-check:checked'));
+            const deliveryIds = checks.map(cb => cb.value);
+            if (deliveryIds.length === 0) {
                 this.showToast('Please select at least one delivery', 'warning');
                 return;
             }
-
+            const batchNumber = document.getElementById('cb-number')?.value?.trim().toUpperCase()
+                || ('BAT-' + new Date().getFullYear() + '-' + Date.now().toString().slice(-4));
             const data = {
-                batch_number: 'BAT-' + Date.now(),
-                crop_year: new Date().getFullYear(),
-                quality_grade: document.getElementById('batchGrade').value,
-                delivery_ids: checkedDeliveries
+                batch_number: batchNumber,
+                crop_year: parseInt(document.getElementById('cb-year')?.value) || new Date().getFullYear(),
+                processing_method: document.getElementById('cb-method')?.value || 'washed',
+                harvest_start_date: document.getElementById('cb-start')?.value || null,
+                harvest_end_date: document.getElementById('cb-end')?.value || null,
+                notes: document.getElementById('cb-notes')?.value?.trim() || null,
+                delivery_ids: deliveryIds,
             };
-
             await api.createBatch(data);
-            this.showToast('Batch created successfully', 'success');
+            this.showToast('Batch created successfully!', 'success');
             const modal = bootstrap.Modal.getInstance(document.getElementById('createBatchModal'));
             if (modal) modal.hide();
             if (this.currentPage === 'batches') this.loadPage('batches');
         } catch (error) {
             this.showToast(error.message, 'error');
         }
+    }
+
+    async loadConsignments(content) {
+        const EU_COUNTRIES = ['AT','BE','BG','CY','CZ','DE','DK','EE','ES','FI','FR','GR','HR','HU','IE','IT','LT','LU','LV','MT','NL','PL','PT','RO','SE','SI','SK'];
+        content.innerHTML = `
+        <div class="card border-0 shadow-sm">
+            <div class="card-header d-flex justify-content-between align-items-center" style="background:linear-gradient(135deg,#2c1a0e,#6f4e37);color:white;">
+                <h5 class="mb-0"><i class="bi bi-airplane me-2"></i>Consignment Management (EUDR Export)</h5>
+                <button class="btn btn-sm" style="background:#daa520;color:#3d2515;" onclick="app.showCreateConsignmentModal()">
+                    <i class="bi bi-plus-lg me-1"></i> New Consignment
+                </button>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr><th>Reference</th><th>Destination</th><th>Importer</th><th>Total (kg)</th><th>Batches</th><th>Status</th><th>DDS Ref</th><th>Shipment Date</th><th>Actions</th></tr>
+                        </thead>
+                        <tbody id="consignments-list">
+                            <tr><td colspan="9" class="text-center py-4"><div class="spinner-border spinner-border-sm me-2"></div>Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>`;
+
+        try {
+            const consignments = await api.getConsignments();
+            const list = document.getElementById('consignments-list');
+            const statusClass = s => {
+                const u = (s||'').toLowerCase();
+                if (u === 'dds_submitted') return 'bg-soft-success text-success';
+                if (u === 'dds_ready') return 'bg-soft-primary text-primary';
+                if (u === 'rejected') return 'bg-soft-danger text-danger';
+                return 'bg-soft-warning text-warning';
+            };
+            const statusLabel = s => (s||'pending_dds').replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
+
+            if (consignments && consignments.length > 0) {
+                list.innerHTML = consignments.map(c => `
+                    <tr>
+                        <td class="fw-bold text-primary">${c.consignment_reference}</td>
+                        <td><span class="badge bg-soft-info text-info">${c.destination_country}</span></td>
+                        <td>${c.importer_name}</td>
+                        <td>${(c.total_weight_kg||0).toFixed(1)} kg</td>
+                        <td>${(c.batch_ids||[]).length}</td>
+                        <td><span class="badge ${statusClass(c.consignment_status)}">${statusLabel(c.consignment_status)}</span></td>
+                        <td>${c.dds_reference ? `<code>${c.dds_reference}</code>` : '—'}</td>
+                        <td>${c.expected_shipment_date ? new Date(c.expected_shipment_date).toLocaleDateString() : '—'}</td>
+                        <td>
+                            ${c.consignment_status === 'pending_dds' ? `
+                            <button class="btn btn-xs btn-success" onclick="app.markDDSReady('${c.id}')">Mark DDS Ready</button>` : ''}
+                            ${c.consignment_status === 'dds_ready' ? `
+                            <button class="btn btn-xs btn-primary" onclick="app.markDDSSubmitted('${c.id}')">Mark Submitted</button>` : ''}
+                        </td>
+                    </tr>`).join('');
+            } else {
+                list.innerHTML = `<tr><td colspan="9" class="text-center py-5 text-muted">
+                    <i class="bi bi-airplane fs-2 d-block mb-2"></i>No consignments yet.<br>
+                    <small>Create a consignment from verified batches ready for export.</small></td></tr>`;
+            }
+        } catch (e) {
+            console.error(e);
+            document.getElementById('consignments-list').innerHTML = `<tr><td colspan="9" class="text-danger text-center py-4">Error: ${e.message}</td></tr>`;
+        }
+    }
+
+    async showCreateConsignmentModal() {
+        try {
+            const batches = await api.getBatches();
+            const EU_COUNTRIES = ['AT','BE','BG','CY','CZ','DE','DK','EE','ES','FI','FR','GR','HR','HU','IE','IT','LT','LU','LV','MT','NL','PL','PT','RO','SE','SI','SK'];
+            const today = new Date().toISOString().slice(0,10);
+            const modalHtml = `
+            <div class="modal fade" id="createConsignmentModal" tabindex="-1">
+                <div class="modal-dialog modal-lg modal-dialog-centered">
+                    <div class="modal-content">
+                        <div class="modal-header" style="background:linear-gradient(135deg,#2c1a0e,#6f4e37);color:white;">
+                            <h5 class="modal-title"><i class="bi bi-airplane me-2"></i>New Consignment</h5>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="row g-3 mb-3">
+                                <div class="col-md-6">
+                                    <label class="form-label fw-semibold">Reference (auto if blank)</label>
+                                    <input class="form-control" id="cc-ref" placeholder="e.g. NYR-2025-C01" style="text-transform:uppercase">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label fw-semibold">Destination Country <span class="text-danger">*</span></label>
+                                    <select class="form-select" id="cc-country">
+                                        <option value="">— EU country —</option>
+                                        ${EU_COUNTRIES.map(c => `<option value="${c}">${c}</option>`).join('')}
+                                    </select>
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label fw-semibold">Expected Shipment</label>
+                                    <input type="date" class="form-control" id="cc-date" value="${today}">
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label fw-semibold">Importer Name <span class="text-danger">*</span></label>
+                                    <input class="form-control" id="cc-importer" placeholder="EU importer company name">
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label fw-semibold">Notes</label>
+                                    <textarea class="form-control" id="cc-notes" rows="2"></textarea>
+                                </div>
+                            </div>
+                            <h6>Select Batches <span class="text-muted small fw-normal">(${batches.length} available)</span></h6>
+                            <div style="max-height:220px;overflow-y:auto;border:1px solid #dee2e6;border-radius:8px;padding:12px">
+                                ${batches.length > 0 ? batches.map(b => `
+                                    <div class="form-check py-1 border-bottom">
+                                        <input class="form-check-input cc-batch-check" type="checkbox" value="${b.id}" id="ccb-${b.id}">
+                                        <label class="form-check-label d-flex justify-content-between" for="ccb-${b.id}">
+                                            <span><strong>${b.batch_number}</strong> · ${b.crop_year||'—'} · ${(b.status||'').replace(/_/g,' ')}</span>
+                                            <span class="text-muted">${(b.total_weight_kg||0).toFixed(1)} kg</span>
+                                        </label>
+                                    </div>`).join('')
+                                : '<div class="text-muted text-center py-3">No batches available.</div>'}
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                            <button class="btn btn-primary" onclick="app.handleCreateConsignment()">
+                                <i class="bi bi-airplane me-1"></i>Create Consignment
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+            document.getElementById('createConsignmentModal')?.remove();
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
+            new bootstrap.Modal(document.getElementById('createConsignmentModal')).show();
+        } catch (e) {
+            this.showToast('Error: ' + e.message, 'error');
+        }
+    }
+
+    async handleCreateConsignment() {
+        const batchIds = Array.from(document.querySelectorAll('.cc-batch-check:checked')).map(cb => cb.value);
+        const country = document.getElementById('cc-country')?.value;
+        const importer = document.getElementById('cc-importer')?.value?.trim();
+        if (!batchIds.length) { this.showToast('Select at least one batch.', 'warning'); return; }
+        if (!country) { this.showToast('Select destination country.', 'warning'); return; }
+        if (!importer) { this.showToast('Importer name is required.', 'warning'); return; }
+        try {
+            await api.createConsignment({
+                batch_ids: batchIds,
+                consignment_reference: document.getElementById('cc-ref')?.value?.trim().toUpperCase() || null,
+                destination_country: country,
+                importer_name: importer,
+                expected_shipment_date: document.getElementById('cc-date')?.value || null,
+                notes: document.getElementById('cc-notes')?.value?.trim() || null,
+            });
+            bootstrap.Modal.getInstance(document.getElementById('createConsignmentModal')).hide();
+            this.showToast('Consignment created successfully!', 'success');
+            this.loadPage('consignments');
+        } catch (e) {
+            this.showToast(e.message, 'error');
+        }
+    }
+
+    async markDDSReady(id) {
+        try {
+            await api.updateConsignmentStatus(id, 'dds_ready');
+            this.showToast('Consignment marked as DDS Ready', 'success');
+            this.loadPage('consignments');
+        } catch (e) { this.showToast(e.message, 'error'); }
+    }
+
+    async markDDSSubmitted(id) {
+        const ddsRef = prompt('Enter EU TRACES DDS Reference Number:');
+        if (ddsRef === null) return;
+        try {
+            await api.updateConsignmentStatus(id, 'dds_submitted', ddsRef.trim() || null);
+            this.showToast('DDS marked as submitted', 'success');
+            this.loadPage('consignments');
+        } catch (e) { this.showToast(e.message, 'error'); }
     }
 
     async handleGenerateDDS() {
@@ -5266,67 +5643,241 @@ class PlotraDashboard {
         const isAdmin = ['PLATFORM_ADMIN', 'SUPER_ADMIN', 'ADMIN', 'PLOTRA_ADMIN'].includes(role);
 
         content.innerHTML = `
-            <div class="row g-4 mb-4">
-                <div class="col-md-12">
-                    <div class="card">
-                        <div class="card-header d-flex justify-content-between align-items-center">
-                            <h4 class="card-title">Processing Batches</h4>
-                            ${(isCoop || isAdmin) ? `
-                                <button class="btn btn-primary btn-sm" onclick="app.showCreateBatchModal()">
-                                    <i class="bi bi-plus-lg me-1"></i> Create Batch
-                                </button>
-                            ` : ''}
-                        </div>
-                        <div class="card-body p-0">
-                            <div class="table-responsive">
-                                <table class="table table-hover mb-0">
-                                    <thead>
-                                        <tr>
-                                            <th>Batch #</th>
-                                            <th>Year</th>
-                                            <th>Weight</th>
-                                            <th>Grade</th>
-                                            <th>Compliance</th>
-                                            <th>Date</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="batches-list">
-                                        <tr><td colspan="6" class="text-center py-4">Loading batches...</td></tr>
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
+        <div class="card border-0 shadow-sm">
+            <div class="card-header d-flex justify-content-between align-items-center" style="background:linear-gradient(135deg,#2c1a0e,#6f4e37);color:white;">
+                <h5 class="mb-0"><i class="bi bi-layers me-2"></i>Batch Management</h5>
+                ${(isCoop || isAdmin) ? `
+                <button class="btn btn-sm" style="background:#daa520;color:#3d2515;" onclick="app.showCreateBatchModal()">
+                    <i class="bi bi-plus-lg me-1"></i> Create Batch
+                </button>` : ''}
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Batch #</th><th>Year</th><th>Total (kg)</th>
+                                <th>EUDR Eligible (kg)</th><th>Grade</th>
+                                <th>Status</th><th>Compliance</th><th>Date</th>
+                                ${isCoop ? '<th>Actions</th>' : ''}
+                            </tr>
+                        </thead>
+                        <tbody id="batches-list">
+                            <tr><td colspan="9" class="text-center py-4"><div class="spinner-border spinner-border-sm me-2"></div>Loading batches...</td></tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
-        `;
+        </div>
+        <!-- Batch Detail Panel -->
+        <div id="batch-detail-panel" class="card border-0 shadow-sm mt-4" style="display:none">
+            <div class="card-header d-flex justify-content-between align-items-center bg-light">
+                <h6 class="mb-0" id="bdp-title">Batch Detail</h6>
+                <button class="btn btn-sm btn-outline-secondary" onclick="document.getElementById('batch-detail-panel').style.display='none'">
+                    <i class="bi bi-x"></i> Close
+                </button>
+            </div>
+            <div class="card-body" id="bdp-body">Loading...</div>
+        </div>`;
 
         try {
             const batches = await api.getBatches();
             const list = document.getElementById('batches-list');
-            
+            const statusLabel = s => (s||'draft').replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
+            const batchStatusClass = s => {
+                const u = (s||'').toLowerCase();
+                if (u === 'verified') return 'bg-soft-success text-success';
+                if (u === 'released') return 'bg-soft-primary text-primary';
+                if (u === 'under_satellite_review') return 'bg-soft-info text-info';
+                if (u === 'dds_submitted') return 'bg-soft-success text-success';
+                return 'bg-soft-warning text-warning';
+            };
+
             if (batches && batches.length > 0) {
                 list.innerHTML = batches.map(b => `
-                    <tr>
-                        <td><span class="fw-bold">${b.batch_number}</span></td>
-                        <td>${b.crop_year}</td>
-                        <td class="fw-bold">${b.total_weight_kg || 0} kg</td>
-                        <td><span class="badge bg-soft-primary text-primary">${b.quality_grade || 'N/A'}</span></td>
-                        <td><span class="badge ${b.compliance_status === 'Compliant' ? 'bg-soft-success text-success' : 'bg-soft-warning text-warning'}">${b.compliance_status}</span></td>
+                    <tr style="cursor:pointer" onclick="app.showBatchDetail('${b.id}')">
+                        <td class="fw-bold text-primary">${b.batch_number}</td>
+                        <td>${b.crop_year||'—'}</td>
+                        <td class="fw-bold">${(b.total_weight_kg||0).toFixed(1)} kg</td>
+                        <td>${b.eudr_eligible_kg != null ? (b.eudr_eligible_kg||0).toFixed(1)+' kg' : '—'}</td>
+                        <td><span class="badge bg-soft-primary text-primary">${b.quality_grade||'N/A'}</span></td>
+                        <td><span class="badge ${batchStatusClass(b.status)}">${statusLabel(b.status)}</span></td>
+                        <td><span class="badge ${b.compliance_status==='Compliant'?'bg-soft-success text-success':'bg-soft-warning text-warning'}">${b.compliance_status||'Under Review'}</span></td>
                         <td>${new Date(b.created_at).toLocaleDateString()}</td>
-                    </tr>
-                `).join('');
+                        ${isCoop ? `<td onclick="event.stopPropagation()">
+                            ${b.status === 'draft' ? `<button class="btn btn-xs btn-success" onclick="app.releaseBatch('${b.id}','${b.batch_number}')">
+                                <i class="bi bi-rocket me-1"></i>Release
+                            </button>` : `<button class="btn btn-xs btn-outline-secondary" onclick="app.showBatchDetail('${b.id}')">
+                                <i class="bi bi-eye"></i>
+                            </button>`}
+                        </td>` : ''}
+                    </tr>`).join('');
             } else {
-                list.innerHTML = '<tr><td colspan="6" class="text-center py-4">No batches found.</td></tr>';
+                list.innerHTML = `<tr><td colspan="9" class="text-center py-5 text-muted">
+                    <i class="bi bi-layers fs-2 d-block mb-2"></i>No batches found.</td></tr>`;
             }
         } catch (error) {
             console.error(error);
-            list.innerHTML = `<tr><td colspan="6" class="text-center py-4 text-danger">Error: ${error.message}</td></tr>`;
+            const list = document.getElementById('batches-list');
+            if (list) list.innerHTML = `<tr><td colspan="9" class="text-center text-danger py-4">Error: ${error.message}</td></tr>`;
         }
     }
 
-    showCreateBatchModal() {
-        this.showToast('Batch creation modal would open here', 'info');
+    async showBatchDetail(batchId) {
+        const panel = document.getElementById('batch-detail-panel');
+        const body = document.getElementById('bdp-body');
+        const title = document.getElementById('bdp-title');
+        if (!panel) return;
+        panel.style.display = 'block';
+        body.innerHTML = '<div class="text-center py-4"><div class="spinner-border spinner-border-sm"></div> Loading...</div>';
+        panel.scrollIntoView({ behavior:'smooth', block:'start' });
+        try {
+            const b = await api.getBatch(batchId);
+            const statusLabel = s => (s||'draft').replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
+            const eudrPct = b.total_weight_kg > 0 ? ((b.eudr_eligible_kg||0)/b.total_weight_kg*100).toFixed(1) : 0;
+            title.textContent = `Batch: ${b.batch_number}`;
+            body.innerHTML = `
+            <div class="row g-3 mb-3">
+                <div class="col-md-3 text-center"><div class="p-3 bg-light rounded-3">
+                    <div class="small text-muted">Total Weight</div><h4>${(b.total_weight_kg||0).toFixed(1)} kg</h4>
+                </div></div>
+                <div class="col-md-3 text-center"><div class="p-3 rounded-3" style="background:#f0fdf4">
+                    <div class="small text-muted">EUDR Eligible</div>
+                    <h4 class="text-success">${(b.eudr_eligible_kg||0).toFixed(1)} kg</h4>
+                    <div class="progress" style="height:6px"><div class="progress-bar bg-success" style="width:${eudrPct}%"></div></div>
+                    <small class="text-muted">${eudrPct}% of total</small>
+                </div></div>
+                <div class="col-md-3 text-center"><div class="p-3 bg-light rounded-3">
+                    <div class="small text-muted">Farmers</div><h4>${b.total_farmers||0}</h4>
+                </div></div>
+                <div class="col-md-3 text-center"><div class="p-3 bg-light rounded-3">
+                    <div class="small text-muted">Deliveries</div><h4>${(b.deliveries||[]).length}</h4>
+                </div></div>
+            </div>
+            ${b.status === 'draft' ? `<div class="alert alert-warning d-flex align-items-center gap-2">
+                <i class="bi bi-rocket fs-4"></i>
+                <div>This batch is a Draft. Release it to submit for Plotra Admin satellite screening.
+                    <button class="btn btn-sm btn-warning ms-3" onclick="app.releaseBatch('${b.id}','${b.batch_number}')">
+                        Release for Satellite Screening
+                    </button>
+                </div>
+            </div>` : `<div class="alert alert-info"><strong>Status:</strong> ${statusLabel(b.status)}
+                ${b.released_at ? ` · Released: ${new Date(b.released_at).toLocaleDateString()}` : ''}</div>`}
+            <h6 class="mb-2">Deliveries in this batch</h6>
+            <div class="table-responsive">
+                <table class="table table-sm table-hover mb-0 border rounded-3">
+                    <thead class="table-light"><tr><th>Delivery #</th><th>Net (kg)</th><th>Status</th><th>EUDR</th><th>Grade</th></tr></thead>
+                    <tbody>
+                    ${(b.deliveries||[]).map(d => `<tr>
+                        <td class="fw-semibold">${d.delivery_number||d.id}</td>
+                        <td>${(d.net_weight_kg||0).toFixed(1)} kg</td>
+                        <td><span class="badge bg-soft-info text-info">${statusLabel(d.status)}</span></td>
+                        <td>${d.eudr_eligible!==false ? '<i class="bi bi-shield-check text-success"></i>' : '<i class="bi bi-shield-x text-danger"></i>'}</td>
+                        <td>${d.quality_grade||'—'}</td>
+                    </tr>`).join('') || '<tr><td colspan="5" class="text-center text-muted py-3">No deliveries assigned</td></tr>'}
+                    </tbody>
+                </table>
+            </div>
+            ${b.notes ? `<div class="mt-3 p-3 bg-light rounded-3"><small class="text-muted">Notes:</small> ${b.notes}</div>` : ''}`;
+        } catch(e) {
+            body.innerHTML = `<div class="text-danger">Error: ${e.message}</div>`;
+        }
+    }
+
+    async releaseBatch(batchId, batchNumber) {
+        if (!confirm(`Release batch "${batchNumber}" for satellite screening?\n\nAll included deliveries will be locked and submitted to Plotra Admin.`)) return;
+        try {
+            await api.releaseBatch(batchId);
+            this.showToast(`Batch ${batchNumber} released for satellite screening!`, 'success');
+            this.loadPage('batches');
+        } catch(e) {
+            this.showToast(e.message, 'error');
+        }
+    }
+
+    async showCreateBatchModal() {
+        try {
+            const deliveries = await api.getDeliveries({ status_filter: 'ready_for_batching' });
+            const allDeliveries = await api.getDeliveries();
+            const readyDeliveries = allDeliveries.filter(d =>
+                ['ready_for_batching','received','processed'].includes((d.status||'').toLowerCase())
+            );
+            const modalHtml = `
+            <div class="modal fade" id="createBatchModal" tabindex="-1">
+                <div class="modal-dialog modal-lg modal-dialog-centered">
+                    <div class="modal-content">
+                        <div class="modal-header" style="background:linear-gradient(135deg,#2c1a0e,#6f4e37);color:white;">
+                            <h5 class="modal-title"><i class="bi bi-layers me-2"></i>Create New Batch</h5>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="row g-3 mb-3">
+                                <div class="col-md-4">
+                                    <label class="form-label fw-semibold">Batch Reference</label>
+                                    <input class="form-control" id="cb-number" placeholder="e.g. NYR-2025-B04" style="text-transform:uppercase">
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label fw-semibold">Crop Year</label>
+                                    <input type="number" class="form-control" id="cb-year" value="${new Date().getFullYear()}">
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label fw-semibold">Processing Method</label>
+                                    <select class="form-select" id="cb-method">
+                                        <option value="washed">Washed</option>
+                                        <option value="natural">Natural</option>
+                                        <option value="honey">Honey</option>
+                                        <option value="pulped_natural">Pulped Natural</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-semibold">Harvest Start</label>
+                                    <input type="date" class="form-control" id="cb-start">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-semibold">Harvest End</label>
+                                    <input type="date" class="form-control" id="cb-end">
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label fw-semibold">Notes</label>
+                                    <textarea class="form-control" id="cb-notes" rows="2" placeholder="Optional batch notes"></textarea>
+                                </div>
+                            </div>
+                            <h6>Select Deliveries <span class="text-muted small fw-normal">(${readyDeliveries.length} available)</span></h6>
+                            <div id="batch-deliveries-list" style="max-height:260px;overflow-y:auto;border:1px solid #dee2e6;border-radius:8px;padding:12px">
+                                ${readyDeliveries.length > 0 ? readyDeliveries.map(d => `
+                                    <div class="form-check py-1 border-bottom">
+                                        <input class="form-check-input batch-deliv-check" type="checkbox" value="${d.id}" id="bdc-${d.id}">
+                                        <label class="form-check-label d-flex justify-content-between" for="bdc-${d.id}">
+                                            <span><strong>${d.delivery_number||'D-'+d.id}</strong> · ${d.farmer_name||'—'} · ${d.farm_name||'—'}</span>
+                                            <span class="text-muted">${(d.net_weight_kg||0).toFixed(1)} kg · ${d.quality_grade||'N/A'}</span>
+                                        </label>
+                                    </div>`).join('')
+                                : '<div class="text-center text-muted py-3">No deliveries ready for batching.<br><small>Add processing steps to deliveries first.</small></div>'}
+                            </div>
+                            <div id="cb-summary" class="mt-2 p-2 bg-light rounded small text-muted"></div>
+                        </div>
+                        <div class="modal-footer">
+                            <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                            <button class="btn btn-primary" onclick="app.handleCreateBatch()">
+                                <i class="bi bi-layers me-1"></i>Create Batch
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+            document.getElementById('createBatchModal')?.remove();
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
+            // Update summary on checkbox change
+            document.getElementById('batch-deliveries-list')?.addEventListener('change', () => {
+                const checks = document.querySelectorAll('.batch-deliv-check:checked');
+                const selectedDeliveries = allDeliveries.filter(d => [...checks].map(c=>c.value).includes(String(d.id)));
+                const totalKg = selectedDeliveries.reduce((s,d) => s+(d.net_weight_kg||0), 0);
+                document.getElementById('cb-summary').textContent = `${checks.length} delivery(ies) selected · ${totalKg.toFixed(1)} kg total`;
+            });
+            new bootstrap.Modal(document.getElementById('createBatchModal')).show();
+        } catch (e) {
+            this.showToast('Failed to load deliveries: ' + e.message, 'error');
+        }
     }
     async loadVerification(content) {
         const role = (this.currentUser?.role || '').toUpperCase();

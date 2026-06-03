@@ -377,17 +377,88 @@ Attempted URL: ${url}`;
             body: JSON.stringify(data)
         });
     }
-    
+
+    async getDelivery(id) {
+        return this.request(`/coop/deliveries/${id}`);
+    }
+
+    async updateDeliveryStatus(id, status, notes) {
+        return this.request(`/coop/deliveries/${id}/status`, {
+            method: 'PATCH',
+            body: JSON.stringify({ status, notes })
+        });
+    }
+
+    async addProcessingStep(deliveryId, data) {
+        return this.request(`/coop/deliveries/${deliveryId}/processing`, {
+            method: 'POST',
+            body: JSON.stringify(data)
+        });
+    }
+
+    async getProcessingLog(deliveryId) {
+        return this.request(`/coop/deliveries/${deliveryId}/processing`);
+    }
+
     // Batches
     async getBatches(filters = {}) {
         const params = new URLSearchParams(filters);
-        return this.request(`/coop/batches?${params}`);
+        return this.request(`/coop/batches?${params}`, { optional: true, default: [] });
     }
-    
+
+    async getBatch(id) {
+        return this.request(`/coop/batches/${id}`);
+    }
+
     async createBatch(data) {
         return this.request('/coop/batches', {
             method: 'POST',
             body: JSON.stringify(data)
+        });
+    }
+
+    async releaseBatch(id, notes) {
+        return this.request(`/coop/batches/${id}/release`, {
+            method: 'POST',
+            body: JSON.stringify({ notes })
+        });
+    }
+
+    async updateBatchStatus(id, status) {
+        return this.request(`/coop/batches/${id}/status`, {
+            method: 'PATCH',
+            body: JSON.stringify({ status })
+        });
+    }
+
+    // Consignments
+    async getConsignments() {
+        return this.request('/coop/consignments', { optional: true, default: [] });
+    }
+
+    async getConsignment(id) {
+        return this.request(`/coop/consignments/${id}`);
+    }
+
+    async createConsignment(data) {
+        return this.request('/coop/consignments', {
+            method: 'POST',
+            body: JSON.stringify(data)
+        });
+    }
+
+    async updateConsignmentStatus(id, status, ddsReference) {
+        return this.request(`/coop/consignments/${id}/status`, {
+            method: 'PATCH',
+            body: JSON.stringify({ status, dds_reference: ddsReference })
+        });
+    }
+
+    // Farmers (coop)
+    async rejectFarmer(userId, reason) {
+        return this.request(`/coop/members/${userId}/reject`, {
+            method: 'POST',
+            body: JSON.stringify({ reason })
         });
     }
     
