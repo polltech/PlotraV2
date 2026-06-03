@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 
 from app.core.database import get_db
-from app.core.auth import get_current_user, require_coop_admin, require_plotra_admin
+from app.core.auth import get_current_user, require_coop_admin, require_coop_staff, require_plotra_admin, get_password_hash
 from app.models.user import User, VerificationStatus, CooperativeMember, Cooperative, UserRole
 from app.models.farm import Farm
 from app.models.traceability import (
@@ -22,7 +22,8 @@ from app.api.schemas import (
     UserResponse, DeliveryCreate, DeliveryResponse,
     BatchCreate, BatchResponse, MessageResponse,
     CooperativeCreate, CooperativeResponse, CooperativeAdminCreate,
-    CooperativeUserAddRequest, CooperativeUserResponse, CooperativeUserRoleEnum
+    CooperativeUserAddRequest, CooperativeUserResponse, CooperativeUserRoleEnum,
+    CreateCoopStaffRequest, CoopStaffResponse,
 )
 
 from pydantic import BaseModel, EmailStr
@@ -1130,7 +1131,7 @@ async def get_pending_farms(
 @router.post("/deliveries", response_model=DeliveryResponse, status_code=status.HTTP_201_CREATED)
 async def record_delivery(
     delivery_data: DeliveryCreate,
-    current_user: User = Depends(require_coop_admin),
+    current_user: User = Depends(require_coop_staff),
     db: AsyncSession = Depends(get_db)
 ):
     """Record a coffee delivery — farm must belong to a farmer in this cooperative."""
@@ -1158,12 +1159,110 @@ async def record_delivery(
         cherry_type=delivery_data.cherry_type,
         picking_date=delivery_data.picking_date,
         status=DeliveryStatus.PENDING,
-        received_by_id=current_user.id
+        received_by_id=current_user.id,
+        agent_id=current_user.id,
     )
     db.add(delivery)
     await db.commit()
     await db.refresh(delivery)
     return delivery
+
+
+@router.post("/staff", response_model=CoopStaffResponse, status_code=status.HTTP_201_CREATED)
+async def create_delivery_agent(
+    staff_data: CreateCoopStaffRequest,
+    current_user: User = Depends(require_coop_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Create a new Delivery Agent account linked to this cooperative.
+    Only cooperative officers can create staff accounts.
+    """
+    coop_id = await _get_coop_id_for_officer(current_user, db)
+    if not coop_id:
+        raise HTTPException(status_code=403, detail="No cooperative linked to your account")
+
+    # Prevent duplicate phone
+    dup_phone = await db.execute(select(User).where(User.phone == staff_data.phone))
+    if dup_phone.scalar_one_or_none():
+        raise HTTPException(status_code=400, detail="A user with this phone number already exists")
+
+    if staff_data.email:
+        dup_email = await db.execute(select(User).where(User.email == staff_data.email))
+        if dup_email.scalar_one_or_none():
+            raise HTTPException(status_code=400, detail="A user with this email already exists")
+
+    agent = User(
+        first_name=staff_data.first_name,
+        last_name=staff_data.last_name,
+        phone=staff_data.phone,
+        email=staff_data.email,
+        password_hash=get_password_hash(staff_data.password),
+        national_id=staff_data.national_id,
+        role=UserRole.DELIVERY_AGENT,
+        is_active=True,
+    )
+    db.add(agent)
+    await db.flush()
+
+    membership = CooperativeMember(
+        user_id=agent.id,
+        cooperative_id=coop_id,
+        cooperative_role=CooperativeUserRoleEnum.DELIVERY_AGENT.value,
+        membership_type="staff",
+        is_active=True,
+    )
+    db.add(membership)
+    await db.commit()
+    await db.refresh(agent)
+
+    return CoopStaffResponse(
+        id=str(agent.id),
+        first_name=agent.first_name,
+        last_name=agent.last_name,
+        phone=agent.phone,
+        email=agent.email,
+        role=agent.role.value if hasattr(agent.role, "value") else str(agent.role),
+        job_title=staff_data.job_title or "Delivery Agent",
+        is_active=bool(agent.is_active),
+        created_at=agent.created_at,
+    )
+
+
+@router.get("/staff", response_model=List[CoopStaffResponse])
+async def get_coop_staff(
+    current_user: User = Depends(require_coop_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """List all delivery agents belonging to this cooperative."""
+    coop_id = await _get_coop_id_for_officer(current_user, db)
+    if not coop_id:
+        raise HTTPException(status_code=403, detail="No cooperative linked to your account")
+
+    result = await db.execute(
+        select(User, CooperativeMember)
+        .join(CooperativeMember, CooperativeMember.user_id == User.id)
+        .where(
+            CooperativeMember.cooperative_id == coop_id,
+            CooperativeMember.cooperative_role == CooperativeUserRoleEnum.DELIVERY_AGENT.value,
+            CooperativeMember.is_active == True,
+        )
+    )
+    rows = result.all()
+    return [
+        CoopStaffResponse(
+            id=str(u.id),
+            first_name=u.first_name,
+            last_name=u.last_name,
+            phone=u.phone,
+            email=u.email,
+            role=u.role.value if hasattr(u.role, "value") else str(u.role),
+            job_title="Delivery Agent",
+            is_active=bool(m.is_active),
+            created_at=u.created_at,
+        )
+        for u, m in rows
+    ]
 
 
 @router.get("/deliveries", response_model=List[DeliveryResponse])

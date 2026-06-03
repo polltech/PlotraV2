@@ -117,6 +117,7 @@ class CooperativeUserRoleEnum(str, Enum):
     ACCOUNTANT = "accountant"
     FIELD_OFFICER = "field_officer"
     QUALITY_CONTROL = "quality_control"
+    DELIVERY_AGENT = "delivery_agent"
 
 
 class CooperativeUserAddRequest(BaseModel):
@@ -140,6 +141,32 @@ class CooperativeUserResponse(BaseModel):
     is_active: bool
     joined_at: datetime
     
+    class Config:
+        from_attributes = True
+
+
+class CreateCoopStaffRequest(BaseModel):
+    """Create a new delivery-agent user directly under the cooperative."""
+    first_name: str
+    last_name: str
+    phone: str
+    email: Optional[str] = None
+    password: str
+    national_id: Optional[str] = None
+    job_title: Optional[str] = "Delivery Agent"
+
+
+class CoopStaffResponse(BaseModel):
+    id: str
+    first_name: str
+    last_name: str
+    phone: Optional[str]
+    email: Optional[str]
+    role: str
+    job_title: Optional[str]
+    is_active: bool
+    created_at: datetime
+
     class Config:
         from_attributes = True
 

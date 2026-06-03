@@ -13,6 +13,7 @@ class UserRole(str, enum.Enum):
     """User roles for the four-tier verification system"""
     FARMER = "farmer"
     COOPERATIVE_OFFICER = "cooperative_officer"
+    DELIVERY_AGENT = "delivery_agent"
     PLOTRA_ADMIN = "plotra_admin"
     EUDR_REVIEWER = "eudr_reviewer"
 

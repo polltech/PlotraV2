@@ -226,6 +226,7 @@ def require_role(allowed_roles: list[UserRole]):
 # Pre-configured role checkers
 require_farmer = require_role([UserRole.FARMER])
 require_coop_admin = require_role([UserRole.COOPERATIVE_OFFICER])
+require_coop_staff = require_role([UserRole.COOPERATIVE_OFFICER, UserRole.DELIVERY_AGENT])
 require_plotra_admin = require_role([UserRole.PLOTRA_ADMIN])
 require_platform_admin = require_role([UserRole.PLOTRA_ADMIN])
 require_auditor = require_role([UserRole.EUDR_REVIEWER])
