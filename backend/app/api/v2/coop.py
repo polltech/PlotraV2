@@ -1017,14 +1017,23 @@ async def coop_reject_farm(
 
 
 async def _get_coop_id_for_officer(current_user: User, db: AsyncSession) -> Optional[str]:
-    """Resolve the cooperative ID for the current officer via membership or primary_officer_id."""
+    """Resolve the cooperative ID for the current officer/agent via user field, primary_officer, or membership."""
     coop_id = getattr(current_user, 'cooperative_id', None)
     if not coop_id:
+        # Fallback 1: cooperative where this user is the primary officer
         coop_result = await db.execute(
             select(Cooperative).where(Cooperative.primary_officer_id == current_user.id)
         )
         coop = coop_result.scalar_one_or_none()
         coop_id = str(coop.id) if coop else None
+    if not coop_id:
+        # Fallback 2: CooperativeMember entry (handles delivery agents + web-created staff)
+        mem_result = await db.execute(
+            select(CooperativeMember.cooperative_id)
+            .where(CooperativeMember.user_id == current_user.id, CooperativeMember.is_active == True)
+            .limit(1)
+        )
+        coop_id = mem_result.scalar_one_or_none()
     return coop_id
 
 
@@ -1200,6 +1209,7 @@ async def create_delivery_agent(
         password_hash=get_password_hash(staff_data.password),
         national_id=staff_data.national_id,
         role=UserRole.DELIVERY_AGENT,
+        cooperative_id=coop_id,   # so /auth/me returns cooperative_id and coop APIs resolve correctly
         is_active=True,
     )
     db.add(agent)
