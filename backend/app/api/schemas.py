@@ -548,13 +548,15 @@ class DeliveryCreate(BaseModel):
 
 class DeliveryResponse(BaseModel):
     """Delivery response schema"""
-    id: int
+    id: str
     delivery_number: str
-    farm_id: int
+    farm_id: str
     net_weight_kg: float
     quality_grade: Optional[QualityGradeEnum]
     status: DeliveryStatusEnum
     created_at: datetime
+
+    model_config = {"from_attributes": True}
 
 
 class BatchCreate(BaseModel):
