@@ -1,7 +1,7 @@
 """
 Plotra Platform - Pydantic Schemas for API Validation
 """
-from datetime import datetime
+from datetime import datetime, date
 from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, Field, EmailStr, field_validator, ConfigDict, model_validator, AliasChoices
 from enum import Enum
@@ -564,12 +564,27 @@ class DeliveryResponse(BaseModel):
 
 class BatchCreate(BaseModel):
     """Schema for creating a coffee batch — URS §4.2"""
-    batch_number: str                            # human reference e.g. NYR-2025-B04
-    harvest_start_date: Optional[datetime] = None
-    harvest_end_date: Optional[datetime] = None
+    batch_number: str
+    harvest_start_date: Optional[date] = None
+    harvest_end_date: Optional[date] = None
     notes: Optional[str] = None
-    delivery_ids: List[str] = []                 # UUID strings
+    delivery_ids: List[str] = []
     release_immediately: bool = False
+
+    @field_validator('harvest_start_date', 'harvest_end_date', mode='before')
+    @classmethod
+    def parse_flexible_date(cls, v):
+        if v is None or v == '':
+            return None
+        if isinstance(v, (date, datetime)):
+            return v.date() if isinstance(v, datetime) else v
+        s = str(v).strip().replace('/', '-')
+        # Strip time component if present (e.g. "2024-05-06T00:00:00")
+        s = s.split('T')[0].split(' ')[0]
+        try:
+            return date.fromisoformat(s)
+        except ValueError:
+            raise ValueError(f"Cannot parse date: {v!r}. Use YYYY-MM-DD or YYYY/MM/DD.")
 
 
 class BatchResponse(BaseModel):

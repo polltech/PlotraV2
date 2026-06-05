@@ -22,7 +22,6 @@ from app.models.farm import Farm, FarmParcel, LandDocument
 from app.models.traceability import Batch, Delivery
 from app.models.satellite import SatelliteObservation, AnalysisStatus
 from app.models.compliance import ComplianceStatus, EUDRCompliance
-from app.models.traceability import Batch
 from app.services.satellite_analysis import satellite_engine
 from app.services.eudr_integration import eudr_service, DDSData, CertificateData
 from app.api.schemas import (
@@ -450,6 +449,162 @@ async def reject_farm(
     db.add(notif)
     await db.commit()
     return {"message": "Farm rejected", "verification_status": farm.verification_status}
+
+
+@router.get("/batches")
+async def admin_get_all_batches(
+    status_filter: Optional[str] = None,
+    cooperative_id: Optional[str] = None,
+    page: int = 1,
+    page_size: int = 50,
+    current_user: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """List all batches across cooperatives — admin review queue."""
+    from app.models.traceability import BatchStatus
+    query = select(Batch).order_by(Batch.created_at.desc())
+    if status_filter:
+        query = query.where(Batch.status == status_filter.lower())
+    if cooperative_id:
+        query = query.where(Batch.cooperative_id == cooperative_id)
+    count_res = await db.execute(select(func.count()).select_from(query.subquery()))
+    total = count_res.scalar() or 0
+    query = query.offset((page - 1) * page_size).limit(page_size)
+    result = await db.execute(query)
+    batches = result.scalars().all()
+
+    # Attach cooperative names
+    coop_ids = {b.cooperative_id for b in batches if b.cooperative_id}
+    coop_map: dict = {}
+    if coop_ids:
+        cr = await db.execute(select(Cooperative).where(Cooperative.id.in_(coop_ids)))
+        for c in cr.scalars().all():
+            coop_map[c.id] = c.name
+
+    return {
+        "batches": [
+            {
+                "id": b.id,
+                "batch_number": b.batch_number,
+                "cooperative_id": b.cooperative_id,
+                "cooperative_name": coop_map.get(b.cooperative_id, "—"),
+                "status": getattr(b.status, 'value', str(b.status)) if b.status else "draft",
+                "total_weight_kg": b.total_weight_kg,
+                "eudr_eligible_kg": b.eudr_eligible_kg,
+                "total_farmers": b.total_farmers,
+                "total_parcels": b.total_parcels,
+                "harvest_start_date": b.harvest_start_date.isoformat() if b.harvest_start_date else None,
+                "harvest_end_date": b.harvest_end_date.isoformat() if b.harvest_end_date else None,
+                "compliance_status": b.compliance_status,
+                "notes": b.notes,
+                "released_at": b.released_at.isoformat() if b.released_at else None,
+                "created_at": b.created_at.isoformat() if b.created_at else None,
+            }
+            for b in batches
+        ],
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+    }
+
+
+@router.get("/batches/{batch_id}")
+async def admin_get_batch_detail(
+    batch_id: str,
+    current_user: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Full batch detail with deliveries for admin review."""
+    batch = await db.get(Batch, batch_id)
+    if not batch:
+        raise HTTPException(status_code=404, detail="Batch not found")
+
+    # Cooperative name
+    coop_name = "—"
+    if batch.cooperative_id:
+        coop = await db.get(Cooperative, batch.cooperative_id)
+        coop_name = coop.name if coop else "—"
+
+    # Included deliveries
+    d_res = await db.execute(select(Delivery).where(Delivery.batch_id == batch_id))
+    deliveries = d_res.scalars().all()
+
+    # Farm names for deliveries
+    from app.models.farm import Farm
+    farm_ids = {d.farm_id for d in deliveries if d.farm_id}
+    farm_map: dict = {}
+    if farm_ids:
+        fr = await db.execute(select(Farm).where(Farm.id.in_(farm_ids)))
+        for f in fr.scalars().all():
+            farm_map[f.id] = f.farm_name or f.id
+
+    # Farmer names
+    farmer_ids_for_farms = set()
+    if farm_ids:
+        fr2 = await db.execute(select(Farm).where(Farm.id.in_(farm_ids)))
+        for f in fr2.scalars().all():
+            if f.farmer_id:
+                farmer_ids_for_farms.add(f.farmer_id)
+    farmer_map: dict = {}
+    if farmer_ids_for_farms:
+        ur = await db.execute(select(User).where(User.id.in_(farmer_ids_for_farms)))
+        for u in ur.scalars().all():
+            farmer_map[u.id] = f"{u.first_name or ''} {u.last_name or ''}".strip() or u.email
+
+    return {
+        "id": batch.id,
+        "batch_number": batch.batch_number,
+        "cooperative_id": batch.cooperative_id,
+        "cooperative_name": coop_name,
+        "status": getattr(batch.status, 'value', str(batch.status)) if batch.status else "draft",
+        "total_weight_kg": batch.total_weight_kg,
+        "eudr_eligible_kg": batch.eudr_eligible_kg,
+        "total_farmers": batch.total_farmers,
+        "total_parcels": batch.total_parcels,
+        "harvest_start_date": batch.harvest_start_date.isoformat() if batch.harvest_start_date else None,
+        "harvest_end_date": batch.harvest_end_date.isoformat() if batch.harvest_end_date else None,
+        "compliance_status": batch.compliance_status,
+        "notes": batch.notes,
+        "released_at": batch.released_at.isoformat() if batch.released_at else None,
+        "created_at": batch.created_at.isoformat() if batch.created_at else None,
+        "deliveries": [
+            {
+                "id": d.id,
+                "delivery_number": d.delivery_number,
+                "farm_name": farm_map.get(d.farm_id, "—"),
+                "net_weight_kg": d.net_weight_kg,
+                "eudr_eligible": d.eudr_eligible,
+                "status": getattr(d.status, 'value', str(d.status)) if d.status else None,
+                "reception_date": d.reception_date.isoformat() if d.reception_date else None,
+            }
+            for d in deliveries
+        ],
+    }
+
+
+@router.patch("/batches/{batch_id}/status")
+async def admin_update_batch_status(
+    batch_id: str,
+    body: dict,
+    current_user: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Admin advances batch through review flow (released→under_satellite_review→verified→dds_submitted)."""
+    from app.models.traceability import BatchStatus
+    batch = await db.get(Batch, batch_id)
+    if not batch:
+        raise HTTPException(status_code=404, detail="Batch not found")
+    new_status = body.get("status", "")
+    try:
+        validated = BatchStatus(new_status)
+    except ValueError:
+        raise HTTPException(status_code=400, detail=f"Invalid status. Valid: {[s.value for s in BatchStatus]}")
+    prev = getattr(batch.status, 'value', str(batch.status or ''))
+    batch.status = validated.value
+    if body.get("notes"):
+        batch.notes = (batch.notes or "") + f"\n[Admin {current_user.email}]: {body['notes']}"
+    await db.commit()
+    return {"batch_id": batch_id, "status": validated.value, "previous_status": prev}
 
 
 @router.get("/deliveries")
