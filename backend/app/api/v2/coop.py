@@ -1067,11 +1067,11 @@ async def _get_or_generate_member_no(user_id: str, coop_id: str, db: AsyncSessio
     member = res.scalar_one_or_none()
     if not member:
         return None
-    if not member.membership_number:
+    if not member.membership_number or not member.membership_number.startswith("PCFNO/"):
         count_res = await db.execute(
             select(func.count(CooperativeMember.id)).where(
                 CooperativeMember.cooperative_id == coop_id,
-                CooperativeMember.membership_number != None,
+                CooperativeMember.membership_number.like("PCFNO/%"),
             )
         )
         seq = (count_res.scalar() or 0) + 1
