@@ -542,7 +542,6 @@ class DeliveryCreate(BaseModel):
     farm_id: str
     gross_weight_kg: float
     tare_weight_kg: float = 0.0
-    quality_grade: Optional[QualityGradeEnum] = None
     notes: Optional[str] = None
     crop_mix: Optional[dict] = None
 
