@@ -563,13 +563,13 @@ class DeliveryResponse(BaseModel):
 
 
 class BatchCreate(BaseModel):
-    """Schema for creating a coffee batch"""
-    batch_number: str
-    crop_year: int
+    """Schema for creating a coffee batch — URS §4.2"""
+    batch_number: str                            # human reference e.g. NYR-2025-B04
     harvest_start_date: Optional[datetime] = None
     harvest_end_date: Optional[datetime] = None
-    processing_method: str = "washed"
-    delivery_ids: List[int] = []
+    notes: Optional[str] = None
+    delivery_ids: List[str] = []                 # UUID strings
+    release_immediately: bool = False
 
 
 class BatchResponse(BaseModel):

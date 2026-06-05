@@ -1377,7 +1377,7 @@ async def get_deliveries(
     if end_date:
         query = query.where(Delivery.created_at <= end_date)
     if status_filter:
-        query = query.where(Delivery.status == DeliveryStatus(status_filter))
+        query = query.where(Delivery.status == status_filter.lower())
 
     result = await db.execute(query.order_by(Delivery.created_at.desc()))
     return result.scalars().all()
@@ -1389,56 +1389,73 @@ async def create_batch(
     current_user: User = Depends(require_coop_admin),
     db: AsyncSession = Depends(get_db)
 ):
-    """
-    Create a coffee batch from multiple deliveries.
-    Batches are used for traceability and export certification.
-    """
-    # Get cooperative
+    """Create a coffee batch from ready-for-batching deliveries — URS §4.2"""
+    from datetime import datetime as _dt, date as _date
+    from app.models.farms import Farm
+
+    # Resolve cooperative
     coop_result = await db.execute(
         select(Cooperative).where(Cooperative.primary_officer_id == current_user.id)
     )
     cooperative = coop_result.scalar_one_or_none()
-    
     if not cooperative:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You are not assigned as a cooperative admin"
-        )
-    
-    # Get deliveries
+        raise HTTPException(status_code=403, detail="You are not assigned as a cooperative admin")
+
+    # Load selected deliveries
+    deliveries: list = []
     if batch_data.delivery_ids:
-        deliveries_result = await db.execute(
-            select(Delivery).where(Delivery.id.in_(batch_data.delivery_ids))
-        )
-        deliveries = deliveries_result.scalars().all()
-        
-        total_weight = sum(d.net_weight_kg for d in deliveries)
-    else:
-        deliveries = []
-        total_weight = 0
-    
-    # Create batch
+        d_res = await db.execute(select(Delivery).where(Delivery.id.in_(batch_data.delivery_ids)))
+        deliveries = d_res.scalars().all()
+
+    # Auto-compute totals
+    total_weight    = sum(d.net_weight_kg or 0 for d in deliveries)
+    eudr_kg         = sum((d.net_weight_kg or 0) for d in deliveries if d.eudr_eligible is not False)
+    parcel_ids      = {d.parcel_id for d in deliveries if d.parcel_id}
+    farm_ids        = {d.farm_id   for d in deliveries if d.farm_id}
+
+    # Count unique farmers from farms
+    farmer_ids: set = set()
+    if farm_ids:
+        f_res = await db.execute(select(Farm).where(Farm.id.in_(farm_ids)))
+        for f in f_res.scalars().all():
+            if f.farmer_id:
+                farmer_ids.add(f.farmer_id)
+
+    crop_year = (batch_data.harvest_start_date.year
+                 if batch_data.harvest_start_date else _date.today().year)
+
     batch = Batch(
         cooperative_id=cooperative.id,
         batch_number=batch_data.batch_number,
-        crop_year=batch_data.crop_year,
+        crop_year=crop_year,
         harvest_start_date=batch_data.harvest_start_date,
         harvest_end_date=batch_data.harvest_end_date,
-        processing_method=batch_data.processing_method,
         total_weight_kg=total_weight,
-        compliance_status="Under Review"
+        eudr_eligible_kg=eudr_kg,
+        total_farmers=len(farmer_ids) or len(farm_ids),
+        total_parcels=len(parcel_ids),
+        notes=batch_data.notes,
+        created_by_id=current_user.id,
+        compliance_status="Under Review",
+        status=BatchStatus.DRAFT.value,
     )
-    
     db.add(batch)
     await db.flush()
-    
-    # Update delivery batch references
-    for delivery in deliveries:
-        delivery.batch_id = batch.id
-    
+
+    # Link deliveries → batch
+    for d in deliveries:
+        d.batch_id = batch.id
+
+    # Release immediately if requested
+    if batch_data.release_immediately:
+        batch.status = BatchStatus.RELEASED.value
+        batch.released_at = _dt.utcnow()
+
+    _audit(db, AuditEventType.BATCH_CREATED, "batch", batch.id, current_user.id,
+           nxt=batch.status)
+
     await db.commit()
     await db.refresh(batch)
-    
     return batch
 
 
