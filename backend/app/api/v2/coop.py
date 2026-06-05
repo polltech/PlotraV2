@@ -1182,16 +1182,29 @@ async def record_delivery(
 ):
     """Record a coffee delivery — farm must belong to a farmer in this cooperative."""
     coop_id = await _get_coop_id_for_officer(current_user, db)
+    now = datetime.utcnow()
+
+    coop_farm_ids: list = []
     if coop_id:
+        farmer_ids = await _get_farmer_ids_for_coop(coop_id, db)
         # Verify the farm belongs to a member of this cooperative
         farm_res = await db.execute(select(Farm).where(Farm.id == delivery_data.farm_id))
         farm = farm_res.scalar_one_or_none()
-        if farm:
-            farmer_ids = await _get_farmer_ids_for_coop(coop_id, db)
-            if farmer_ids and str(farm.owner_id) not in [str(fid) for fid in farmer_ids]:
-                raise HTTPException(status_code=403, detail="Farm does not belong to a farmer in your cooperative")
+        if farm and farmer_ids and str(farm.owner_id) not in [str(fid) for fid in farmer_ids]:
+            raise HTTPException(status_code=403, detail="Farm does not belong to a farmer in your cooperative")
+        if farmer_ids:
+            cf_res = await db.execute(select(Farm.id).where(Farm.owner_id.in_(farmer_ids)))
+            coop_farm_ids = cf_res.scalars().all()
 
-    delivery_number = f"DEL-{datetime.utcnow().strftime('%Y%m%d')}-{uuid.uuid4().hex[:6].upper()}"
+    # Sequential delivery number scoped to this cooperative
+    if coop_farm_ids:
+        count_res = await db.execute(
+            select(func.count(Delivery.id)).where(Delivery.farm_id.in_(coop_farm_ids))
+        )
+    else:
+        count_res = await db.execute(select(func.count(Delivery.id)))
+    seq = (count_res.scalar() or 0) + 1
+    delivery_number = f"PCFDELIVERY/{seq:03d}/{now.year}"
     net_weight = delivery_data.gross_weight_kg - delivery_data.tare_weight_kg
 
     delivery = Delivery(
