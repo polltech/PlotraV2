@@ -1644,6 +1644,14 @@ async def get_delivery_detail(
     )
     logs = logs_res.scalars().all()
 
+    # Resolve logged-by names for processing logs
+    log_user_ids = list({lg.logged_by_id for lg in logs if lg.logged_by_id})
+    log_users: dict = {}
+    if log_user_ids:
+        lu_res = await db.execute(select(User).where(User.id.in_(log_user_ids)))
+        for u in lu_res.scalars().all():
+            log_users[u.id] = f"{u.first_name or ''} {u.last_name or ''}".strip() or u.email
+
     # Build farm/farmer info
     farm = await db.get(Farm, delivery.farm_id) if delivery.farm_id else None
     farmer = None
@@ -1682,6 +1690,7 @@ async def get_delivery_detail(
                 "grade": lg.grade,
                 "notes": lg.notes,
                 "logged_by_id": lg.logged_by_id,
+                "logged_by_name": log_users.get(lg.logged_by_id, ''),
                 "created_at": lg.created_at.isoformat() if lg.created_at else None,
             }
             for lg in logs
@@ -1771,6 +1780,7 @@ async def add_processing_step(
            nxt=delivery.status.value, notes=f"Step: {step_type.value}")
     await db.commit()
     await db.refresh(log)
+    logged_by_name = f"{current_user.first_name or ''} {current_user.last_name or ''}".strip() or current_user.email
     return {
         "id": log.id,
         "log_number": log.log_number,
@@ -1780,6 +1790,8 @@ async def add_processing_step(
         "weight_out_kg": log.weight_out_kg,
         "grade": log.grade,
         "notes": log.notes,
+        "logged_by_id": log.logged_by_id,
+        "logged_by_name": logged_by_name,
         "delivery_status": delivery.status.value,
     }
 
@@ -1797,13 +1809,23 @@ async def get_processing_log(
         .order_by(ProcessingLog.step_date)
     )
     logs = res.scalars().all()
+
+    user_ids = list({lg.logged_by_id for lg in logs if lg.logged_by_id})
+    users: dict = {}
+    if user_ids:
+        u_res = await db.execute(select(User).where(User.id.in_(user_ids)))
+        for u in u_res.scalars().all():
+            users[u.id] = f"{u.first_name or ''} {u.last_name or ''}".strip() or u.email
+
     return [
         {
             "id": lg.id, "log_number": lg.log_number,
             "step_type": lg.step_type.value,
             "step_date": lg.step_date.isoformat() if lg.step_date else None,
             "weight_out_kg": lg.weight_out_kg, "grade": lg.grade,
-            "notes": lg.notes, "logged_by_id": lg.logged_by_id,
+            "notes": lg.notes,
+            "logged_by_id": lg.logged_by_id,
+            "logged_by_name": users.get(lg.logged_by_id, ''),
             "created_at": lg.created_at.isoformat() if lg.created_at else None,
         }
         for lg in logs
