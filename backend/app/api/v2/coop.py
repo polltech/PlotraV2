@@ -1201,7 +1201,7 @@ async def record_delivery(
         tare_weight_kg=delivery_data.tare_weight_kg,
         net_weight_kg=net_weight,
         quality_grade=delivery_data.quality_grade,
-        status=DeliveryStatus.PENDING,
+        status=DeliveryStatus.RECEIVED,
         received_by_id=current_user.id,
         agent_id=current_user.id,
     )
