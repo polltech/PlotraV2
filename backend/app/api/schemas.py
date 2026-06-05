@@ -544,6 +544,7 @@ class DeliveryCreate(BaseModel):
     tare_weight_kg: float = 0.0
     quality_grade: Optional[QualityGradeEnum] = None
     notes: Optional[str] = None
+    crop_mix: Optional[dict] = None
 
 
 class DeliveryResponse(BaseModel):
