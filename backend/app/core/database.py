@@ -93,6 +93,18 @@ async def init_db():
             "ALTER TABLE batches ADD COLUMN IF NOT EXISTS created_by_id VARCHAR(36)",
             # ProcessingLog URS additions
             "ALTER TABLE processing_logs ADD COLUMN IF NOT EXISTS log_number VARCHAR(40) UNIQUE",
+            # Convert native PostgreSQL enum columns to VARCHAR so SQLAlchemy's
+            # asyncpg dialect no longer rejects uppercase enum names on UPDATE.
+            # USING status::text preserves existing lowercase string values.
+            # Wrapped in DO/EXCEPTION so it is idempotent (no-op if already VARCHAR).
+            """DO $$ BEGIN
+                 ALTER TABLE deliveries ALTER COLUMN status TYPE VARCHAR(50) USING status::text;
+               EXCEPTION WHEN others THEN NULL;
+             END $$""",
+            """DO $$ BEGIN
+                 ALTER TABLE batches ALTER COLUMN status TYPE VARCHAR(50) USING status::text;
+               EXCEPTION WHEN others THEN NULL;
+             END $$""",
         ]:
             await conn.execute(__import__('sqlalchemy').text(sql))
 

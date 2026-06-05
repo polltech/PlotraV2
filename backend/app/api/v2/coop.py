@@ -1662,7 +1662,7 @@ async def get_delivery_detail(
     return {
         "id": delivery.id,
         "delivery_number": delivery.delivery_number,
-        "status": delivery.status.value if delivery.status else "pending",
+        "status": getattr(delivery.status, 'value', str(delivery.status)) if delivery.status else "pending",
         "farm_id": delivery.farm_id,
         "farm_name": farm.farm_name if farm else None,
         "farmer_name": f"{farmer.first_name} {farmer.last_name}" if farmer else None,
@@ -1798,7 +1798,7 @@ async def add_processing_step(
         "notes": log.notes,
         "logged_by_id": log.logged_by_id,
         "logged_by_name": logged_by_name,
-        "delivery_status": delivery.status.value,
+        "delivery_status": getattr(delivery.status, 'value', str(delivery.status)),
     }
 
 
@@ -1877,7 +1877,7 @@ async def get_batch_detail(
         "eudr_eligible_kg": eudr_kg,
         "total_farmers": len(unique_farms),
         "total_parcels": batch.total_parcels,
-        "status": batch.status.value if batch.status else "draft",
+        "status": getattr(batch.status, 'value', str(batch.status)) if batch.status else "draft",
         "compliance_status": batch.compliance_status,
         "notes": batch.notes,
         "released_at": batch.released_at.isoformat() if batch.released_at else None,
@@ -1886,7 +1886,7 @@ async def get_batch_detail(
             {
                 "id": d.id, "delivery_number": d.delivery_number,
                 "net_weight_kg": d.net_weight_kg,
-                "status": d.status.value if d.status else None,
+                "status": getattr(d.status, 'value', str(d.status)) if d.status else None,
                 "eudr_eligible": d.eudr_eligible,
                 "quality_grade": d.quality_grade.value if d.quality_grade else None,
             }
@@ -1910,7 +1910,7 @@ async def release_batch(
     if not batch:
         raise HTTPException(status_code=404, detail="Batch not found")
     if batch.status != BatchStatus.DRAFT:
-        raise HTTPException(status_code=400, detail=f"Batch is already in status '{batch.status.value}' — only Draft batches can be released")
+        raise HTTPException(status_code=400, detail=f"Batch is already in status '{getattr(batch.status, 'value', batch.status)}' — only Draft batches can be released")
 
     deliveries_res = await db.execute(select(Delivery).where(Delivery.batch_id == batch_id))
     deliveries = deliveries_res.scalars().all()
@@ -1931,19 +1931,21 @@ async def release_batch(
 
     from datetime import datetime as _dt
     prev_status = batch.status
-    batch.status = BatchStatus.RELEASED
+    prev_status_val = prev_status.value if hasattr(prev_status, 'value') else str(prev_status or '')
+    batch.status = BatchStatus.RELEASED.value
     batch.released_at = _dt.utcnow()
     batch.eudr_eligible_kg = sum((d.net_weight_kg or 0) for d in deliveries if d.eudr_eligible is not False)
     batch.total_farmers = len({d.farm_id for d in deliveries if d.farm_id})
 
     # Mark all deliveries as batched
     for d in deliveries:
-        d.status = DeliveryStatus.BATCHED
+        prev_d = d.status.value if hasattr(d.status, 'value') else str(d.status or '')
+        d.status = DeliveryStatus.BATCHED.value
         _audit(db, AuditEventType.DELIVERY_STATUS_CHANGED, "delivery", d.id,
-               current_user.id, prev=d.status.value, nxt="batched")
+               current_user.id, prev=prev_d, nxt=DeliveryStatus.BATCHED.value)
 
     _audit(db, AuditEventType.BATCH_RELEASED, "batch", batch_id,
-           current_user.id, prev=prev_status.value, nxt="released",
+           current_user.id, prev=prev_status_val, nxt=BatchStatus.RELEASED.value,
            notes=(body or {}).get("notes"))
     await db.commit()
     return {
@@ -1970,9 +1972,10 @@ async def update_batch_status(
     except ValueError:
         raise HTTPException(status_code=400, detail=f"Invalid status. Valid: {[s.value for s in BatchStatus]}")
     prev = batch.status
-    batch.status = new_status
+    prev_val = prev.value if hasattr(prev, 'value') else str(prev or '')
+    batch.status = new_status.value
     _audit(db, AuditEventType.BATCH_VERIFIED if new_status == BatchStatus.VERIFIED else AuditEventType.BATCH_RELEASED,
-           "batch", batch_id, current_user.id, prev=prev.value if prev else None, nxt=new_status.value)
+           "batch", batch_id, current_user.id, prev=prev_val, nxt=new_status.value)
     await db.commit()
     return {"batch_id": batch_id, "status": new_status.value}
 
@@ -2129,7 +2132,7 @@ async def get_consignment_detail(
                 "id": b.id, "batch_number": b.batch_number,
                 "total_weight_kg": b.total_weight_kg,
                 "eudr_eligible_kg": b.eudr_eligible_kg,
-                "status": b.status.value if b.status else None,
+                "status": getattr(b.status, 'value', str(b.status)) if b.status else None,
                 "crop_year": b.crop_year,
             })
 
