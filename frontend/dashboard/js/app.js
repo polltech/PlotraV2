@@ -1498,8 +1498,14 @@ class PlotraDashboard {
         const msLeft = expiry - Date.now();
         if (msLeft <= 0) { this._doAutoLogout('session_expired'); return; }
 
+        // setTimeout silently wraps delays > 2^31-1 ms (~24.8 days) to 0 and
+        // fires immediately. For long-lived tokens skip the timers — _checkSession()
+        // polls every 30 s and will catch the actual expiry when it arrives.
+        const MAX_TIMER = 2_000_000_000; // ~23 days, safely below 2^31-1
+        if (msLeft > MAX_TIMER) return;
+
         // Warn 2 minutes before expiry
-        const warnAt = msLeft - 120000;
+        const warnAt = msLeft - 120_000;
         if (warnAt > 0) {
             setTimeout(() => this._showSessionWarning(Math.round((expiry - Date.now()) / 1000)), warnAt);
         }
