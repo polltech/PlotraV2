@@ -1174,6 +1174,30 @@ async def record_delivery(
     db.add(delivery)
     await db.commit()
     await db.refresh(delivery)
+
+    # Notify the farmer that a delivery has been recorded for their farm
+    try:
+        from app.models.notification import Notification
+        notif_farm_res = await db.execute(select(Farm).where(Farm.id == delivery_data.farm_id))
+        notif_farm = notif_farm_res.scalar_one_or_none()
+        if notif_farm and notif_farm.owner_id:
+            officer_name = f"{current_user.first_name or ''} {current_user.last_name or ''}".strip() or "Cooperative Officer"
+            grade = delivery_data.quality_grade or "PB"
+            db.add(Notification(
+                recipient_id=str(notif_farm.owner_id),
+                title="New Delivery Recorded",
+                message=(
+                    f"A delivery of {net_weight:.1f} kg ({grade} grade) has been recorded "
+                    f"for your farm by {officer_name}. Reference: {delivery_number}."
+                ),
+                type="success",
+                reference_id=str(delivery.id),
+                reference_type="delivery",
+            ))
+            await db.commit()
+    except Exception:
+        pass  # never fail the delivery if notification creation errors
+
     return delivery
 
 
