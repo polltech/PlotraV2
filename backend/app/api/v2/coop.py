@@ -1761,7 +1761,7 @@ async def add_processing_step(
         step_type=step_type,
         step_date=step_date,
         weight_out_kg=body.get("weight_out_kg"),
-        grade=body.get("grade"),
+        grade=body.get("grade") if step_type == ProcessingStepType.GRADING else None,
         notes=body.get("notes"),
         logged_by_id=current_user.id,
     )
