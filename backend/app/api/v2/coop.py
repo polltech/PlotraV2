@@ -1716,9 +1716,9 @@ async def update_delivery_status(
         raise HTTPException(status_code=400, detail=f"Invalid status. Valid values: {[s.value for s in DeliveryStatus]}")
 
     prev_status = delivery.status
-    delivery.status = new_status
+    delivery.status = new_status.value  # use plain string to avoid asyncpg sending uppercase name
     _audit(db, AuditEventType.DELIVERY_STATUS_CHANGED, "delivery", delivery_id,
-           current_user.id, prev=prev_status.value if prev_status else None,
+           current_user.id, prev=prev_status.value if hasattr(prev_status, 'value') else str(prev_status),
            nxt=new_status.value, notes=body.get("notes"))
     await db.commit()
     return {"delivery_id": delivery_id, "status": new_status.value}
@@ -1768,16 +1768,22 @@ async def add_processing_step(
     db.add(log)
 
     # Auto-advance delivery status
+    # Use .value (plain string) not the enum object — SQLAlchemy 1.4/asyncpg sends
+    # .name (uppercase) for enum objects in UPDATE statements, causing a DB type error.
     prev_status = delivery.status
+    prev_val = prev_status.value if hasattr(prev_status, 'value') else str(prev_status)
     if step_type == ProcessingStepType.PACKING:
-        delivery.status = DeliveryStatus.READY_FOR_BATCHING
-    elif delivery.status in (DeliveryStatus.PENDING, DeliveryStatus.RECEIVED,
-                              DeliveryStatus.WEIGHED, DeliveryStatus.QUALITY_CHECKED):
-        delivery.status = DeliveryStatus.IN_PROCESSING
+        delivery.status = DeliveryStatus.READY_FOR_BATCHING.value
+    elif str(delivery.status) in (
+        DeliveryStatus.PENDING.value, DeliveryStatus.RECEIVED.value,
+        DeliveryStatus.WEIGHED.value, DeliveryStatus.QUALITY_CHECKED.value,
+        DeliveryStatus.IN_PROCESSING.value,
+    ):
+        delivery.status = DeliveryStatus.IN_PROCESSING.value
 
     _audit(db, AuditEventType.PROCESSING_STEP_ADDED, "delivery", delivery_id,
-           current_user.id, prev=prev_status.value if prev_status else None,
-           nxt=delivery.status.value, notes=f"Step: {step_type.value}")
+           current_user.id, prev=prev_val,
+           nxt=str(delivery.status), notes=f"Step: {step_type.value}")
     await db.commit()
     await db.refresh(log)
     logged_by_name = f"{current_user.first_name or ''} {current_user.last_name or ''}".strip() or current_user.email
