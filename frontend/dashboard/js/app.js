@@ -457,22 +457,33 @@ class PlotraDashboard {
     async loadCurrentUser() {
         try {
             this.currentUser = await api.getCurrentUser();
-            localStorage.setItem('plotra_user', JSON.stringify(this.currentUser));
-            console.log('Current user loaded:', this.currentUser);
-            console.log('User role:', this.currentUser?.role);
-
             if (!this.currentUser || !this.currentUser.id) {
                 throw new Error('Invalid user data');
             }
-
+            localStorage.setItem('plotra_user', JSON.stringify(this.currentUser));
+            console.log('Current user loaded:', this.currentUser?.role);
             this._applyUserUI();
         } catch (error) {
             console.error('Failed to load user:', error);
-            // Clear invalid token and show landing page
-            localStorage.removeItem('plotra_token');
-            localStorage.removeItem('plotra_user');
-            this.showToast('Session expired. Please login again.', 'error');
-            this.showLandingPage();
+            const is401 = error.message?.includes('401') || error.message?.includes('Unauthorized');
+            if (is401) {
+                // Token is genuinely invalid — clear and show landing page
+                localStorage.removeItem('plotra_token');
+                localStorage.removeItem('plotra_user');
+                this.showToast('Session expired. Please login again.', 'error');
+                this.showLandingPage();
+            } else {
+                // Network/server error — use cached user so we don't kick logged-in users
+                const cached = localStorage.getItem('plotra_user');
+                if (cached) {
+                    try { this.currentUser = JSON.parse(cached); this._applyUserUI(); } catch (_) {}
+                    this.showToast('Could not refresh profile. Using cached data.', 'warning', 4000);
+                } else {
+                    // No cache either — show error but keep token
+                    this.showToast('Failed to load user data. Please refresh.', 'error');
+                    throw error;
+                }
+            }
         }
     }
 
@@ -1449,7 +1460,12 @@ class PlotraDashboard {
         const token = localStorage.getItem('plotra_token');
         if (!token) return null;
         try {
-            const payload = JSON.parse(atob(token.split('.')[1]));
+            // JWT uses base64url (replaces + with - and / with _) without padding.
+            // atob() needs standard base64 with padding — convert before decoding.
+            const b64url = token.split('.')[1];
+            const b64 = b64url.replace(/-/g, '+').replace(/_/g, '/');
+            const padded = b64 + '='.repeat((4 - b64.length % 4) % 4);
+            const payload = JSON.parse(atob(padded));
             return payload.exp ? payload.exp * 1000 : null;
         } catch { return null; }
     }
@@ -1493,7 +1509,9 @@ class PlotraDashboard {
 
     _checkSession() {
         const expiry = this._getTokenExpiry();
-        if (!expiry) { this._doAutoLogout('session_expired'); return; }
+        // If expiry can't be read, skip this tick rather than logging out.
+        // _scheduleTokenExpiry() already sets a hard timer when the token CAN be decoded.
+        if (!expiry) return;
         if (Date.now() >= expiry) { this._doAutoLogout('session_expired'); return; }
 
         // Inactivity: read timeout from config (default 60 min)
