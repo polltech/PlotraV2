@@ -91,6 +91,8 @@ async def init_db():
             "ALTER TABLE batches ADD COLUMN IF NOT EXISTS notes TEXT",
             "ALTER TABLE batches ADD COLUMN IF NOT EXISTS released_at TIMESTAMP",
             "ALTER TABLE batches ADD COLUMN IF NOT EXISTS created_by_id VARCHAR(36)",
+            # ProcessingLog URS additions
+            "ALTER TABLE processing_logs ADD COLUMN IF NOT EXISTS log_number VARCHAR(40) UNIQUE",
         ]:
             await conn.execute(__import__('sqlalchemy').text(sql))
 
