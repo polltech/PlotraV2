@@ -431,6 +431,23 @@ Attempted URL: ${url}`;
         });
     }
 
+    // Admin batch management
+    async getAdminBatches(filters = {}) {
+        const params = new URLSearchParams(filters);
+        return this.request(`/admin/batches?${params}`, { optional: true, default: { batches: [], total: 0 } });
+    }
+
+    async getAdminBatch(id) {
+        return this.request(`/admin/batches/${id}`);
+    }
+
+    async adminAdvanceBatchStatus(id, status, notes) {
+        return this.request(`/admin/batches/${id}/status`, {
+            method: 'PATCH',
+            body: JSON.stringify({ status, notes: notes || undefined })
+        });
+    }
+
     // Consignments
     async getConsignments() {
         return this.request('/coop/consignments', { optional: true, default: [] });

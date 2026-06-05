@@ -348,6 +348,7 @@ class PlotraDashboard {
             { id: 'cooperatives', icon: 'bi-building', label: 'Cooperatives' },
             { id: 'farmers', icon: 'bi-people', label: 'Farmers' },
             { id: 'farms', icon: 'bi-geo-alt', label: 'Farms' },
+            { id: 'batches', icon: 'bi-boxes', label: 'Batch Management' },
             { id: 'wallet', icon: 'bi-wallet2', label: 'Wallet & Payments' },
             { id: 'users', icon: 'bi-people', label: 'Users' },
             { id: 'verification', icon: 'bi-check-circle', label: 'Verification EUDR' },
@@ -3361,71 +3362,256 @@ class PlotraDashboard {
     }
     async loadBatches(content) {
         const role = (this.currentUser?.role || '').toUpperCase();
-        const isCoop = ['COOPERATIVE_OFFICER', 'FACTOR', 'COOP_ADMIN', 'COOP_OFFICER'].includes(role);
         const isAdmin = ['PLATFORM_ADMIN', 'SUPER_ADMIN', 'ADMIN', 'PLOTRA_ADMIN'].includes(role);
 
+        if (isAdmin) {
+            await this._loadAdminBatches(content);
+        } else {
+            await this._loadCoopBatches(content);
+        }
+    }
+
+    async _loadAdminBatches(content) {
+        const STATUS_LABELS = {
+            draft:                  { label: 'Draft',             cls: 'secondary' },
+            released:               { label: 'Released',          cls: 'warning text-dark' },
+            under_satellite_review: { label: 'Satellite Review',  cls: 'primary' },
+            verified:               { label: 'Verified',          cls: 'success' },
+            dds_submitted:          { label: 'DDS Submitted',     cls: 'purple' },
+        };
+        const NEXT_STATUS = {
+            released:               { to: 'under_satellite_review', label: 'Begin Review' },
+            under_satellite_review: { to: 'verified',               label: 'Mark Verified' },
+            verified:               { to: 'dds_submitted',          label: 'Submit DDS' },
+        };
+        const badge = (s) => {
+            const info = STATUS_LABELS[s] || { label: s, cls: 'secondary' };
+            return `<span class="badge bg-${info.cls}">${info.label}</span>`;
+        };
+        const fmtKg = (v) => v != null ? Number(v).toLocaleString(undefined, { maximumFractionDigits: 1 }) + ' kg' : '—';
+        const fmtDate = (iso) => iso ? new Date(iso).toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' }) : '—';
+
         content.innerHTML = `
-            <div class="row g-4 mb-4">
-                <div class="col-md-12">
-                    <div class="card">
-                        <div class="card-header d-flex justify-content-between align-items-center">
-                            <h4 class="card-title">Processing Batches</h4>
-                            ${(isCoop || isAdmin) ? `
-                                <button class="btn btn-primary btn-sm" onclick="app.showCreateBatchModal()">
-                                    <i class="bi bi-plus-lg me-1"></i> Create Batch
-                                </button>
-                            ` : ''}
+            <div class="row g-3 mb-4">
+                <div class="col-6 col-md-3"><div class="card p-3 border-start border-warning border-4">
+                    <div class="small text-muted">Released (Pending)</div><h3 id="bc-released">—</h3></div></div>
+                <div class="col-6 col-md-3"><div class="card p-3 border-start border-primary border-4">
+                    <div class="small text-muted">Under Review</div><h3 id="bc-reviewing">—</h3></div></div>
+                <div class="col-6 col-md-3"><div class="card p-3 border-start border-success border-4">
+                    <div class="small text-muted">Verified</div><h3 id="bc-verified">—</h3></div></div>
+                <div class="col-6 col-md-3"><div class="card p-3 border-start border-info border-4">
+                    <div class="small text-muted">DDS Submitted</div><h3 id="bc-submitted">—</h3></div></div>
+            </div>
+            <div class="card">
+                <div class="card-header d-flex flex-wrap align-items-center gap-2">
+                    <span class="fw-semibold me-auto"><i class="bi bi-boxes me-1"></i> Batch Review Queue</span>
+                    <select class="form-select form-select-sm" style="width:auto" id="batch-status-filter">
+                        <option value="">All Statuses</option>
+                        <option value="released">Released</option>
+                        <option value="under_satellite_review">Satellite Review</option>
+                        <option value="verified">Verified</option>
+                        <option value="dds_submitted">DDS Submitted</option>
+                        <option value="draft">Draft</option>
+                    </select>
+                    <button class="btn btn-sm btn-outline-secondary" id="batch-refresh-btn"><i class="bi bi-arrow-clockwise"></i></button>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Batch Ref</th><th>Cooperative</th><th>Harvest Period</th>
+                                <th class="text-end">Total kg</th><th class="text-end">EUDR kg</th>
+                                <th class="text-end">Farmers</th><th>Status</th><th>Released</th><th></th>
+                            </tr>
+                        </thead>
+                        <tbody id="admin-batches-list">
+                            <tr><td colspan="9" class="text-center py-4">Loading…</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <!-- Batch Detail Modal -->
+            <div class="modal fade" id="adminBatchModal" tabindex="-1">
+                <div class="modal-dialog modal-xl modal-dialog-scrollable">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title" id="adminBatchModalTitle">Batch Detail</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                         </div>
-                        <div class="card-body p-0">
-                            <div class="table-responsive">
-                                <table class="table table-hover mb-0">
-                                    <thead>
-                                        <tr>
-                                            <th>Batch #</th>
-                                            <th>Year</th>
-                                            <th>Weight</th>
-                                            <th>Grade</th>
-                                            <th>Compliance</th>
-                                            <th>Date</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="batches-list">
-                                        <tr><td colspan="6" class="text-center py-4">Loading batches...</td></tr>
-                                    </tbody>
-                                </table>
-                            </div>
+                        <div class="modal-body row g-3" id="adminBatchModalBody">
+                            <div class="text-center py-4"><div class="spinner-border text-primary"></div></div>
                         </div>
+                        <div class="modal-footer" id="adminBatchModalFooter"></div>
                     </div>
                 </div>
             </div>
         `;
 
+        const fetchAndRender = async () => {
+            const statusFilter = document.getElementById('batch-status-filter')?.value || '';
+            const list = document.getElementById('admin-batches-list');
+            if (!list) return;
+            list.innerHTML = '<tr><td colspan="9" class="text-center py-4">Loading…</td></tr>';
+            try {
+                const params = statusFilter ? { status_filter: statusFilter } : {};
+                const data = await api.getAdminBatches(params);
+                const batches = data.batches || data || [];
+                if (!batches.length) {
+                    list.innerHTML = '<tr><td colspan="9" class="text-center text-muted py-4">No batches found.</td></tr>';
+                    return;
+                }
+                list.innerHTML = batches.map(b => {
+                    const hp = b.harvest_start_date ? fmtDate(b.harvest_start_date) + (b.harvest_end_date ? ' – ' + fmtDate(b.harvest_end_date) : '') : '—';
+                    return `<tr style="cursor:pointer" onclick="app._openAdminBatch('${b.id}')">
+                        <td><strong>${b.batch_number}</strong></td>
+                        <td>${b.cooperative_name || '—'}</td>
+                        <td class="small text-muted">${hp}</td>
+                        <td class="text-end">${fmtKg(b.total_weight_kg)}</td>
+                        <td class="text-end">${fmtKg(b.eudr_eligible_kg)}</td>
+                        <td class="text-end">${b.total_farmers ?? '—'}</td>
+                        <td>${badge(b.status)}</td>
+                        <td class="small text-muted">${fmtDate(b.released_at)}</td>
+                        <td><button class="btn btn-sm btn-outline-primary" onclick="event.stopPropagation();app._openAdminBatch('${b.id}')">Review</button></td>
+                    </tr>`;
+                }).join('');
+            } catch (err) {
+                list.innerHTML = `<tr><td colspan="9" class="text-center text-danger py-4">Error: ${err.message}</td></tr>`;
+            }
+        };
+
+        // Stat counts
+        const loadStats = async () => {
+            const pairs = [
+                ['released', 'bc-released'],
+                ['under_satellite_review', 'bc-reviewing'],
+                ['verified', 'bc-verified'],
+                ['dds_submitted', 'bc-submitted'],
+            ];
+            await Promise.all(pairs.map(async ([s, id]) => {
+                try {
+                    const d = await api.getAdminBatches({ status_filter: s, page_size: 1 });
+                    const el = document.getElementById(id);
+                    if (el) el.textContent = d.total ?? (d.batches?.length ?? '?');
+                } catch { }
+            }));
+        };
+
+        document.getElementById('batch-status-filter')?.addEventListener('change', fetchAndRender);
+        document.getElementById('batch-refresh-btn')?.addEventListener('click', () => { fetchAndRender(); loadStats(); });
+
+        this._openAdminBatch = async (id) => {
+            const modal = new bootstrap.Modal(document.getElementById('adminBatchModal'));
+            document.getElementById('adminBatchModalTitle').textContent = 'Loading…';
+            document.getElementById('adminBatchModalBody').innerHTML = '<div class="text-center py-4"><div class="spinner-border text-primary"></div></div>';
+            document.getElementById('adminBatchModalFooter').innerHTML = '';
+            modal.show();
+            try {
+                const b = await api.getAdminBatch(id);
+                document.getElementById('adminBatchModalTitle').textContent = 'Batch ' + b.batch_number;
+                const hp = b.harvest_start_date ? fmtDate(b.harvest_start_date) + (b.harvest_end_date ? ' – ' + fmtDate(b.harvest_end_date) : '') : '—';
+                const deliveryRows = (b.deliveries || []).map((d, i) => `
+                    <tr>
+                        <td class="text-muted small">${i+1}</td>
+                        <td>${d.farm_name || '—'}</td>
+                        <td class="text-end">${fmtKg(d.net_weight_kg)}</td>
+                        <td>${d.eudr_eligible === false ? '<span class="badge bg-danger">No</span>' : '<span class="badge bg-success">Yes</span>'}</td>
+                        <td>${badge(d.status)}</td>
+                        <td class="small text-muted">${fmtDate(d.reception_date)}</td>
+                    </tr>`).join('') || '<tr><td colspan="6" class="text-muted text-center">No deliveries</td></tr>';
+
+                document.getElementById('adminBatchModalBody').innerHTML = `
+                    <div class="col-md-5">
+                        <div class="row g-2 small">
+                            <div class="col-6"><div class="text-muted">Cooperative</div><strong>${b.cooperative_name}</strong></div>
+                            <div class="col-6"><div class="text-muted">Status</div>${badge(b.status)}</div>
+                            <div class="col-6"><div class="text-muted">Harvest Period</div>${hp}</div>
+                            <div class="col-6"><div class="text-muted">Released</div>${fmtDate(b.released_at)}</div>
+                            <div class="col-4"><div class="text-muted">Total Weight</div><strong>${fmtKg(b.total_weight_kg)}</strong></div>
+                            <div class="col-4"><div class="text-muted">EUDR Eligible</div><strong>${fmtKg(b.eudr_eligible_kg)}</strong></div>
+                            <div class="col-4"><div class="text-muted">Farmers</div><strong>${b.total_farmers ?? '—'}</strong></div>
+                            ${b.notes ? `<div class="col-12"><div class="text-muted">Notes</div><pre class="small bg-light p-2 rounded">${b.notes}</pre></div>` : ''}
+                        </div>
+                    </div>
+                    <div class="col-md-7">
+                        <div class="fw-semibold small text-muted mb-2">Included Deliveries (${(b.deliveries||[]).length})</div>
+                        <div class="table-responsive">
+                            <table class="table table-sm">
+                                <thead class="table-light"><tr><th>#</th><th>Farm</th><th class="text-end">kg</th><th>EUDR</th><th>Status</th><th>Date</th></tr></thead>
+                                <tbody>${deliveryRows}</tbody>
+                            </table>
+                        </div>
+                    </div>`;
+
+                const footer = document.getElementById('adminBatchModalFooter');
+                const next = NEXT_STATUS[b.status];
+                if (next) {
+                    const advBtn = document.createElement('button');
+                    advBtn.className = 'btn btn-primary';
+                    advBtn.innerHTML = `<i class="bi bi-arrow-right-circle me-1"></i> ${next.label}`;
+                    advBtn.onclick = async () => {
+                        const notes = prompt('Add review notes (optional):');
+                        if (notes === null) return;
+                        advBtn.disabled = true;
+                        advBtn.textContent = 'Saving…';
+                        try {
+                            await api.adminAdvanceBatchStatus(id, next.to, notes || undefined);
+                            bootstrap.Modal.getInstance(document.getElementById('adminBatchModal')).hide();
+                            this.showToast('Batch status updated', 'success');
+                            fetchAndRender();
+                            loadStats();
+                        } catch (err) {
+                            this.showToast('Error: ' + err.message, 'error');
+                            advBtn.disabled = false;
+                            advBtn.textContent = next.label;
+                        }
+                    };
+                    footer.appendChild(advBtn);
+                }
+                const closeBtn = document.createElement('button');
+                closeBtn.className = 'btn btn-secondary';
+                closeBtn.setAttribute('data-bs-dismiss', 'modal');
+                closeBtn.textContent = 'Close';
+                footer.appendChild(closeBtn);
+            } catch (err) {
+                document.getElementById('adminBatchModalBody').innerHTML = `<div class="alert alert-danger">${err.message}</div>`;
+            }
+        };
+
+        fetchAndRender();
+        loadStats();
+    }
+
+    async _loadCoopBatches(content) {
+        content.innerHTML = `
+            <div class="card">
+                <div class="card-header"><h4 class="card-title mb-0">Processing Batches</h4></div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead><tr><th>Batch #</th><th>Year</th><th>Weight</th><th>Compliance</th><th>Date</th></tr></thead>
+                            <tbody id="batches-list"><tr><td colspan="5" class="text-center py-4">Loading…</td></tr></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>`;
         try {
             const batches = await api.getBatches();
             const list = document.getElementById('batches-list');
-            
             if (batches && batches.length > 0) {
                 list.innerHTML = batches.map(b => `
                     <tr>
-                        <td><span class="fw-bold">${b.batch_number}</span></td>
-                        <td>${b.crop_year}</td>
-                        <td class="fw-bold">${b.total_weight_kg || 0} kg</td>
-                        <td><span class="badge bg-soft-primary text-primary">${b.quality_grade || 'N/A'}</span></td>
-                        <td><span class="badge ${b.compliance_status === 'Compliant' ? 'bg-soft-success text-success' : 'bg-soft-warning text-warning'}">${b.compliance_status}</span></td>
+                        <td><strong>${b.batch_number}</strong></td>
+                        <td>${b.crop_year || '—'}</td>
+                        <td>${b.total_weight_kg || 0} kg</td>
+                        <td><span class="badge ${b.compliance_status === 'Compliant' ? 'bg-success' : 'bg-warning text-dark'}">${b.compliance_status || '—'}</span></td>
                         <td>${new Date(b.created_at).toLocaleDateString()}</td>
-                    </tr>
-                `).join('');
+                    </tr>`).join('');
             } else {
-                list.innerHTML = '<tr><td colspan="6" class="text-center py-4">No batches found.</td></tr>';
+                list.innerHTML = '<tr><td colspan="5" class="text-center py-4">No batches found.</td></tr>';
             }
-        } catch (error) {
-            console.error(error);
-            list.innerHTML = `<tr><td colspan="6" class="text-center py-4 text-danger">Error: ${error.message}</td></tr>`;
+        } catch (err) {
+            document.getElementById('batches-list').innerHTML = `<tr><td colspan="5" class="text-center text-danger py-4">Error: ${err.message}</td></tr>`;
         }
-    }
-
-    showCreateBatchModal() {
-        this.showToast('Batch creation modal would open here', 'info');
     }
     async loadVerification(content) {
         const role = (this.currentUser?.role || '').toUpperCase();
