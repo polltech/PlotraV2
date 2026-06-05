@@ -533,6 +533,9 @@ class DeliveryStatusEnum(str, Enum):
     RECEIVED = "received"
     WEIGHED = "weighed"
     QUALITY_CHECKED = "quality_checked"
+    IN_PROCESSING = "in_processing"
+    READY_FOR_BATCHING = "ready_for_batching"
+    BATCHED = "batched"
     PROCESSED = "processed"
     REJECTED = "rejected"
 
