@@ -287,6 +287,7 @@ class ProcessingLog(BaseModel):
     """Immutable log of a processing step applied to one delivery — URS UC-04."""
     __tablename__ = "processing_logs"
 
+    log_number = Column(String(40), nullable=True, unique=True, index=True)
     delivery_id = Column(String(36), ForeignKey("deliveries.id"), nullable=False, index=True)
     step_type = Column(Enum(ProcessingStepType), nullable=False)
     step_date = Column(DateTime, nullable=False)

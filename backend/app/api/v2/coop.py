@@ -1675,6 +1675,7 @@ async def get_delivery_detail(
         "processing_log": [
             {
                 "id": lg.id,
+                "log_number": lg.log_number,
                 "step_type": lg.step_type.value,
                 "step_date": lg.step_date.isoformat() if lg.step_date else None,
                 "weight_out_kg": lg.weight_out_kg,
@@ -1738,8 +1739,15 @@ async def add_processing_step(
     from datetime import datetime as _dt
     step_date_raw = body.get("step_date")
     step_date = _dt.fromisoformat(step_date_raw) if step_date_raw else _dt.utcnow()
+    now = _dt.utcnow()
+
+    # Sequential log number scoped to all processing logs
+    pl_count_res = await db.execute(select(func.count(ProcessingLog.id)))
+    pl_seq = (pl_count_res.scalar() or 0) + 1
+    log_number = f"PDELPL/{pl_seq:03d}/{now.year}/{now.strftime('%H%M')}"
 
     log = ProcessingLog(
+        log_number=log_number,
         delivery_id=delivery_id,
         step_type=step_type,
         step_date=step_date,
@@ -1765,6 +1773,7 @@ async def add_processing_step(
     await db.refresh(log)
     return {
         "id": log.id,
+        "log_number": log.log_number,
         "delivery_id": delivery_id,
         "step_type": log.step_type.value,
         "step_date": log.step_date.isoformat(),
@@ -1790,7 +1799,8 @@ async def get_processing_log(
     logs = res.scalars().all()
     return [
         {
-            "id": lg.id, "step_type": lg.step_type.value,
+            "id": lg.id, "log_number": lg.log_number,
+            "step_type": lg.step_type.value,
             "step_date": lg.step_date.isoformat() if lg.step_date else None,
             "weight_out_kg": lg.weight_out_kg, "grade": lg.grade,
             "notes": lg.notes, "logged_by_id": lg.logged_by_id,
