@@ -539,13 +539,11 @@ class DeliveryStatusEnum(str, Enum):
 
 class DeliveryCreate(BaseModel):
     """Schema for recording coffee delivery"""
-    farm_id: int
+    farm_id: str
     gross_weight_kg: float
     tare_weight_kg: float = 0.0
     quality_grade: Optional[QualityGradeEnum] = None
-    moisture_content: Optional[float] = None
-    cherry_type: Optional[str] = None
-    picking_date: Optional[datetime] = None
+    notes: Optional[str] = None
 
 
 class DeliveryResponse(BaseModel):
