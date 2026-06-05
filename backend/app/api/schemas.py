@@ -291,6 +291,8 @@ class UserResponse(BaseModel):
     update_request_notes: Optional[str] = None
     update_requested_by_name: Optional[str] = None
     update_requested_at: Optional[datetime] = None
+    # Cooperative member number
+    coop_member_no: Optional[str] = None
 
     class Config:
         from_attributes = True

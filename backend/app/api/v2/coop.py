@@ -738,6 +738,7 @@ async def get_coop_all_farmers(
             )
         )
         farm_count = farm_count_res.scalar() or 0
+        member_no = await _get_or_generate_member_no(f.id, coop_id, db)
         output.append({
             "id": f.id,
             "first_name": f.first_name,
@@ -753,6 +754,7 @@ async def get_coop_all_farmers(
             "update_request_notes": getattr(f, 'update_request_notes', None),
             "update_requested_by_name": getattr(f, 'update_requested_by_name', None),
             "farm_count": farm_count,
+            "coop_member_no": member_no,
             "created_at": f.created_at.isoformat() if f.created_at else None,
         })
     return output
@@ -834,6 +836,10 @@ async def coop_approve_farmer(
     farmer.coop_verified_at = datetime.utcnow()
     farmer.coop_notes = body.get('reason', '') if isinstance(body, dict) else ''
     farmer.update_requested = False
+    # Generate cooperative member number if not already assigned
+    coop_id = await _get_coop_id_for_officer(current_user, db)
+    if coop_id:
+        await _get_or_generate_member_no(farmer_id, coop_id, db)
     notif = Notification(
         id=str(__import__('uuid').uuid4()),
         recipient_id=farmer.id,
@@ -1046,6 +1052,33 @@ async def _get_farmer_ids_for_coop(coop_id: str, db: AsyncSession):
         )
     )
     return result.scalars().all()
+
+
+async def _get_or_generate_member_no(user_id: str, coop_id: str, db: AsyncSession) -> str | None:
+    """Return or lazily generate a PCFNO member number for a farmer in a cooperative."""
+    from datetime import datetime as _dt
+    res = await db.execute(
+        select(CooperativeMember).where(
+            CooperativeMember.user_id == user_id,
+            CooperativeMember.cooperative_id == coop_id,
+            CooperativeMember.is_active == True,
+        )
+    )
+    member = res.scalar_one_or_none()
+    if not member:
+        return None
+    if not member.membership_number:
+        count_res = await db.execute(
+            select(func.count(CooperativeMember.id)).where(
+                CooperativeMember.cooperative_id == coop_id,
+                CooperativeMember.membership_number != None,
+            )
+        )
+        seq = (count_res.scalar() or 0) + 1
+        year = member.join_date.year if member.join_date else _dt.utcnow().year
+        member.membership_number = f"PCFNO/{seq:03d}/{year}"
+        await db.commit()
+    return member.membership_number
 
 
 @router.get("/farms")

@@ -1475,6 +1475,50 @@ async def verify_cooperative(
 
 # ============== Farmer Verification Management ==============
 
+@router.get("/farmers")
+async def get_all_farmers_admin(
+    page: int = 1,
+    page_size: int = 50,
+    current_user: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db)
+):
+    """Get all farmers with their cooperative member number."""
+    from app.models.user import CooperativeMember
+    query = select(User).where(User.role == UserRole.FARMER).order_by(User.created_at.desc())
+    total_result = await db.execute(select(func.count()).select_from(query.subquery()))
+    total = total_result.scalar() or 0
+    farmers = (await db.execute(query.offset((page - 1) * page_size).limit(page_size))).scalars().all()
+    output = []
+    for f in farmers:
+        mem_res = await db.execute(
+            select(CooperativeMember.membership_number).where(
+                CooperativeMember.user_id == f.id,
+                CooperativeMember.is_active == True,
+            ).order_by(CooperativeMember.created_at).limit(1)
+        )
+        coop_member_no = mem_res.scalar_one_or_none()
+        cooperative_name = None
+        if f.cooperative_id:
+            from app.models.user import Cooperative
+            coop_res = await db.execute(select(Cooperative.name).where(Cooperative.id == f.cooperative_id))
+            cooperative_name = coop_res.scalar_one_or_none()
+        output.append({
+            "id": f.id,
+            "first_name": f.first_name,
+            "last_name": f.last_name,
+            "email": f.email,
+            "phone": f.phone,
+            "national_id": getattr(f, 'national_id', None),
+            "county": f.county,
+            "verification_status": f.verification_status.value if hasattr(f.verification_status, 'value') else str(f.verification_status),
+            "coop_status": f.coop_status,
+            "cooperative_name": cooperative_name,
+            "coop_member_no": coop_member_no,
+            "created_at": f.created_at.isoformat() if f.created_at else None,
+        })
+    return {"farmers": output, "total": total}
+
+
 @router.get("/farmers/pending", response_model=List[UserResponse])
 async def get_pending_farmers(
     page: int = 1,

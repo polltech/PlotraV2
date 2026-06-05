@@ -424,7 +424,7 @@ async def register_user(
                 farmer_seq = (member_count_result.scalar() or 0) + 1
 
                 year = _dt.utcnow().year
-                membership_number = f"PCF:{coop_seq:03d}/{year}/{farmer_seq:03d}"
+                membership_number = f"PCFNO/{farmer_seq:03d}/{year}"
 
                 # Create cooperative membership
                 membership = CooperativeMember(
@@ -467,6 +467,15 @@ async def get_current_user_info(
             select(Cooperative.name).where(Cooperative.id == current_user.cooperative_id)
         )
         resp.cooperative_name = result.scalar_one_or_none()
+    # Include cooperative member number
+    from app.models.user import CooperativeMember as _CM
+    mem_res = await db.execute(
+        select(_CM.membership_number).where(
+            _CM.user_id == current_user.id,
+            _CM.is_active == True,
+        ).order_by(_CM.created_at).limit(1)
+    )
+    resp.coop_member_no = mem_res.scalar_one_or_none()
     return resp
 
 
@@ -507,7 +516,7 @@ async def get_my_membership(
         )
         farmer_seq = (member_count_result.scalar() or 0)
         year = _dt.utcnow().year
-        membership.membership_number = f"PCF:{coop_seq:03d}/{year}/{farmer_seq:03d}"
+        membership.membership_number = f"PCFNO/{farmer_seq:03d}/{year}"
         await db.commit()
 
     return {
